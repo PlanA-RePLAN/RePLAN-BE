@@ -37,5 +37,5 @@ out/
 .vscode/
 
 # application.yml
-application-local.yml
-application-prod.yml
+application-local.yaml
+application-prod.yaml
