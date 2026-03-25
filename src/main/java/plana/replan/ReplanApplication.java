@@ -6,8 +6,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 @SpringBootApplication
 public class ReplanApplication {
 
-    public static void main(String[] args) {
-        SpringApplication.run(ReplanApplication.class, args);
-    }
-
+  public static void main(String[] args) {
+    SpringApplication.run(ReplanApplication.class, args);
+  }
 }
