@@ -1,6 +1,5 @@
 package plana.replan.global.exception;
 
-import java.time.LocalDateTime;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -20,15 +19,16 @@ public class GlobalExceptionHandler {
 
   @ExceptionHandler(MethodArgumentNotValidException.class)
   public ResponseEntity<ErrorResponse> handleValidException(MethodArgumentNotValidException e) {
-    String message = e.getBindingResult().getFieldErrors().get(0).getDefaultMessage();
+
+    String detail =
+        e.getBindingResult().getFieldErrors().stream()
+            .findFirst()
+            .map(error -> error.getField() + ": " + error.getDefaultMessage())
+            .orElse(e.getMessage());
+    log.error("ValidationException: {}", detail);
+
     return ResponseEntity.badRequest()
-        .body(
-            ErrorResponse.builder()
-                .status(400)
-                .code("INVALID_INPUT")
-                .message(message)
-                .timestamp(LocalDateTime.now())
-                .build());
+        .body(ErrorResponse.of(GlobalErrorCode.INVALID_INPUT, detail));
   }
 
   @ExceptionHandler(Exception.class)
