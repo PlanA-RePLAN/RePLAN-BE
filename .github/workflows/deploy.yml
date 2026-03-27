@@ -2,7 +2,12 @@ name: Deploy to EC2
 
 on:
   push:
-    branches: [ main ] # main 브랜치에 push될 때만 실행 (develop → main 머지 시 트리거)
+    branches: [ main ]
+
+# 동시 배포 방지: 이전 배포가 진행 중이면 취소하고 최신 것만 실행
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   deploy:
@@ -51,15 +56,21 @@ jobs:
             # ECR 로그인
             aws ecr get-login-password --region ${{ secrets.AWS_REGION }} | \
               docker login --username AWS --password-stdin ${{ secrets.ECR_REGISTRY }}
-            # 새 이미지 pull 후 컨테이너 재시작
+            # compose 파일이 있는 디렉토리로 이동 후 실행
+            cd /home/ubuntu/app || exit 1
             docker compose pull
             docker compose up -d
             # 사용하지 않는 이미지 정리
             docker image prune -f
 
       # 6. 배포 후 앱이 정상 동작하는지 확인
-      # /health 엔드포인트에 200 응답이 오면 성공, 아니면 워크플로우 실패 처리
+      # 최대 100초(10회 x 10초) 동안 재시도 → cold start / DB migration 여유 시간 확보
       - name: Health check
         run: |
-          sleep 30
-          curl -f http://${{ secrets.EC2_HOST }}/actuator/health || exit 1
+          for i in $(seq 1 10); do
+            echo "Health check attempt $i/10..."
+            curl -sf http://${{ secrets.EC2_HOST }}/actuator/health && exit 0
+            sleep 10
+          done
+          echo "Health check failed after 10 attempts"
+          exit 1
