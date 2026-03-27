@@ -1,0 +1,76 @@
+name: Deploy to EC2
+
+on:
+  push:
+    branches: [ main ]
+
+# 동시 배포 방지: 이전 배포가 진행 중이면 취소하고 최신 것만 실행
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write  # OIDC 토큰 발급을 위해 필요
+      contents: read   # 코드 체크아웃을 위해 필요
+
+    steps:
+      # 1. 코드 체크아웃
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # 2. OIDC로 AWS 임시 자격증명 발급 (long-lived key 불필요)
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      # 3. ECR 로그인
+      - name: Login to ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      # 4. Docker 이미지 빌드 후 ECR push
+      # 커밋 해시를 태그로 사용해서 어느 커밋에서 만들어진 이미지인지 추적 가능
+      - name: Build and push image
+        env:
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          docker build -t ${{ secrets.ECR_REGISTRY }}/${{ secrets.ECR_REPOSITORY }}:$IMAGE_TAG .
+          docker push ${{ secrets.ECR_REGISTRY }}/${{ secrets.ECR_REPOSITORY }}:$IMAGE_TAG
+          docker tag ${{ secrets.ECR_REGISTRY }}/${{ secrets.ECR_REPOSITORY }}:$IMAGE_TAG \
+                     ${{ secrets.ECR_REGISTRY }}/${{ secrets.ECR_REPOSITORY }}:latest
+          docker push ${{ secrets.ECR_REGISTRY }}/${{ secrets.ECR_REPOSITORY }}:latest
+
+      # 5. EC2에 SSH 접속해서 새 이미지 pull 후 컨테이너 재시작
+      - name: Deploy to EC2
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ubuntu
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            # ECR 로그인
+            aws ecr get-login-password --region ${{ secrets.AWS_REGION }} | \
+              docker login --username AWS --password-stdin ${{ secrets.ECR_REGISTRY }}
+            # compose 파일이 있는 디렉토리로 이동 후 실행
+            cd /home/ubuntu/app || exit 1
+            docker compose pull
+            docker compose up -d
+            # 사용하지 않는 이미지 정리
+            docker image prune -f
+
+      # 6. 배포 후 앱이 정상 동작하는지 확인
+      # 최대 100초(10회 x 10초) 동안 재시도 → cold start / DB migration 여유 시간 확보
+      - name: Health check
+        run: |
+          for i in $(seq 1 10); do
+            echo "Health check attempt $i/10..."
+            curl -sf http://${{ secrets.EC2_HOST }}/actuator/health && exit 0
+            sleep 10
+          done
+          echo "Health check failed after 10 attempts"
+          exit 1
