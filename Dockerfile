@@ -23,12 +23,16 @@ WORKDIR /app
 # 빌드 단계에서 생성된 jar 파일만 복사
 COPY --from=build /app/build/libs/*.jar app.jar
 
+# 비root 사용자 생성 및 전환
+RUN addgroup -S appgroup && adduser -S appuser -G appgroup
+USER appuser
+
 # 8080 포트 오픈
 EXPOSE 8080
 
 # Health check 설정
 # 30초마다 /health 엔드포인트 확인
 HEALTHCHECK --interval=30s --timeout=3s \
-  CMD wget -q -O- http://localhost:8080/health || exit 1
+  CMD wget -q -O- http://localhost:8080/actuator/health || exit 1
 
 ENTRYPOINT ["java", "-jar", "app.jar"]
