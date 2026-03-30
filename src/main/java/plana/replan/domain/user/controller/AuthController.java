@@ -33,4 +33,11 @@ public class AuthController {
     String refreshToken = authHeader.substring(7); // "Bearer " 제거
     return ResponseEntity.ok(authService.reissue(refreshToken));
   }
+
+  @PostMapping("/logout")
+  public ResponseEntity<Void> logout(@RequestHeader("Authorization") String authHeader) {
+    String accessToken = authHeader.substring(7); // "Bearer " 제거
+    authService.logout(accessToken);
+    return ResponseEntity.ok().build();
+  }
 }

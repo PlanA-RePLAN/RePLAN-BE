@@ -121,4 +121,14 @@ public class AuthService {
 
     return new LoginResponseDto(newAccessToken, newRefreshToken);
   }
+
+  public void logout(String accessToken) {
+
+    // 1. Access Token 검증 및 이메일 추출
+    jwtUtil.validateToken(accessToken);
+    String email = jwtUtil.getEmail(accessToken);
+
+    // 2. Redis에서 Refresh Token 삭제
+    redisTemplate.delete("refresh:" + email);
+  }
 }
