@@ -1,4 +1,4 @@
-package plana.replan.domain.user.entity;
+package plana.replan.domain.user.exception;
 
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
