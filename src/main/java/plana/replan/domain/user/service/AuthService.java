@@ -1,6 +1,8 @@
 package plana.replan.domain.user.service;
 
+import java.util.concurrent.TimeUnit;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -22,6 +24,7 @@ public class AuthService {
   private final UserRepository userRepository;
   private final PasswordEncoder passwordEncoder;
   private final JwtUtil jwtUtil;
+  private final StringRedisTemplate redisTemplate;
 
   @Transactional
   public void signUp(SignUpRequestDto request) {
@@ -64,6 +67,15 @@ public class AuthService {
     // 3. 토큰 발급
     String accessToken = jwtUtil.generateAccessToken(user.getEmail(), user.getRole().name());
     String refreshToken = jwtUtil.generateRefreshToken(user.getEmail());
+
+    // 4. Refresh Token Redis에 저장 (7일)
+    redisTemplate
+        .opsForValue()
+        .set(
+            "refresh:" + user.getEmail(),
+            refreshToken,
+            jwtUtil.getRefreshExpiration(),
+            TimeUnit.MILLISECONDS);
 
     return new LoginResponseDto(accessToken, refreshToken);
   }

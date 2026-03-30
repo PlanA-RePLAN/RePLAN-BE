@@ -65,6 +65,10 @@ public class JwtUtil {
     return true;
   }
 
+  public long getRefreshExpiration() {
+    return refreshExpiration;
+  }
+
   private Claims getClaims(String token) {
     try {
       return Jwts.parser().verifyWith(key).build().parseSignedClaims(token).getPayload();
