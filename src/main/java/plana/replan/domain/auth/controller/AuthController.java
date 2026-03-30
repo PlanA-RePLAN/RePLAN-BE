@@ -1,13 +1,13 @@
-package plana.replan.domain.user.controller;
+package plana.replan.domain.auth.controller;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import plana.replan.domain.user.dto.LoginRequestDto;
-import plana.replan.domain.user.dto.LoginResponseDto;
-import plana.replan.domain.user.dto.SignUpRequestDto;
-import plana.replan.domain.user.service.AuthService;
+import plana.replan.domain.auth.dto.LoginRequestDto;
+import plana.replan.domain.auth.dto.LoginResponseDto;
+import plana.replan.domain.auth.dto.SignUpRequestDto;
+import plana.replan.domain.auth.service.AuthService;
 
 @RestController
 @RequestMapping("/api/auth")

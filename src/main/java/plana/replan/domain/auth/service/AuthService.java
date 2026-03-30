@@ -1,4 +1,4 @@
-package plana.replan.domain.user.service;
+package plana.replan.domain.auth.service;
 
 import java.util.concurrent.TimeUnit;
 import lombok.RequiredArgsConstructor;
@@ -6,9 +6,9 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import plana.replan.domain.user.dto.LoginRequestDto;
-import plana.replan.domain.user.dto.LoginResponseDto;
-import plana.replan.domain.user.dto.SignUpRequestDto;
+import plana.replan.domain.auth.dto.LoginRequestDto;
+import plana.replan.domain.auth.dto.LoginResponseDto;
+import plana.replan.domain.auth.dto.SignUpRequestDto;
 import plana.replan.domain.user.entity.Provider;
 import plana.replan.domain.user.entity.Role;
 import plana.replan.domain.user.entity.User;
