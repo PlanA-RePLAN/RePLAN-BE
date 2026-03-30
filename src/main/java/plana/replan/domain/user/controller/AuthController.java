@@ -3,10 +3,7 @@ package plana.replan.domain.user.controller;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 import plana.replan.domain.user.dto.LoginRequestDto;
 import plana.replan.domain.user.dto.LoginResponseDto;
 import plana.replan.domain.user.dto.SignUpRequestDto;
@@ -28,5 +25,12 @@ public class AuthController {
   @PostMapping("/login")
   public ResponseEntity<LoginResponseDto> login(@Valid @RequestBody LoginRequestDto request) {
     return ResponseEntity.ok(authService.login(request));
+  }
+
+  @PostMapping("/reissue")
+  public ResponseEntity<LoginResponseDto> reissue(
+      @RequestHeader("Authorization") String authHeader) {
+    String refreshToken = authHeader.substring(7); // "Bearer " 제거
+    return ResponseEntity.ok(authService.reissue(refreshToken));
   }
 }

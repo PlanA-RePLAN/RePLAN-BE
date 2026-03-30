@@ -15,6 +15,7 @@ import plana.replan.domain.user.entity.User;
 import plana.replan.domain.user.exception.UserErrorCode;
 import plana.replan.domain.user.repository.UserRepository;
 import plana.replan.global.exception.CustomException;
+import plana.replan.global.jwt.JwtErrorCode;
 import plana.replan.global.jwt.JwtUtil;
 
 @Service
@@ -78,5 +79,46 @@ public class AuthService {
             TimeUnit.MILLISECONDS);
 
     return new LoginResponseDto(accessToken, refreshToken);
+  }
+
+  public LoginResponseDto reissue(String refreshToken) {
+
+    // 1. JWT 서명 검증 및 이메일 추출
+    jwtUtil.validateToken(refreshToken);
+    String email = jwtUtil.getEmail(refreshToken);
+
+    // 2. Redis에서 Refresh Token 조회
+    String savedRefreshToken = redisTemplate.opsForValue().get("refresh:" + email);
+
+    // 3. Redis에 없으면 (로그아웃 or 만료)
+    if (savedRefreshToken == null) {
+      throw new CustomException(JwtErrorCode.REFRESH_TOKEN_NOT_FOUND);
+    }
+
+    // 4. 클라이언트가 보낸 토큰이랑 Redis에 있는 토큰 비교
+    if (!savedRefreshToken.equals(refreshToken)) {
+      throw new CustomException(JwtErrorCode.INVALID_REFRESH_TOKEN);
+    }
+
+    // 5. 유저 조회 (role 가져오기 위해)
+    User user =
+        userRepository
+            .findByEmail(email)
+            .orElseThrow(() -> new CustomException(UserErrorCode.USER_NOT_FOUND));
+
+    // 6. 새 토큰 발급
+    String newAccessToken = jwtUtil.generateAccessToken(email, user.getRole().name());
+    String newRefreshToken = jwtUtil.generateRefreshToken(email);
+
+    // 7. Redis Refresh Token 덮어쓰기 (Rotation)
+    redisTemplate
+        .opsForValue()
+        .set(
+            "refresh:" + email,
+            newRefreshToken,
+            jwtUtil.getRefreshExpiration(),
+            TimeUnit.MILLISECONDS);
+
+    return new LoginResponseDto(newAccessToken, newRefreshToken);
   }
 }
