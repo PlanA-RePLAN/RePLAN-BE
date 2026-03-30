@@ -29,10 +29,11 @@ public class JwtUtil {
   }
 
   // Access Token 발급
-  public String generateAccessToken(String email, String role) {
+  public String generateAccessToken(String email, String role, Long userId) {
     return Jwts.builder()
         .subject(email)
         .claim("role", role)
+        .claim("userId", userId)
         .issuedAt(new Date())
         .expiration(new Date(System.currentTimeMillis() + accessExpiration))
         .signWith(key)
@@ -57,6 +58,10 @@ public class JwtUtil {
   // 토큰에서 역할 추출
   public String getRole(String token) {
     return getClaims(token).get("role", String.class);
+  }
+
+  public Long getUserId(String token) {
+    return getClaims(token).get("userId", Long.class);
   }
 
   // 토큰 유효성 검증

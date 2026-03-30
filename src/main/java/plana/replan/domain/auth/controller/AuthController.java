@@ -1,5 +1,6 @@
 package plana.replan.domain.auth.controller;
 
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -28,15 +29,16 @@ public class AuthController {
   }
 
   @PostMapping("/reissue")
-  public ResponseEntity<LoginResponseDto> reissue(
-      @RequestHeader("Authorization") String authHeader) {
-    String refreshToken = authHeader.substring(7); // "Bearer " 제거
+  public ResponseEntity<LoginResponseDto> reissue(HttpServletRequest request) {
+    String authHeader = request.getHeader("Authorization");
+    String refreshToken = authHeader.substring(7);
     return ResponseEntity.ok(authService.reissue(refreshToken));
   }
 
   @PostMapping("/logout")
-  public ResponseEntity<Void> logout(@RequestHeader("Authorization") String authHeader) {
-    String accessToken = authHeader.substring(7); // "Bearer " 제거
+  public ResponseEntity<Void> logout(HttpServletRequest request) {
+    String authHeader = request.getHeader("Authorization");
+    String accessToken = authHeader.substring(7);
     authService.logout(accessToken);
     return ResponseEntity.ok().build();
   }

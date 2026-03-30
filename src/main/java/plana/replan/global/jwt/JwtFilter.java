@@ -36,13 +36,13 @@ public class JwtFilter extends OncePerRequestFilter {
     try {
       jwtUtil.validateToken(token);
 
-      String email = jwtUtil.getEmail(token);
+      Long userId = jwtUtil.getUserId(token);
       String role = jwtUtil.getRole(token);
 
       // 4. SecurityContext에 인증 정보 저장
       UsernamePasswordAuthenticationToken authentication =
           new UsernamePasswordAuthenticationToken(
-              email, // principal (현재 유저)
+              userId, // principal (현재 유저)
               null, // credentials (비밀번호, JWT에선 필요없음)
               List.of(new SimpleGrantedAuthority(role)) // 권한
               );
@@ -50,8 +50,6 @@ public class JwtFilter extends OncePerRequestFilter {
       SecurityContextHolder.getContext().setAuthentication(authentication);
 
     } catch (CustomException e) {
-      // 5. 토큰이 유효하지 않으면 SecurityContext 비워두고 통과
-      // → SecurityConfig에서 인증 필요한 API면 401 반환
       SecurityContextHolder.clearContext();
     }
 

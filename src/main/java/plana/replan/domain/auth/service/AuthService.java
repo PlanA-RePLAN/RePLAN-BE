@@ -66,7 +66,8 @@ public class AuthService {
     }
 
     // 3. 토큰 발급
-    String accessToken = jwtUtil.generateAccessToken(user.getEmail(), user.getRole().name());
+    String accessToken =
+        jwtUtil.generateAccessToken(user.getEmail(), user.getRole().name(), user.getId());
     String refreshToken = jwtUtil.generateRefreshToken(user.getEmail());
 
     // 4. Refresh Token Redis에 저장 (7일)
@@ -107,7 +108,7 @@ public class AuthService {
             .orElseThrow(() -> new CustomException(UserErrorCode.USER_NOT_FOUND));
 
     // 6. 새 토큰 발급
-    String newAccessToken = jwtUtil.generateAccessToken(email, user.getRole().name());
+    String newAccessToken = jwtUtil.generateAccessToken(email, user.getRole().name(), user.getId());
     String newRefreshToken = jwtUtil.generateRefreshToken(email);
 
     // 7. Redis Refresh Token 덮어쓰기 (Rotation)
