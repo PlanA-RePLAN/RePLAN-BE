@@ -1,5 +1,8 @@
 package plana.replan.global.jwt;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -7,16 +10,23 @@ import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.MediaType;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.filter.OncePerRequestFilter;
 import plana.replan.global.exception.CustomException;
+import plana.replan.global.exception.ErrorCode;
+import plana.replan.global.exception.ErrorResponse;
 
 @RequiredArgsConstructor
 public class JwtFilter extends OncePerRequestFilter {
 
   private final JwtUtil jwtUtil;
+  private final ObjectMapper objectMapper =
+      new ObjectMapper()
+          .registerModule(new JavaTimeModule())
+          .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS); // ← 추가
 
   @Override
   protected boolean shouldNotFilter(HttpServletRequest request) {
@@ -57,6 +67,8 @@ public class JwtFilter extends OncePerRequestFilter {
 
     } catch (CustomException e) {
       SecurityContextHolder.clearContext();
+      sendErrorResponse(response, e.getErrorCode());
+      return;
     }
 
     filterChain.doFilter(request, response);
@@ -69,5 +81,17 @@ public class JwtFilter extends OncePerRequestFilter {
       return bearerToken.substring(7); // "Bearer " 이후 토큰만 추출
     }
     return null;
+  }
+
+  private void sendErrorResponse(HttpServletResponse response, ErrorCode errorCode)
+      throws IOException {
+    response.setStatus(errorCode.getStatus());
+    response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+    response.setCharacterEncoding("UTF-8");
+    ErrorResponse errorResponse = ErrorResponse.of(errorCode);
+    String json = objectMapper.writeValueAsString(errorResponse);
+    System.out.println("sendErrorResponse: " + json); // ← 추가
+    response.getWriter().write(json);
+    response.getWriter().flush(); // ← 추가
   }
 }
