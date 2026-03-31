@@ -90,8 +90,6 @@ public class JwtFilter extends OncePerRequestFilter {
     response.setCharacterEncoding("UTF-8");
     ErrorResponse errorResponse = ErrorResponse.of(errorCode);
     String json = objectMapper.writeValueAsString(errorResponse);
-    System.out.println("sendErrorResponse: " + json); // ← 추가
     response.getWriter().write(json);
-    response.getWriter().flush(); // ← 추가
   }
 }
