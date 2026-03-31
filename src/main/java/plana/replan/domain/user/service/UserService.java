@@ -17,10 +17,13 @@ public class UserService {
 
   @Transactional(readOnly = true)
   public UserResponseDto getMyInfo(Long userId) {
+    if (userId == null) {
+      throw new CustomException(UserErrorCode.USER_NOT_FOUND);
+    }
     User user =
-        userRepository
-            .findById(userId)
-            .orElseThrow(() -> new CustomException(UserErrorCode.USER_NOT_FOUND));
+            userRepository
+                    .findById(userId)
+                    .orElseThrow(() -> new CustomException(UserErrorCode.USER_NOT_FOUND));
     return UserResponseDto.from(user);
   }
 }

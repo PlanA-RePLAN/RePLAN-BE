@@ -67,11 +67,7 @@ public class AuthService {
 
     // 3. 토큰 발급
     String accessToken =
-<<<<<<< HEAD
             jwtUtil.generateAccessToken(user.getEmail(), user.getRole().name(), user.getId());
-=======
-        jwtUtil.generateAccessToken(user.getEmail(), user.getRole().name(), user.getId());
->>>>>>> 932582f (Feat: 유저 정보 조회 API 구현)
     String refreshToken = jwtUtil.generateRefreshToken(user.getEmail());
 
     // 4. Refresh Token Redis에 저장 (7일)
