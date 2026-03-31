@@ -58,11 +58,11 @@ public class AuthService {
     User user =
         userRepository
             .findByEmail(request.getEmail())
-            .orElseThrow(() -> new CustomException(UserErrorCode.USER_NOT_FOUND));
+            .orElseThrow(() -> new CustomException(UserErrorCode.LOGIN_FAILED));
 
     // 2. 비밀번호 검증
     if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
-      throw new CustomException(UserErrorCode.INVALID_PASSWORD);
+      throw new CustomException(UserErrorCode.LOGIN_FAILED);
     }
 
     // 3. 토큰 발급
