@@ -1,4 +1,4 @@
-package plana.replan.domain.user.dto;
+package plana.replan.domain.auth.dto;
 
 import lombok.AllArgsConstructor;
 import lombok.Getter;

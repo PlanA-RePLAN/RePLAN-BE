@@ -1,4 +1,4 @@
-package plana.replan.domain.user.service;
+package plana.replan.domain.auth.service;
 
 import java.util.List;
 import lombok.RequiredArgsConstructor;
