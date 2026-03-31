@@ -21,9 +21,9 @@ public class UserService {
       throw new CustomException(UserErrorCode.USER_NOT_FOUND);
     }
     User user =
-            userRepository
-                    .findById(userId)
-                    .orElseThrow(() -> new CustomException(UserErrorCode.USER_NOT_FOUND));
+        userRepository
+            .findById(userId)
+            .orElseThrow(() -> new CustomException(UserErrorCode.USER_NOT_FOUND));
     return UserResponseDto.from(user);
   }
 }

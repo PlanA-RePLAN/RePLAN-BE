@@ -40,13 +40,13 @@ public class AuthService {
 
     // 3. User 엔티티 생성 및 저장
     User user =
-            User.builder()
-                    .email(request.getEmail())
-                    .password(encodedPassword)
-                    .nickname(request.getNickname())
-                    .role(Role.ROLE_USER)
-                    .provider(Provider.LOCAL)
-                    .build();
+        User.builder()
+            .email(request.getEmail())
+            .password(encodedPassword)
+            .nickname(request.getNickname())
+            .role(Role.ROLE_USER)
+            .provider(Provider.LOCAL)
+            .build();
 
     userRepository.save(user);
   }
@@ -56,9 +56,9 @@ public class AuthService {
 
     // 1. 이메일로 유저 조회
     User user =
-            userRepository
-                    .findByEmail(request.getEmail())
-                    .orElseThrow(() -> new CustomException(UserErrorCode.LOGIN_FAILED));
+        userRepository
+            .findByEmail(request.getEmail())
+            .orElseThrow(() -> new CustomException(UserErrorCode.LOGIN_FAILED));
 
     // 2. 비밀번호 검증
     if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
@@ -67,17 +67,17 @@ public class AuthService {
 
     // 3. 토큰 발급
     String accessToken =
-            jwtUtil.generateAccessToken(user.getEmail(), user.getRole().name(), user.getId());
+        jwtUtil.generateAccessToken(user.getEmail(), user.getRole().name(), user.getId());
     String refreshToken = jwtUtil.generateRefreshToken(user.getEmail());
 
     // 4. Refresh Token Redis에 저장 (7일)
     redisTemplate
-            .opsForValue()
-            .set(
-                    "refresh:" + user.getEmail(),
-                    refreshToken,
-                    jwtUtil.getRefreshExpiration(),
-                    TimeUnit.MILLISECONDS);
+        .opsForValue()
+        .set(
+            "refresh:" + user.getEmail(),
+            refreshToken,
+            jwtUtil.getRefreshExpiration(),
+            TimeUnit.MILLISECONDS);
 
     return new LoginResponseDto(accessToken, refreshToken);
   }
@@ -103,9 +103,9 @@ public class AuthService {
 
     // 5. 유저 조회 (role 가져오기 위해)
     User user =
-            userRepository
-                    .findByEmail(email)
-                    .orElseThrow(() -> new CustomException(UserErrorCode.USER_NOT_FOUND));
+        userRepository
+            .findByEmail(email)
+            .orElseThrow(() -> new CustomException(UserErrorCode.USER_NOT_FOUND));
 
     // 6. 새 토큰 발급
     String newAccessToken = jwtUtil.generateAccessToken(email, user.getRole().name(), user.getId());
@@ -113,12 +113,12 @@ public class AuthService {
 
     // 7. Redis Refresh Token 덮어쓰기 (Rotation)
     redisTemplate
-            .opsForValue()
-            .set(
-                    "refresh:" + email,
-                    newRefreshToken,
-                    jwtUtil.getRefreshExpiration(),
-                    TimeUnit.MILLISECONDS);
+        .opsForValue()
+        .set(
+            "refresh:" + email,
+            newRefreshToken,
+            jwtUtil.getRefreshExpiration(),
+            TimeUnit.MILLISECONDS);
 
     return new LoginResponseDto(newAccessToken, newRefreshToken);
   }

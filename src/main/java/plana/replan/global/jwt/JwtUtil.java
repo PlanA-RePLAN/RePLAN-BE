@@ -20,9 +20,9 @@ public class JwtUtil {
   private final long refreshExpiration;
 
   public JwtUtil(
-          @Value("${jwt.secret}") String secret,
-          @Value("${jwt.access-expiration}") long accessExpiration,
-          @Value("${jwt.refresh-expiration}") long refreshExpiration) {
+      @Value("${jwt.secret}") String secret,
+      @Value("${jwt.access-expiration}") long accessExpiration,
+      @Value("${jwt.refresh-expiration}") long refreshExpiration) {
     this.key = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
     this.accessExpiration = accessExpiration;
     this.refreshExpiration = refreshExpiration;
@@ -31,23 +31,23 @@ public class JwtUtil {
   // Access Token 발급
   public String generateAccessToken(String email, String role, Long userId) {
     return Jwts.builder()
-            .subject(email)
-            .claim("role", role)
-            .claim("userId", userId)
-            .issuedAt(new Date())
-            .expiration(new Date(System.currentTimeMillis() + accessExpiration))
-            .signWith(key)
-            .compact();
+        .subject(email)
+        .claim("role", role)
+        .claim("userId", userId)
+        .issuedAt(new Date())
+        .expiration(new Date(System.currentTimeMillis() + accessExpiration))
+        .signWith(key)
+        .compact();
   }
 
   // Refresh Token 발급
   public String generateRefreshToken(String email) {
     return Jwts.builder()
-            .subject(email)
-            .issuedAt(new Date())
-            .expiration(new Date(System.currentTimeMillis() + refreshExpiration))
-            .signWith(key)
-            .compact();
+        .subject(email)
+        .issuedAt(new Date())
+        .expiration(new Date(System.currentTimeMillis() + refreshExpiration))
+        .signWith(key)
+        .compact();
   }
 
   // 토큰에서 이메일 추출

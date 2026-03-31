@@ -24,9 +24,9 @@ public class JwtFilter extends OncePerRequestFilter {
 
   private final JwtUtil jwtUtil;
   private final ObjectMapper objectMapper =
-          new ObjectMapper()
-                  .registerModule(new JavaTimeModule())
-                  .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS); // ← 추가
+      new ObjectMapper()
+          .registerModule(new JavaTimeModule())
+          .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS); // ← 추가
 
   @Override
   protected boolean shouldNotFilter(HttpServletRequest request) {
@@ -36,8 +36,8 @@ public class JwtFilter extends OncePerRequestFilter {
 
   @Override
   protected void doFilterInternal(
-          HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
-          throws ServletException, IOException {
+      HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
+      throws ServletException, IOException {
 
     // 1. 헤더에서 토큰 꺼내기
     String token = resolveToken(request);
@@ -57,10 +57,10 @@ public class JwtFilter extends OncePerRequestFilter {
 
       // 4. SecurityContext에 인증 정보 저장
       UsernamePasswordAuthenticationToken authentication =
-              new UsernamePasswordAuthenticationToken(
-                      userId, // principal (현재 유저)
-                      null, // credentials (비밀번호, JWT에선 필요없음)
-                      List.of(new SimpleGrantedAuthority(role)) // 권한
+          new UsernamePasswordAuthenticationToken(
+              userId, // principal (현재 유저)
+              null, // credentials (비밀번호, JWT에선 필요없음)
+              List.of(new SimpleGrantedAuthority(role)) // 권한
               );
 
       SecurityContextHolder.getContext().setAuthentication(authentication);
@@ -84,7 +84,7 @@ public class JwtFilter extends OncePerRequestFilter {
   }
 
   private void sendErrorResponse(HttpServletResponse response, ErrorCode errorCode)
-          throws IOException {
+      throws IOException {
     response.setStatus(errorCode.getStatus());
     response.setContentType(MediaType.APPLICATION_JSON_VALUE);
     response.setCharacterEncoding("UTF-8");
