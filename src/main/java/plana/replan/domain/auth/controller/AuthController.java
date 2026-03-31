@@ -264,6 +264,9 @@ public class AuthController {
       throw new CustomException(JwtErrorCode.EMPTY_TOKEN);
     }
     String refreshToken = authHeader.substring(7);
+    if (refreshToken.isBlank()) {
+      throw new CustomException(JwtErrorCode.EMPTY_TOKEN);
+    }
     return ResponseEntity.ok(authService.reissue(refreshToken));
   }
 
@@ -337,6 +340,9 @@ public class AuthController {
       throw new CustomException(JwtErrorCode.EMPTY_TOKEN);
     }
     String accessToken = authHeader.substring(7);
+    if (accessToken.isBlank()) {
+      throw new CustomException(JwtErrorCode.EMPTY_TOKEN);
+    }
     authService.logout(accessToken);
     return ResponseEntity.ok().build();
   }
