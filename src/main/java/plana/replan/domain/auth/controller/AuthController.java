@@ -9,6 +9,8 @@ import plana.replan.domain.auth.dto.LoginRequestDto;
 import plana.replan.domain.auth.dto.LoginResponseDto;
 import plana.replan.domain.auth.dto.SignUpRequestDto;
 import plana.replan.domain.auth.service.AuthService;
+import plana.replan.global.exception.CustomException;
+import plana.replan.global.jwt.JwtErrorCode;
 
 @RestController
 @RequestMapping("/api/auth")
@@ -31,6 +33,9 @@ public class AuthController {
   @PostMapping("/reissue")
   public ResponseEntity<LoginResponseDto> reissue(HttpServletRequest request) {
     String authHeader = request.getHeader("Authorization");
+    if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+      throw new CustomException(JwtErrorCode.EMPTY_TOKEN);
+    }
     String refreshToken = authHeader.substring(7);
     return ResponseEntity.ok(authService.reissue(refreshToken));
   }
@@ -38,6 +43,9 @@ public class AuthController {
   @PostMapping("/logout")
   public ResponseEntity<Void> logout(HttpServletRequest request) {
     String authHeader = request.getHeader("Authorization");
+    if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+      throw new CustomException(JwtErrorCode.EMPTY_TOKEN);
+    }
     String accessToken = authHeader.substring(7);
     authService.logout(accessToken);
     return ResponseEntity.ok().build();
