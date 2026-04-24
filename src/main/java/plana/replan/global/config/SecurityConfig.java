@@ -1,8 +1,11 @@
 package plana.replan.global.config;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.MediaType;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
@@ -11,6 +14,9 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import plana.replan.global.common.ApiResult;
+import plana.replan.global.exception.ErrorDetail;
+import plana.replan.global.jwt.JwtErrorCode;
 import plana.replan.global.jwt.JwtFilter;
 import plana.replan.global.jwt.JwtUtil;
 
@@ -20,6 +26,7 @@ import plana.replan.global.jwt.JwtUtil;
 public class SecurityConfig {
 
   private final JwtUtil jwtUtil;
+  private final ObjectMapper objectMapper = new ObjectMapper();
 
   @Bean
   public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
@@ -46,7 +53,20 @@ public class SecurityConfig {
                     .anyRequest()
                     .authenticated())
 
-        // 4. JwtFilter를 UsernamePasswordAuthenticationFilter 앞에 등록
+        // 4. 미인증 요청 → 401, 인가 실패 → 403
+        .exceptionHandling(
+            ex ->
+                ex.authenticationEntryPoint(
+                    (request, response, authException) -> {
+                      response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                      response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+                      response.setCharacterEncoding("UTF-8");
+                      ApiResult<?> body =
+                          ApiResult.error(401, ErrorDetail.of(JwtErrorCode.EMPTY_TOKEN));
+                      response.getWriter().write(objectMapper.writeValueAsString(body));
+                    }))
+
+        // 5. JwtFilter를 UsernamePasswordAuthenticationFilter 앞에 등록
         .addFilterBefore(new JwtFilter(jwtUtil), UsernamePasswordAuthenticationFilter.class);
 
     return http.build();
