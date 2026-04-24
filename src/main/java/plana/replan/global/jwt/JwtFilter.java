@@ -1,8 +1,6 @@
 package plana.replan.global.jwt;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.SerializationFeature;
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -15,18 +13,16 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.filter.OncePerRequestFilter;
+import plana.replan.global.common.ApiResult;
 import plana.replan.global.exception.CustomException;
 import plana.replan.global.exception.ErrorCode;
-import plana.replan.global.exception.ErrorResponse;
+import plana.replan.global.exception.ErrorDetail;
 
 @RequiredArgsConstructor
 public class JwtFilter extends OncePerRequestFilter {
 
   private final JwtUtil jwtUtil;
-  private final ObjectMapper objectMapper =
-      new ObjectMapper()
-          .registerModule(new JavaTimeModule())
-          .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS); // ← 추가
+  private final ObjectMapper objectMapper = new ObjectMapper();
 
   @Override
   protected boolean shouldNotFilter(HttpServletRequest request) {
@@ -85,11 +81,11 @@ public class JwtFilter extends OncePerRequestFilter {
 
   private void sendErrorResponse(HttpServletResponse response, ErrorCode errorCode)
       throws IOException {
-    response.setStatus(errorCode.getStatus());
+    int status = errorCode.getStatus();
+    response.setStatus(status);
     response.setContentType(MediaType.APPLICATION_JSON_VALUE);
     response.setCharacterEncoding("UTF-8");
-    ErrorResponse errorResponse = ErrorResponse.of(errorCode);
-    String json = objectMapper.writeValueAsString(errorResponse);
-    response.getWriter().write(json);
+    ApiResult<?> body = ApiResult.error(status, ErrorDetail.of(errorCode));
+    response.getWriter().write(objectMapper.writeValueAsString(body));
   }
 }

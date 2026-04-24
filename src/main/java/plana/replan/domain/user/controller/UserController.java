@@ -16,7 +16,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import plana.replan.domain.user.dto.UserResponseDto;
 import plana.replan.domain.user.service.UserService;
-import plana.replan.global.exception.ErrorResponse;
+import plana.replan.global.common.ApiResult;
 
 @Tag(name = "User", description = "유저 관련 API")
 @RestController
@@ -55,11 +55,15 @@ public class UserController {
                         value =
                             """
                                   {
-                                    "userId": 1,
-                                    "email": "user@example.com",
-                                    "nickname": "일규",
-                                    "role": "ROLE_USER",
-                                    "provider": "LOCAL"
+                                    "status": 200,
+                                    "success": true,
+                                    "data": {
+                                      "userId": 1,
+                                      "email": "user@example.com",
+                                      "nickname": "일규",
+                                      "role": "ROLE_USER",
+                                      "provider": "LOCAL"
+                                    }
                                   }
                                   """))),
     @ApiResponse(
@@ -67,7 +71,6 @@ public class UserController {
         description = "AccessToken 없음 또는 유효하지 않은 토큰",
         content =
             @Content(
-                schema = @Schema(implementation = ErrorResponse.class),
                 examples = {
                   @ExampleObject(
                       name = "토큰 없음",
@@ -75,10 +78,12 @@ public class UserController {
                           """
                                                 {
                                                   "status": 401,
-                                                  "code": "EMPTY_TOKEN",
-                                                  "message": "토큰이 없습니다.",
-                                                  "detail": null,
-                                                  "timestamp": "2026-03-31T12:00:00"
+                                                  "success": false,
+                                                  "error": {
+                                                    "code": "EMPTY_TOKEN",
+                                                    "message": "토큰이 없습니다.",
+                                                    "detail": null
+                                                  }
                                                 }
                                                 """),
                   @ExampleObject(
@@ -87,10 +92,12 @@ public class UserController {
                           """
                                                 {
                                                   "status": 401,
-                                                  "code": "EXPIRED_TOKEN",
-                                                  "message": "만료된 토큰입니다.",
-                                                  "detail": null,
-                                                  "timestamp": "2026-03-31T12:00:00"
+                                                  "success": false,
+                                                  "error": {
+                                                    "code": "EXPIRED_TOKEN",
+                                                    "message": "만료된 토큰입니다.",
+                                                    "detail": null
+                                                  }
                                                 }
                                                 """)
                 })),
@@ -99,22 +106,24 @@ public class UserController {
         description = "토큰은 유효하나 해당 유저가 DB에 없는 경우",
         content =
             @Content(
-                schema = @Schema(implementation = ErrorResponse.class),
                 examples =
                     @ExampleObject(
                         value =
                             """
                                   {
                                     "status": 404,
-                                    "code": "USER_NOT_FOUND",
-                                    "message": "유저를 찾을 수 없습니다.",
-                                    "detail": null,
-                                    "timestamp": "2026-03-31T12:00:00"
+                                    "success": false,
+                                    "error": {
+                                      "code": "USER_NOT_FOUND",
+                                      "message": "유저를 찾을 수 없습니다.",
+                                      "detail": null
+                                    }
                                   }
                                   """)))
   })
   @GetMapping("/me")
-  public ResponseEntity<UserResponseDto> getMyInfo(@AuthenticationPrincipal Long userId) {
-    return ResponseEntity.ok(userService.getMyInfo(userId));
+  public ResponseEntity<ApiResult<UserResponseDto>> getMyInfo(
+      @AuthenticationPrincipal Long userId) {
+    return ResponseEntity.ok(ApiResult.ok(userService.getMyInfo(userId)));
   }
 }

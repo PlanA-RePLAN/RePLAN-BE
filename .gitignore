@@ -38,3 +38,6 @@ out/
 
 # application.yml
 src/main/resources/application-local.yaml
+
+# 클로드
+.claude
