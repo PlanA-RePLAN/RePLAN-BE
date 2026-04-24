@@ -7,12 +7,13 @@ import plana.replan.global.exception.ErrorDetail;
 
 @Getter
 @JsonPropertyOrder({"status", "success", "data", "error"})
-@JsonInclude(JsonInclude.Include.NON_NULL)
 public class ApiResult<T> {
 
   private final int status;
   private final boolean success;
   private final T data;
+
+  @JsonInclude(JsonInclude.Include.NON_NULL)
   private final ErrorDetail error;
 
   private ApiResult(int status, T data) {
