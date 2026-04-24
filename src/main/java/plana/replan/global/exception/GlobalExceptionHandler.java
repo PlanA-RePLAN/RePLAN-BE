@@ -5,36 +5,36 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import plana.replan.global.common.ApiResult;
 
 @Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
   @ExceptionHandler(CustomException.class)
-  public ResponseEntity<ErrorResponse> handleCustomException(CustomException e) {
+  public ResponseEntity<ApiResult<?>> handleCustomException(CustomException e) {
     log.error("CustomException: {}", e.getMessage());
-    return ResponseEntity.status(e.getErrorCode().getStatus())
-        .body(ErrorResponse.of(e.getErrorCode(), e.getDetail()));
+    int status = e.getErrorCode().getStatus();
+    return ResponseEntity.status(status)
+        .body(ApiResult.error(status, ErrorDetail.of(e.getErrorCode(), e.getDetail())));
   }
 
   @ExceptionHandler(MethodArgumentNotValidException.class)
-  public ResponseEntity<ErrorResponse> handleValidException(MethodArgumentNotValidException e) {
-
+  public ResponseEntity<ApiResult<?>> handleValidException(MethodArgumentNotValidException e) {
     String detail =
         e.getBindingResult().getFieldErrors().stream()
             .findFirst()
             .map(error -> error.getField() + ": " + error.getDefaultMessage())
             .orElse(e.getMessage());
     log.error("ValidationException: {}", detail);
-
     return ResponseEntity.badRequest()
-        .body(ErrorResponse.of(GlobalErrorCode.INVALID_INPUT, detail));
+        .body(ApiResult.error(400, ErrorDetail.of(GlobalErrorCode.INVALID_INPUT, detail)));
   }
 
   @ExceptionHandler(Exception.class)
-  public ResponseEntity<ErrorResponse> handleException(Exception e) {
+  public ResponseEntity<ApiResult<?>> handleException(Exception e) {
     log.error("UnhandledException: ", e);
     return ResponseEntity.internalServerError()
-        .body(ErrorResponse.of(GlobalErrorCode.INTERNAL_SERVER_ERROR));
+        .body(ApiResult.error(500, ErrorDetail.of(GlobalErrorCode.INTERNAL_SERVER_ERROR)));
   }
 }
