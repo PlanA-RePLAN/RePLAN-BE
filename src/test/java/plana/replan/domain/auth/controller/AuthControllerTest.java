@@ -183,4 +183,15 @@ class AuthControllerTest {
         .andExpect(jsonPath("$.success").value(false))
         .andExpect(jsonPath("$.error.code").value("EMPTY_TOKEN"));
   }
+
+  @Test
+  @DisplayName("logout - Bearer 뒤 토큰이 빈 문자열: status=401, error.code=EMPTY_TOKEN")
+  void logout_blankToken() throws Exception {
+    mockMvc
+        .perform(post("/api/auth/logout").header("Authorization", "Bearer "))
+        .andExpect(status().isUnauthorized())
+        .andExpect(jsonPath("$.status").value(401))
+        .andExpect(jsonPath("$.success").value(false))
+        .andExpect(jsonPath("$.error.code").value("EMPTY_TOKEN"));
+  }
 }
