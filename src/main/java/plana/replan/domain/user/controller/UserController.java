@@ -42,7 +42,7 @@ public class UserController {
 
                     **참고**: userId가 null이거나 DB에 존재하지 않으면 404 반환
                     """,
-      security = @SecurityRequirement(name = "bearerAuth"))
+      security = @SecurityRequirement(name = "Bearer Authentication"))
   @ApiResponses({
     @ApiResponse(
         responseCode = "200",
