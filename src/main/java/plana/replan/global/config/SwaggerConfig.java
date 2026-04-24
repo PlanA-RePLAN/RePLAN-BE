@@ -23,6 +23,7 @@ public class SwaggerConfig {
                     new SecurityScheme()
                         .type(SecurityScheme.Type.HTTP)
                         .scheme("bearer")
-                        .bearerFormat("JWT")));
+                        .bearerFormat("JWT")
+                        .description("Bearer 없이 토큰만 입력하세요. (예: eyJhbGci...)")));
   }
 }
