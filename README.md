@@ -28,6 +28,34 @@
 
 ---
 
+## ⚙️ 로컬 개발 환경 설정
+
+### 1. 설정 파일 준비
+
+example 파일을 복사해서 실제 파일을 만들고 값을 채웁니다.
+
+```bash
+cp docker-compose.yml.example docker-compose.yml
+cp src/main/resources/application-local.yaml.example src/main/resources/application-local.yaml
+```
+
+> `docker-compose.yml`과 `application-local.yaml`은 gitignore에 등록되어 있습니다.  
+> 두 파일의 DB 정보를 동일하게 맞춰주세요.
+
+### 2. Docker 컨테이너 실행
+
+```bash
+docker compose up -d
+```
+
+PostgreSQL(5432)과 Redis(6379)가 함께 실행됩니다.
+
+### 3. 앱 실행
+
+IntelliJ에서 `local` 프로파일로 실행합니다.
+
+---
+
 ## 🛠️ 기술 스택
 
 | 분류 | 기술 |
@@ -61,7 +89,7 @@ feat/*   → 기능 개발
 
 
 
-## 📌 중간 발표 (04/12) 목표
+## 📌 중간 발표 (05/16) 목표
 
 - [ ] 로그인 / 인증
 - [ ] 온보딩
