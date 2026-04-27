@@ -7,6 +7,7 @@ import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.SQLRestriction;
 import plana.replan.domain.goal.entity.Goal;
 import plana.replan.domain.routine.entity.Routine;
 import plana.replan.domain.tag.entity.Tag;
@@ -17,6 +18,7 @@ import plana.replan.global.entity.BaseTimeEntity;
 @Table(name = "todo")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
+@SQLRestriction("deleted_at IS NULL")
 public class Todo extends BaseTimeEntity {
 
   @Id
@@ -64,7 +66,7 @@ public class Todo extends BaseTimeEntity {
   public Todo(
       String title,
       LocalDateTime dueDate,
-      double sortOrder,
+      Double sortOrder,
       Boolean isPinned,
       User user,
       Tag tag,
@@ -73,7 +75,7 @@ public class Todo extends BaseTimeEntity {
     this.title = Objects.requireNonNull(title, "제목은 필수입니다.");
     this.user = Objects.requireNonNull(user, "유저는 필수입니다.");
     this.dueDate = dueDate;
-    this.sortOrder = sortOrder;
+    this.sortOrder = sortOrder != null ? sortOrder : 10000.0;
     this.isPinned = isPinned;
     this.tag = tag;
     this.goal = goal;
