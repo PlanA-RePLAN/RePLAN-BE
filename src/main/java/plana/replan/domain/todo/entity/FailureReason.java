@@ -6,12 +6,13 @@ import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import plana.replan.global.entity.BaseTimeEntity;
 
 @Entity
 @Table(name = "failure_reason")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class FailureReason {
+public class FailureReason extends BaseTimeEntity {
 
   @Id
   @GeneratedValue(strategy = GenerationType.IDENTITY)
