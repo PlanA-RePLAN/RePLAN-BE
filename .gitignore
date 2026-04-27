@@ -38,6 +38,7 @@ out/
 
 # application.yml
 src/main/resources/application-local.yaml
+docker-compose.yml
 
 # 클로드
 .claude

@@ -6,12 +6,13 @@ import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import plana.replan.global.entity.BaseTimeEntity;
 
 @Entity
 @Table(name = "users")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class User {
+public class User extends BaseTimeEntity {
 
   @Id
   @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -30,15 +31,25 @@ public class User {
   private Role role;
 
   @Enumerated(EnumType.STRING)
-  @Column(nullable = false)
+  @Column(name = "login_type", nullable = false)
   private Provider provider;
 
+  @Column(name = "profile_image", columnDefinition = "TEXT")
+  private String profileImage;
+
   @Builder
-  public User(String email, String password, String nickname, Role role, Provider provider) {
+  public User(
+      String email,
+      String password,
+      String nickname,
+      Role role,
+      Provider provider,
+      String profileImage) {
     this.email = Objects.requireNonNull(email, "이메일은 필수입니다.");
     this.nickname = Objects.requireNonNull(nickname, "닉네임은 필수입니다.");
     this.role = Objects.requireNonNull(role, "역할은 필수입니다.");
     this.provider = Objects.requireNonNull(provider, "제공자는 필수입니다.");
-    this.password = password; // OAuth는 null 가능
+    this.password = password;
+    this.profileImage = profileImage;
   }
 }
