@@ -57,6 +57,9 @@ public class Todo extends BaseTimeEntity {
   @JoinColumn(name = "routine_id")
   private Routine routine;
 
+  @OneToOne(mappedBy = "todo", fetch = FetchType.LAZY)
+  private FailureReason failureReason;
+
   @Builder
   public Todo(
       String title,
