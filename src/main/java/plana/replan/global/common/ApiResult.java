@@ -11,6 +11,8 @@ public class ApiResult<T> {
 
   private final int status;
   private final boolean success;
+
+  @JsonInclude(JsonInclude.Include.NON_NULL)
   private final T data;
 
   @JsonInclude(JsonInclude.Include.NON_NULL)
