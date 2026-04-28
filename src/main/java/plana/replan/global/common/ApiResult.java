@@ -1,6 +1,5 @@
 package plana.replan.global.common;
 
-import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 import lombok.Getter;
 import plana.replan.global.exception.ErrorDetail;
