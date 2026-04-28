@@ -1,5 +1,6 @@
 package plana.replan.domain.auth.controller;
 
+import static org.hamcrest.Matchers.nullValue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.willDoNothing;
@@ -53,8 +54,8 @@ class AuthControllerTest {
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.status").value(200))
         .andExpect(jsonPath("$.success").value(true))
-        .andExpect(jsonPath("$.data").doesNotExist())
-        .andExpect(jsonPath("$.error").doesNotExist());
+        .andExpect(jsonPath("$.data").value(nullValue()))
+        .andExpect(jsonPath("$.error").value(nullValue()));
   }
 
   @Test
@@ -76,7 +77,7 @@ class AuthControllerTest {
         .andExpect(jsonPath("$.status").value(400))
         .andExpect(jsonPath("$.success").value(false))
         .andExpect(jsonPath("$.error.code").value("INVALID_INPUT"))
-        .andExpect(jsonPath("$.data").doesNotExist());
+        .andExpect(jsonPath("$.data").value(nullValue()));
   }
 
   @Test
@@ -100,7 +101,7 @@ class AuthControllerTest {
         .andExpect(jsonPath("$.status").value(409))
         .andExpect(jsonPath("$.success").value(false))
         .andExpect(jsonPath("$.error.code").value("DUPLICATE_EMAIL"))
-        .andExpect(jsonPath("$.data").doesNotExist());
+        .andExpect(jsonPath("$.data").value(nullValue()));
   }
 
   @Test
@@ -125,7 +126,7 @@ class AuthControllerTest {
         .andExpect(jsonPath("$.success").value(true))
         .andExpect(jsonPath("$.data.accessToken").value("access-token-value"))
         .andExpect(jsonPath("$.data.refreshToken").value("refresh-token-value"))
-        .andExpect(jsonPath("$.error").doesNotExist());
+        .andExpect(jsonPath("$.error").value(nullValue()));
   }
 
   @Test
@@ -148,7 +149,7 @@ class AuthControllerTest {
         .andExpect(jsonPath("$.status").value(401))
         .andExpect(jsonPath("$.success").value(false))
         .andExpect(jsonPath("$.error.code").value("LOGIN_FAILED"))
-        .andExpect(jsonPath("$.data").doesNotExist());
+        .andExpect(jsonPath("$.data").value(nullValue()));
   }
 
   @Test
