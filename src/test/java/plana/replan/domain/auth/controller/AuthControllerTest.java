@@ -313,4 +313,101 @@ class AuthControllerTest {
         .andExpect(jsonPath("$.error.code").value("OAUTH_PROVIDER_CONFLICT"))
         .andExpect(jsonPath("$.data").value(nullValue()));
   }
+
+  // ── Naver OAuth ──────────────────────────────────────────────────────────
+
+  @Test
+  @DisplayName("Naver 로그인 성공: status=200, success=true, data.accessToken 존재")
+  void naverLogin_success() throws Exception {
+    given(authService.naverLogin(any()))
+        .willReturn(new LoginResponseDto("access-token-value", "refresh-token-value"));
+
+    mockMvc
+        .perform(
+            post("/api/auth/oauth/naver")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """
+                    { "accessToken": "valid-naver-access-token" }
+                    """))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.status").value(200))
+        .andExpect(jsonPath("$.success").value(true))
+        .andExpect(jsonPath("$.data.accessToken").value("access-token-value"))
+        .andExpect(jsonPath("$.data.refreshToken").value("refresh-token-value"))
+        .andExpect(jsonPath("$.error").value(nullValue()));
+  }
+
+  @Test
+  @DisplayName("Naver 로그인 실패 - accessToken 빈 문자열: status=400, error.code=INVALID_INPUT")
+  void naverLogin_blankAccessToken() throws Exception {
+    mockMvc
+        .perform(
+            post("/api/auth/oauth/naver")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    { "accessToken": "" }
+                    """))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.status").value(400))
+        .andExpect(jsonPath("$.success").value(false))
+        .andExpect(jsonPath("$.error.code").value("INVALID_INPUT"))
+        .andExpect(jsonPath("$.data").value(nullValue()));
+  }
+
+  @Test
+  @DisplayName("Naver 로그인 실패 - accessToken 필드 누락: status=400, error.code=INVALID_INPUT")
+  void naverLogin_missingAccessToken() throws Exception {
+    mockMvc
+        .perform(
+            post("/api/auth/oauth/naver").contentType(MediaType.APPLICATION_JSON).content("{}"))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.status").value(400))
+        .andExpect(jsonPath("$.success").value(false))
+        .andExpect(jsonPath("$.error.code").value("INVALID_INPUT"))
+        .andExpect(jsonPath("$.data").value(nullValue()));
+  }
+
+  @Test
+  @DisplayName("Naver 로그인 실패 - 유효하지 않은 Access Token: status=401, error.code=NAVER_TOKEN_INVALID")
+  void naverLogin_invalidToken() throws Exception {
+    given(authService.naverLogin(any()))
+        .willThrow(new CustomException(UserErrorCode.NAVER_TOKEN_INVALID));
+
+    mockMvc
+        .perform(
+            post("/api/auth/oauth/naver")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """
+                    { "accessToken": "invalid-token" }
+                    """))
+        .andExpect(status().isUnauthorized())
+        .andExpect(jsonPath("$.status").value(401))
+        .andExpect(jsonPath("$.success").value(false))
+        .andExpect(jsonPath("$.error.code").value("NAVER_TOKEN_INVALID"))
+        .andExpect(jsonPath("$.data").value(nullValue()));
+  }
+
+  @Test
+  @DisplayName(
+      "Naver 로그인 실패 - 다른 Provider로 가입된 이메일: status=409, error.code=OAUTH_PROVIDER_CONFLICT")
+  void naverLogin_providerConflict() throws Exception {
+    given(authService.naverLogin(any()))
+        .willThrow(new CustomException(UserErrorCode.OAUTH_PROVIDER_CONFLICT));
+
+    mockMvc
+        .perform(
+            post("/api/auth/oauth/naver")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """
+                    { "accessToken": "valid-naver-access-token" }
+                    """))
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.status").value(409))
+        .andExpect(jsonPath("$.success").value(false))
+        .andExpect(jsonPath("$.error.code").value("OAUTH_PROVIDER_CONFLICT"))
+        .andExpect(jsonPath("$.data").value(nullValue()));
+  }
 }
