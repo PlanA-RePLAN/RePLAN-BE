@@ -476,6 +476,26 @@ public class AuthController {
                                 }
                                 """))),
     @ApiResponse(
+        responseCode = "400",
+        description = "요청 값 유효성 검사 실패 (credential 누락/공백)",
+        content =
+            @Content(
+                examples =
+                    @ExampleObject(
+                        value =
+                            """
+                               {
+                                  "status": 400,
+                                  "success": false,
+                                  "data": null,
+                                  "error": {
+                                    "code": "INVALID_INPUT",
+                                    "message": "잘못된 입력입니다.",
+                                    "detail": "credential: Google ID Token은 필수입니다."
+                                  }
+                                }
+                               """))),
+    @ApiResponse(
         responseCode = "401",
         description = "Google ID Token 검증 실패 (만료, 위조, 이메일 미인증)",
         content =
