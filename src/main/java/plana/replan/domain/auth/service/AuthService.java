@@ -1,11 +1,15 @@
 package plana.replan.domain.auth.service;
 
+import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
+import com.google.api.client.googleapis.auth.oauth2.GoogleIdTokenVerifier;
+import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import plana.replan.domain.auth.dto.GoogleLoginRequestDto;
 import plana.replan.domain.auth.dto.LoginRequestDto;
 import plana.replan.domain.auth.dto.LoginResponseDto;
 import plana.replan.domain.auth.dto.SignUpRequestDto;
@@ -26,6 +30,7 @@ public class AuthService {
   private final PasswordEncoder passwordEncoder;
   private final JwtUtil jwtUtil;
   private final StringRedisTemplate redisTemplate;
+  private final GoogleIdTokenVerifier googleIdTokenVerifier;
 
   @Transactional
   public void signUp(SignUpRequestDto request) {
@@ -65,21 +70,8 @@ public class AuthService {
       throw new CustomException(UserErrorCode.LOGIN_FAILED);
     }
 
-    // 3. 토큰 발급
-    String accessToken =
-        jwtUtil.generateAccessToken(user.getEmail(), user.getRole().name(), user.getId());
-    String refreshToken = jwtUtil.generateRefreshToken(user.getEmail());
-
-    // 4. Refresh Token Redis에 저장 (7일)
-    redisTemplate
-        .opsForValue()
-        .set(
-            "refresh:" + user.getEmail(),
-            refreshToken,
-            jwtUtil.getRefreshExpiration(),
-            TimeUnit.MILLISECONDS);
-
-    return new LoginResponseDto(accessToken, refreshToken);
+    // 3. JWT 발급
+    return issueTokenPair(user);
   }
 
   public LoginResponseDto reissue(String refreshToken) {
@@ -107,20 +99,8 @@ public class AuthService {
             .findByEmail(email)
             .orElseThrow(() -> new CustomException(UserErrorCode.USER_NOT_FOUND));
 
-    // 6. 새 토큰 발급
-    String newAccessToken = jwtUtil.generateAccessToken(email, user.getRole().name(), user.getId());
-    String newRefreshToken = jwtUtil.generateRefreshToken(email);
-
-    // 7. Redis Refresh Token 덮어쓰기 (Rotation)
-    redisTemplate
-        .opsForValue()
-        .set(
-            "refresh:" + email,
-            newRefreshToken,
-            jwtUtil.getRefreshExpiration(),
-            TimeUnit.MILLISECONDS);
-
-    return new LoginResponseDto(newAccessToken, newRefreshToken);
+    // 6. 새 JWT 발급 (Rotation)
+    return issueTokenPair(user);
   }
 
   public void logout(String accessToken) {
@@ -131,5 +111,80 @@ public class AuthService {
 
     // 2. Redis에서 Refresh Token 삭제
     redisTemplate.delete("refresh:" + email);
+  }
+
+  @Transactional
+  public LoginResponseDto googleLogin(GoogleLoginRequestDto request) {
+
+    // 1. Google ID Token 검증 (서명, aud, iss, exp를 라이브러리가 자동으로 검증)
+    GoogleIdToken idToken = verifyGoogleIdToken(request.getCredential());
+
+    // 2. 페이로드에서 사용자 정보 추출
+    GoogleIdToken.Payload payload = idToken.getPayload();
+
+    // 3. 구글이 이메일 인증을 완료한 계정인지 확인
+    boolean emailVerified = Boolean.TRUE.equals(payload.getEmailVerified());
+    if (!emailVerified) {
+      throw new CustomException(UserErrorCode.GOOGLE_TOKEN_INVALID);
+    }
+
+    String email = payload.getEmail();
+    String googleName = (String) payload.get("name");
+    String googleProfileImageUrl = (String) payload.get("picture");
+
+    // 4. 같은 이메일로 이미 다른 방식으로 가입된 경우 차단
+    Optional<User> existingUser = userRepository.findByEmail(email);
+    if (existingUser.isPresent() && existingUser.get().getProvider() != Provider.GOOGLE) {
+      throw new CustomException(UserErrorCode.OAUTH_PROVIDER_CONFLICT);
+    }
+
+    // 5. GOOGLE 유저 조회 (없으면 자동 회원가입)
+    User user =
+        userRepository
+            .findByEmailAndProvider(email, Provider.GOOGLE)
+            .orElseGet(() -> createNewGoogleUser(email, googleName, googleProfileImageUrl));
+
+    // 6. JWT 발급 (login()과 동일한 공통 메서드 사용)
+    return issueTokenPair(user);
+  }
+
+  private GoogleIdToken verifyGoogleIdToken(String credential) {
+    try {
+      GoogleIdToken idToken = googleIdTokenVerifier.verify(credential);
+      if (idToken == null) {
+        throw new CustomException(UserErrorCode.GOOGLE_TOKEN_INVALID);
+      }
+      return idToken;
+    } catch (CustomException e) {
+      throw e;
+    } catch (Exception e) {
+      throw new CustomException(UserErrorCode.GOOGLE_TOKEN_INVALID);
+    }
+  }
+
+  private User createNewGoogleUser(String email, String googleName, String googleProfileImageUrl) {
+    String nickname = googleName != null ? googleName : email;
+    return userRepository.save(
+        User.builder()
+            .email(email)
+            .nickname(nickname)
+            .role(Role.ROLE_USER)
+            .provider(Provider.GOOGLE)
+            .profileImage(googleProfileImageUrl)
+            .build());
+  }
+
+  private LoginResponseDto issueTokenPair(User user) {
+    String accessToken =
+        jwtUtil.generateAccessToken(user.getEmail(), user.getRole().name(), user.getId());
+    String refreshToken = jwtUtil.generateRefreshToken(user.getEmail());
+    redisTemplate
+        .opsForValue()
+        .set(
+            "refresh:" + user.getEmail(),
+            refreshToken,
+            jwtUtil.getRefreshExpiration(),
+            TimeUnit.MILLISECONDS);
+    return new LoginResponseDto(accessToken, refreshToken);
   }
 }

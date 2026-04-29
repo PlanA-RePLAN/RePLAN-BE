@@ -12,6 +12,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import plana.replan.domain.auth.dto.GoogleLoginRequestDto;
 import plana.replan.domain.auth.dto.LoginRequestDto;
 import plana.replan.domain.auth.dto.LoginResponseDto;
 import plana.replan.domain.auth.dto.SignUpRequestDto;
@@ -435,5 +436,109 @@ public class AuthController {
     }
     authService.logout(accessToken);
     return ResponseEntity.ok(ApiResult.ok());
+  }
+
+  @Operation(
+      summary = "Google 소셜 로그인",
+      description =
+          """
+                  **호출 주체**: 비인증 사용자 (누구나 호출 가능)
+
+                  **지원 플랫폼**: 웹(GIS SDK) / Android(GoogleSignIn) / iOS(GIDSignIn) 공통 사용
+
+                  **비즈니스 로직**
+                  1. Google SDK에서 발급받은 credential(ID Token)을 전달
+                  2. 서버에서 Google ID Token 서명·audience·만료 검증
+                  3. 이메일 인증이 완료된 구글 계정인지 확인
+                  4. 동일 이메일이 다른 방식으로 가입된 경우 409 반환
+                  5. GOOGLE 유저가 있으면 로그인, 없으면 자동 회원가입 후 로그인
+                  6. 자체 AccessToken + RefreshToken 발급하여 반환
+                  """)
+  @ApiResponses({
+    @ApiResponse(
+        responseCode = "200",
+        description = "Google 로그인 성공 - AccessToken, RefreshToken 반환",
+        content =
+            @Content(
+                schema = @Schema(implementation = LoginResponseDto.class),
+                examples =
+                    @ExampleObject(
+                        value =
+                            """
+                                {
+                                  "status": 200,
+                                  "success": true,
+                                  "data": {
+                                    "accessToken": "eyJhbGciOiJIUzI1NiJ9...",
+                                    "refreshToken": "eyJhbGciOiJIUzI1NiJ9..."
+                                  },
+                                  "error": null
+                                }
+                                """))),
+    @ApiResponse(
+        responseCode = "400",
+        description = "요청 값 유효성 검사 실패 (credential 누락/공백)",
+        content =
+            @Content(
+                examples =
+                    @ExampleObject(
+                        value =
+                            """
+                               {
+                                  "status": 400,
+                                  "success": false,
+                                  "data": null,
+                                  "error": {
+                                    "code": "INVALID_INPUT",
+                                    "message": "잘못된 입력입니다.",
+                                    "detail": "credential: Google ID Token은 필수입니다."
+                                  }
+                                }
+                               """))),
+    @ApiResponse(
+        responseCode = "401",
+        description = "Google ID Token 검증 실패 (만료, 위조, 이메일 미인증)",
+        content =
+            @Content(
+                examples =
+                    @ExampleObject(
+                        value =
+                            """
+                                {
+                                  "status": 401,
+                                  "success": false,
+                                  "data": null,
+                                  "error": {
+                                    "code": "GOOGLE_TOKEN_INVALID",
+                                    "message": "Google ID Token 검증에 실패했습니다.",
+                                    "detail": null
+                                  }
+                                }
+                                """))),
+    @ApiResponse(
+        responseCode = "409",
+        description = "동일 이메일이 이미 다른 방식으로 가입됨",
+        content =
+            @Content(
+                examples =
+                    @ExampleObject(
+                        value =
+                            """
+                                {
+                                  "status": 409,
+                                  "success": false,
+                                  "data": null,
+                                  "error": {
+                                    "code": "OAUTH_PROVIDER_CONFLICT",
+                                    "message": "해당 이메일은 이미 다른 방식으로 가입되어 있습니다.",
+                                    "detail": null
+                                  }
+                                }
+                                """)))
+  })
+  @PostMapping("/oauth/google")
+  public ResponseEntity<ApiResult<LoginResponseDto>> googleLogin(
+      @Valid @RequestBody GoogleLoginRequestDto request) {
+    return ResponseEntity.ok(ApiResult.ok(authService.googleLogin(request)));
   }
 }
