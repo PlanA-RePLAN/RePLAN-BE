@@ -195,4 +195,122 @@ class AuthControllerTest {
         .andExpect(jsonPath("$.success").value(false))
         .andExpect(jsonPath("$.error.code").value("EMPTY_TOKEN"));
   }
+
+  // ── Google OAuth ──────────────────────────────────────────────────────────
+
+  @Test
+  @DisplayName("Google 로그인 성공: status=200, success=true, data.accessToken 존재")
+  void googleLogin_success() throws Exception {
+    given(authService.googleLogin(any()))
+        .willReturn(new LoginResponseDto("access-token-value", "refresh-token-value"));
+
+    mockMvc
+        .perform(
+            post("/api/auth/oauth/google")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """
+                    { "credential": "valid-google-id-token" }
+                    """))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.status").value(200))
+        .andExpect(jsonPath("$.success").value(true))
+        .andExpect(jsonPath("$.data.accessToken").value("access-token-value"))
+        .andExpect(jsonPath("$.data.refreshToken").value("refresh-token-value"))
+        .andExpect(jsonPath("$.error").value(nullValue()));
+  }
+
+  @Test
+  @DisplayName("Google 로그인 실패 - credential 빈 문자열: status=400, error.code=INVALID_INPUT")
+  void googleLogin_blankCredential() throws Exception {
+    mockMvc
+        .perform(
+            post("/api/auth/oauth/google")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    { "credential": "" }
+                    """))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.status").value(400))
+        .andExpect(jsonPath("$.success").value(false))
+        .andExpect(jsonPath("$.error.code").value("INVALID_INPUT"))
+        .andExpect(jsonPath("$.data").value(nullValue()));
+  }
+
+  @Test
+  @DisplayName("Google 로그인 실패 - credential 필드 누락: status=400, error.code=INVALID_INPUT")
+  void googleLogin_missingCredential() throws Exception {
+    mockMvc
+        .perform(
+            post("/api/auth/oauth/google").contentType(MediaType.APPLICATION_JSON).content("{}"))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.status").value(400))
+        .andExpect(jsonPath("$.success").value(false))
+        .andExpect(jsonPath("$.error.code").value("INVALID_INPUT"))
+        .andExpect(jsonPath("$.data").value(nullValue()));
+  }
+
+  @Test
+  @DisplayName("Google 로그인 실패 - 유효하지 않은 ID Token: status=401, error.code=GOOGLE_TOKEN_INVALID")
+  void googleLogin_invalidToken() throws Exception {
+    given(authService.googleLogin(any()))
+        .willThrow(new CustomException(UserErrorCode.GOOGLE_TOKEN_INVALID));
+
+    mockMvc
+        .perform(
+            post("/api/auth/oauth/google")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """
+                    { "credential": "invalid-token" }
+                    """))
+        .andExpect(status().isUnauthorized())
+        .andExpect(jsonPath("$.status").value(401))
+        .andExpect(jsonPath("$.success").value(false))
+        .andExpect(jsonPath("$.error.code").value("GOOGLE_TOKEN_INVALID"))
+        .andExpect(jsonPath("$.data").value(nullValue()));
+  }
+
+  @Test
+  @DisplayName("Google 로그인 실패 - 이메일 미인증 계정: status=401, error.code=GOOGLE_TOKEN_INVALID")
+  void googleLogin_emailNotVerified() throws Exception {
+    given(authService.googleLogin(any()))
+        .willThrow(new CustomException(UserErrorCode.GOOGLE_TOKEN_INVALID));
+
+    mockMvc
+        .perform(
+            post("/api/auth/oauth/google")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """
+                    { "credential": "unverified-email-token" }
+                    """))
+        .andExpect(status().isUnauthorized())
+        .andExpect(jsonPath("$.status").value(401))
+        .andExpect(jsonPath("$.success").value(false))
+        .andExpect(jsonPath("$.error.code").value("GOOGLE_TOKEN_INVALID"))
+        .andExpect(jsonPath("$.data").value(nullValue()));
+  }
+
+  @Test
+  @DisplayName(
+      "Google 로그인 실패 - 다른 Provider로 가입된 이메일: status=409, error.code=OAUTH_PROVIDER_CONFLICT")
+  void googleLogin_providerConflict() throws Exception {
+    given(authService.googleLogin(any()))
+        .willThrow(new CustomException(UserErrorCode.OAUTH_PROVIDER_CONFLICT));
+
+    mockMvc
+        .perform(
+            post("/api/auth/oauth/google")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """
+                    { "credential": "valid-google-id-token" }
+                    """))
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.status").value(409))
+        .andExpect(jsonPath("$.success").value(false))
+        .andExpect(jsonPath("$.error.code").value("OAUTH_PROVIDER_CONFLICT"))
+        .andExpect(jsonPath("$.data").value(nullValue()));
+  }
 }
