@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.*;
 import plana.replan.domain.auth.dto.GoogleLoginRequestDto;
 import plana.replan.domain.auth.dto.LoginRequestDto;
 import plana.replan.domain.auth.dto.LoginResponseDto;
+import plana.replan.domain.auth.dto.NaverLoginRequestDto;
 import plana.replan.domain.auth.dto.SignUpRequestDto;
 import plana.replan.domain.auth.service.AuthService;
 import plana.replan.global.common.ApiResult;
@@ -540,5 +541,107 @@ public class AuthController {
   public ResponseEntity<ApiResult<LoginResponseDto>> googleLogin(
       @Valid @RequestBody GoogleLoginRequestDto request) {
     return ResponseEntity.ok(ApiResult.ok(authService.googleLogin(request)));
+  }
+
+  @Operation(
+      summary = "Naver 소셜 로그인",
+      description =
+          """
+                  **호출 주체**: 비인증 사용자 (누구나 호출 가능)
+
+                  **비즈니스 로직**
+                  1. 네이버 SDK에서 발급받은 Access Token을 전달
+                  2. 서버에서 네이버 프로필 API(`/v1/nid/me`)를 호출하여 토큰 유효성 검증
+                  3. 이메일 제공에 동의하지 않은 경우 401 반환
+                  4. 동일 이메일이 다른 방식으로 가입된 경우 409 반환
+                  5. NAVER 유저가 있으면 로그인, 없으면 자동 회원가입 후 로그인
+                  6. 자체 AccessToken + RefreshToken 발급하여 반환
+                  """)
+  @ApiResponses({
+    @ApiResponse(
+        responseCode = "200",
+        description = "Naver 로그인 성공 - AccessToken, RefreshToken 반환",
+        content =
+            @Content(
+                schema = @Schema(implementation = LoginResponseDto.class),
+                examples =
+                    @ExampleObject(
+                        value =
+                            """
+                                {
+                                  "status": 200,
+                                  "success": true,
+                                  "data": {
+                                    "accessToken": "eyJhbGciOiJIUzI1NiJ9...",
+                                    "refreshToken": "eyJhbGciOiJIUzI1NiJ9..."
+                                  },
+                                  "error": null
+                                }
+                                """))),
+    @ApiResponse(
+        responseCode = "400",
+        description = "요청 값 유효성 검사 실패 (accessToken 누락/공백)",
+        content =
+            @Content(
+                examples =
+                    @ExampleObject(
+                        value =
+                            """
+                               {
+                                  "status": 400,
+                                  "success": false,
+                                  "data": null,
+                                  "error": {
+                                    "code": "INVALID_INPUT",
+                                    "message": "잘못된 입력입니다.",
+                                    "detail": "accessToken: Naver Access Token은 필수입니다."
+                                  }
+                                }
+                               """))),
+    @ApiResponse(
+        responseCode = "401",
+        description = "Naver Access Token 검증 실패 또는 이메일 미제공",
+        content =
+            @Content(
+                examples =
+                    @ExampleObject(
+                        value =
+                            """
+                                {
+                                  "status": 401,
+                                  "success": false,
+                                  "data": null,
+                                  "error": {
+                                    "code": "NAVER_TOKEN_INVALID",
+                                    "message": "Naver Access Token 검증에 실패했습니다.",
+                                    "detail": null
+                                  }
+                                }
+                                """))),
+    @ApiResponse(
+        responseCode = "409",
+        description = "동일 이메일이 이미 다른 방식으로 가입됨",
+        content =
+            @Content(
+                examples =
+                    @ExampleObject(
+                        value =
+                            """
+                                {
+                                  "status": 409,
+                                  "success": false,
+                                  "data": null,
+                                  "error": {
+                                    "code": "OAUTH_PROVIDER_CONFLICT",
+                                    "message": "해당 이메일은 이미 다른 방식으로 가입되어 있습니다.",
+                                    "detail": null
+                                  }
+                                }
+                                """)))
+  })
+  @PostMapping("/oauth/naver")
+  public ResponseEntity<ApiResult<LoginResponseDto>> naverLogin(
+      @Valid @RequestBody NaverLoginRequestDto request) {
+    return ResponseEntity.ok(ApiResult.ok(authService.naverLogin(request)));
   }
 }
