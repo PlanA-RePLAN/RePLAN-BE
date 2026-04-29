@@ -2,16 +2,23 @@ package plana.replan.domain.auth.service;
 
 import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
 import com.google.api.client.googleapis.auth.oauth2.GoogleIdTokenVerifier;
+import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.client.RestTemplate;
 import plana.replan.domain.auth.dto.GoogleLoginRequestDto;
 import plana.replan.domain.auth.dto.LoginRequestDto;
 import plana.replan.domain.auth.dto.LoginResponseDto;
+import plana.replan.domain.auth.dto.NaverLoginRequestDto;
 import plana.replan.domain.auth.dto.SignUpRequestDto;
 import plana.replan.domain.user.entity.Provider;
 import plana.replan.domain.user.entity.Role;
@@ -31,6 +38,7 @@ public class AuthService {
   private final JwtUtil jwtUtil;
   private final StringRedisTemplate redisTemplate;
   private final GoogleIdTokenVerifier googleIdTokenVerifier;
+  private final RestTemplate restTemplate;
 
   @Transactional
   public void signUp(SignUpRequestDto request) {
@@ -146,6 +154,72 @@ public class AuthService {
 
     // 6. JWT 발급 (login()과 동일한 공통 메서드 사용)
     return issueTokenPair(user);
+  }
+
+  @Transactional
+  public LoginResponseDto naverLogin(NaverLoginRequestDto request) {
+
+    // 1. 네이버 프로필 API 호출
+    Map<String, Object> naverProfile = fetchNaverUserInfo(request.getAccessToken());
+
+    // 2. 이메일 추출 (사용자 동의 없으면 null)
+    String email = (String) naverProfile.get("email");
+    if (email == null) {
+      throw new CustomException(UserErrorCode.NAVER_TOKEN_INVALID);
+    }
+
+    String naverName = (String) naverProfile.get("name");
+    String naverProfileImageUrl = (String) naverProfile.get("profile_image");
+
+    // 3. 같은 이메일로 이미 다른 방식으로 가입된 경우 차단
+    Optional<User> existingUser = userRepository.findByEmail(email);
+    if (existingUser.isPresent() && existingUser.get().getProvider() != Provider.NAVER) {
+      throw new CustomException(UserErrorCode.OAUTH_PROVIDER_CONFLICT);
+    }
+
+    // 4. NAVER 유저 조회 (없으면 자동 회원가입)
+    User user =
+        userRepository
+            .findByEmailAndProvider(email, Provider.NAVER)
+            .orElseGet(() -> createNewNaverUser(email, naverName, naverProfileImageUrl));
+
+    // 5. JWT 발급
+    return issueTokenPair(user);
+  }
+
+  @SuppressWarnings("unchecked")
+  private Map<String, Object> fetchNaverUserInfo(String accessToken) {
+    try {
+      HttpHeaders headers = new HttpHeaders();
+      headers.setBearerAuth(accessToken);
+      HttpEntity<Void> entity = new HttpEntity<>(headers);
+
+      ResponseEntity<Map> response =
+          restTemplate.exchange(
+              "https://openapi.naver.com/v1/nid/me", HttpMethod.GET, entity, Map.class);
+
+      Map<String, Object> body = response.getBody();
+      if (body == null || !"00".equals(body.get("resultcode"))) {
+        throw new CustomException(UserErrorCode.NAVER_TOKEN_INVALID);
+      }
+      return (Map<String, Object>) body.get("response");
+    } catch (CustomException e) {
+      throw e;
+    } catch (Exception e) {
+      throw new CustomException(UserErrorCode.NAVER_TOKEN_INVALID);
+    }
+  }
+
+  private User createNewNaverUser(String email, String naverName, String naverProfileImageUrl) {
+    String nickname = naverName != null ? naverName : email.split("@")[0];
+    return userRepository.save(
+        User.builder()
+            .email(email)
+            .nickname(nickname)
+            .role(Role.ROLE_USER)
+            .provider(Provider.NAVER)
+            .profileImage(naverProfileImageUrl)
+            .build());
   }
 
   private GoogleIdToken verifyGoogleIdToken(String credential) {
