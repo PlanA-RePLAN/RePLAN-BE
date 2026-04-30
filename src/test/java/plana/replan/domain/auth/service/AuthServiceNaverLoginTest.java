@@ -64,12 +64,11 @@ class AuthServiceNaverLoginTest {
     given(jwtUtil.getRefreshExpiration()).willReturn(604800000L);
   }
 
-  private void setupValidNaverResponse(String email, String name, String profileImage) {
+  private void setupValidNaverResponse(String email, String name) {
     Map<String, Object> response = new HashMap<>();
     response.put("id", "naver-user-id");
     response.put("email", email);
     response.put("name", name);
-    response.put("profile_image", profileImage);
 
     Map<String, Object> body = new HashMap<>();
     body.put("resultcode", "00");
@@ -88,7 +87,7 @@ class AuthServiceNaverLoginTest {
   @Test
   @DisplayName("신규 Naver 유저 최초 로그인 시 자동 회원가입 후 토큰 반환")
   void naverLogin_newUser_success() {
-    setupValidNaverResponse("new@naver.com", "신규유저", "https://profile.url/photo.jpg");
+    setupValidNaverResponse("new@naver.com", "신규유저");
 
     given(userRepository.findByEmail("new@naver.com")).willReturn(Optional.empty());
     given(userRepository.findByEmailAndProvider("new@naver.com", Provider.NAVER))
@@ -100,7 +99,6 @@ class AuthServiceNaverLoginTest {
             .nickname("신규유저")
             .role(Role.ROLE_USER)
             .provider(Provider.NAVER)
-            .profileImage("https://profile.url/photo.jpg")
             .build();
     given(userRepository.save(any(User.class))).willReturn(savedUser);
 
@@ -116,7 +114,7 @@ class AuthServiceNaverLoginTest {
   @Test
   @DisplayName("기존 Naver 유저 재로그인 시 save 호출 없이 토큰 반환")
   void naverLogin_existingUser_success() {
-    setupValidNaverResponse("existing@naver.com", "기존유저", null);
+    setupValidNaverResponse("existing@naver.com", "기존유저");
 
     User existingUser =
         User.builder()
@@ -182,7 +180,7 @@ class AuthServiceNaverLoginTest {
   @Test
   @DisplayName("이메일이 null인 경우 (사용자 동의 안 함): NAVER_TOKEN_INVALID 예외")
   void naverLogin_nullEmail_throws() {
-    setupValidNaverResponse(null, "이름있는유저", null);
+    setupValidNaverResponse(null, "이름있는유저");
 
     assertThatThrownBy(() -> authService.naverLogin(new NaverLoginRequestDto("valid-token")))
         .isInstanceOf(CustomException.class)
@@ -195,7 +193,7 @@ class AuthServiceNaverLoginTest {
   @Test
   @DisplayName("name이 null이면 nickname을 email prefix(@앞)로 저장")
   void naverLogin_nullName_usesEmailPrefixAsNickname() {
-    setupValidNaverResponse("nonick@naver.com", null, null);
+    setupValidNaverResponse("nonick@naver.com", null);
 
     given(userRepository.findByEmail("nonick@naver.com")).willReturn(Optional.empty());
     given(userRepository.findByEmailAndProvider("nonick@naver.com", Provider.NAVER))
@@ -217,7 +215,7 @@ class AuthServiceNaverLoginTest {
   @Test
   @DisplayName("동일 이메일이 LOCAL Provider로 가입된 경우: OAUTH_PROVIDER_CONFLICT 예외")
   void naverLogin_providerConflict_throws() {
-    setupValidNaverResponse("conflict@naver.com", "충돌유저", null);
+    setupValidNaverResponse("conflict@naver.com", "충돌유저");
 
     User localUser =
         User.builder()

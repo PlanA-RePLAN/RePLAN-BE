@@ -64,10 +64,9 @@ class AuthServiceKakaoLoginTest {
     given(jwtUtil.getRefreshExpiration()).willReturn(604800000L);
   }
 
-  private void setupValidKakaoResponse(String email, String nickname, String profileImageUrl) {
+  private void setupValidKakaoResponse(String email, String nickname) {
     Map<String, Object> profile = new HashMap<>();
     profile.put("nickname", nickname);
-    profile.put("profile_image_url", profileImageUrl);
 
     Map<String, Object> kakaoAccount = new HashMap<>();
     kakaoAccount.put("email", email);
@@ -89,7 +88,7 @@ class AuthServiceKakaoLoginTest {
   @Test
   @DisplayName("신규 Kakao 유저 최초 로그인 시 자동 회원가입 후 토큰 반환")
   void kakaoLogin_newUser_success() {
-    setupValidKakaoResponse("new@kakao.com", "신규유저", "https://profile.url/photo.jpg");
+    setupValidKakaoResponse("new@kakao.com", "신규유저");
 
     given(userRepository.findByEmail("new@kakao.com")).willReturn(Optional.empty());
     given(userRepository.findByEmailAndProvider("new@kakao.com", Provider.KAKAO))
@@ -98,10 +97,9 @@ class AuthServiceKakaoLoginTest {
     User savedUser =
         User.builder()
             .email("new@kakao.com")
-            .nickname("신규유저")
+            .nickname("new")
             .role(Role.ROLE_USER)
             .provider(Provider.KAKAO)
-            .profileImage("https://profile.url/photo.jpg")
             .build();
     given(userRepository.save(any(User.class))).willReturn(savedUser);
 
@@ -117,7 +115,7 @@ class AuthServiceKakaoLoginTest {
   @Test
   @DisplayName("기존 Kakao 유저 재로그인 시 save 호출 없이 토큰 반환")
   void kakaoLogin_existingUser_success() {
-    setupValidKakaoResponse("existing@kakao.com", "기존유저", null);
+    setupValidKakaoResponse("existing@kakao.com", "기존유저");
 
     User existingUser =
         User.builder()
@@ -183,7 +181,7 @@ class AuthServiceKakaoLoginTest {
   @Test
   @DisplayName("이메일이 null인 경우 (사용자 동의 안 함): KAKAO_TOKEN_INVALID 예외")
   void kakaoLogin_nullEmail_throws() {
-    setupValidKakaoResponse(null, "이름있는유저", null);
+    setupValidKakaoResponse(null, "이름있는유저");
 
     assertThatThrownBy(() -> authService.kakaoLogin(new KakaoLoginRequestDto("valid-token")))
         .isInstanceOf(CustomException.class)
@@ -196,7 +194,7 @@ class AuthServiceKakaoLoginTest {
   @Test
   @DisplayName("nickname이 null이면 nickname을 email prefix(@앞)로 저장")
   void kakaoLogin_nullNickname_usesEmailPrefixAsNickname() {
-    setupValidKakaoResponse("nonick@kakao.com", null, null);
+    setupValidKakaoResponse("nonick@kakao.com", null);
 
     given(userRepository.findByEmail("nonick@kakao.com")).willReturn(Optional.empty());
     given(userRepository.findByEmailAndProvider("nonick@kakao.com", Provider.KAKAO))
@@ -218,7 +216,7 @@ class AuthServiceKakaoLoginTest {
   @Test
   @DisplayName("동일 이메일이 LOCAL Provider로 가입된 경우: OAUTH_PROVIDER_CONFLICT 예외")
   void kakaoLogin_providerConflict_throws() {
-    setupValidKakaoResponse("conflict@kakao.com", "충돌유저", null);
+    setupValidKakaoResponse("conflict@kakao.com", "충돌유저");
 
     User localUser =
         User.builder()

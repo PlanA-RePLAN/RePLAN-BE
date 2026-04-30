@@ -139,7 +139,6 @@ public class AuthService {
 
     String email = payload.getEmail();
     String googleName = (String) payload.get("name");
-    String googleProfileImageUrl = (String) payload.get("picture");
 
     // 4. 같은 이메일로 이미 다른 방식으로 가입된 경우 차단
     Optional<User> existingUser = userRepository.findByEmail(email);
@@ -151,7 +150,7 @@ public class AuthService {
     User user =
         userRepository
             .findByEmailAndProvider(email, Provider.GOOGLE)
-            .orElseGet(() -> createNewGoogleUser(email, googleName, googleProfileImageUrl));
+            .orElseGet(() -> createNewGoogleUser(email, googleName));
 
     // 6. JWT 발급 (login()과 동일한 공통 메서드 사용)
     return issueTokenPair(user);
@@ -170,7 +169,6 @@ public class AuthService {
     }
 
     String naverName = (String) naverProfile.get("name");
-    String naverProfileImageUrl = (String) naverProfile.get("profile_image");
 
     // 3. 같은 이메일로 이미 다른 방식으로 가입된 경우 차단
     Optional<User> existingUser = userRepository.findByEmail(email);
@@ -182,7 +180,7 @@ public class AuthService {
     User user =
         userRepository
             .findByEmailAndProvider(email, Provider.NAVER)
-            .orElseGet(() -> createNewNaverUser(email, naverName, naverProfileImageUrl));
+            .orElseGet(() -> createNewNaverUser(email, naverName));
 
     // 5. JWT 발급
     return issueTokenPair(user);
@@ -200,9 +198,6 @@ public class AuthService {
       throw new CustomException(UserErrorCode.KAKAO_TOKEN_INVALID);
     }
 
-    String kakaoNickname = (String) kakaoProfile.get("nickname");
-    String kakaoProfileImageUrl = (String) kakaoProfile.get("profile_image_url");
-
     // 3. 같은 이메일로 이미 다른 방식으로 가입된 경우 차단
     Optional<User> existingUser = userRepository.findByEmail(email);
     if (existingUser.isPresent() && existingUser.get().getProvider() != Provider.KAKAO) {
@@ -213,7 +208,7 @@ public class AuthService {
     User user =
         userRepository
             .findByEmailAndProvider(email, Provider.KAKAO)
-            .orElseGet(() -> createNewKakaoUser(email, kakaoNickname, kakaoProfileImageUrl));
+            .orElseGet(() -> createNewKakaoUser(email));
 
     // 5. JWT 발급
     return issueTokenPair(user);
@@ -245,7 +240,6 @@ public class AuthService {
       Map<String, Object> result = new java.util.HashMap<>();
       result.put("email", kakaoAccount.get("email"));
       result.put("nickname", profile != null ? profile.get("nickname") : null);
-      result.put("profile_image_url", profile != null ? profile.get("profile_image_url") : null);
       return result;
     } catch (CustomException e) {
       throw e;
@@ -254,15 +248,13 @@ public class AuthService {
     }
   }
 
-  private User createNewKakaoUser(String email, String kakaoNickname, String kakaoProfileImageUrl) {
-    String nickname = kakaoNickname != null ? kakaoNickname : email.split("@")[0];
+  private User createNewKakaoUser(String email) {
     return userRepository.save(
         User.builder()
             .email(email)
-            .nickname(nickname)
+            .nickname(email.split("@")[0])
             .role(Role.ROLE_USER)
             .provider(Provider.KAKAO)
-            .profileImage(kakaoProfileImageUrl)
             .build());
   }
 
@@ -289,7 +281,7 @@ public class AuthService {
     }
   }
 
-  private User createNewNaverUser(String email, String naverName, String naverProfileImageUrl) {
+  private User createNewNaverUser(String email, String naverName) {
     String nickname = naverName != null ? naverName : email.split("@")[0];
     return userRepository.save(
         User.builder()
@@ -297,7 +289,6 @@ public class AuthService {
             .nickname(nickname)
             .role(Role.ROLE_USER)
             .provider(Provider.NAVER)
-            .profileImage(naverProfileImageUrl)
             .build());
   }
 
@@ -315,15 +306,14 @@ public class AuthService {
     }
   }
 
-  private User createNewGoogleUser(String email, String googleName, String googleProfileImageUrl) {
-    String nickname = googleName != null ? googleName : email;
+  private User createNewGoogleUser(String email, String googleName) {
+    String nickname = googleName != null ? googleName : email.split("@")[0];
     return userRepository.save(
         User.builder()
             .email(email)
             .nickname(nickname)
             .role(Role.ROLE_USER)
             .provider(Provider.GOOGLE)
-            .profileImage(googleProfileImageUrl)
             .build());
   }
 

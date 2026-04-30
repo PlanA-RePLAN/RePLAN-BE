@@ -195,8 +195,8 @@ class AuthServiceGoogleLoginTest {
   }
 
   @Test
-  @DisplayName("Google name이 null이면 nickname을 email로 저장")
-  void googleLogin_nullName_usesEmailAsNickname() {
+  @DisplayName("Google name이 null이면 nickname을 email prefix(@앞)로 저장")
+  void googleLogin_nullName_usesEmailPrefixAsNickname() {
     setupValidToken("nonick@gmail.com", null, null);
 
     given(userRepository.findByEmail("nonick@gmail.com")).willReturn(Optional.empty());
@@ -207,8 +207,7 @@ class AuthServiceGoogleLoginTest {
         .willAnswer(
             invocation -> {
               User saved = invocation.getArgument(0);
-              // nickname이 email과 동일한지 검증
-              assertThat(saved.getNickname()).isEqualTo("nonick@gmail.com");
+              assertThat(saved.getNickname()).isEqualTo("nonick");
               return saved;
             });
 
