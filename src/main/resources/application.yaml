@@ -37,3 +37,12 @@ google:
     web: ${GOOGLE_WEB_CLIENT_ID}
     android: ${GOOGLE_ANDROID_CLIENT_ID:}
     ios: ${GOOGLE_IOS_CLIENT_ID:}
+
+cloud:
+  aws:
+    region:
+      static: ${AWS_S3_REGION}
+    s3:
+      bucket: ${AWS_S3_BUCKET}
+    cloudfront:
+      domain: ${AWS_CLOUDFRONT_DOMAIN}

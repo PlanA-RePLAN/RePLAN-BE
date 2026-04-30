@@ -19,3 +19,12 @@ google:
     web: test-web-client-id.apps.googleusercontent.com
     android: ""
     ios: ""
+
+cloud:
+  aws:
+    region:
+      static: ap-northeast-2
+    s3:
+      bucket: test-bucket
+    cloudfront:
+      domain: test.cloudfront.net
