@@ -13,7 +13,8 @@ public enum UserErrorCode implements ErrorCode {
   LOGIN_FAILED(401, "이메일 또는 비밀번호가 올바르지 않습니다."),
   OAUTH_PROVIDER_CONFLICT(409, "해당 이메일은 이미 다른 방식으로 가입되어 있습니다."),
   GOOGLE_TOKEN_INVALID(401, "Google ID Token 검증에 실패했습니다."),
-  NAVER_TOKEN_INVALID(401, "Naver Access Token 검증에 실패했습니다.");
+  NAVER_TOKEN_INVALID(401, "Naver Access Token 검증에 실패했습니다."),
+  KAKAO_TOKEN_INVALID(401, "Kakao Access Token 검증에 실패했습니다.");
 
   private final int status;
   private final String message;

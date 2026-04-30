@@ -16,6 +16,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.RestTemplate;
 import plana.replan.domain.auth.dto.GoogleLoginRequestDto;
+import plana.replan.domain.auth.dto.KakaoLoginRequestDto;
 import plana.replan.domain.auth.dto.LoginRequestDto;
 import plana.replan.domain.auth.dto.LoginResponseDto;
 import plana.replan.domain.auth.dto.NaverLoginRequestDto;
@@ -185,6 +186,84 @@ public class AuthService {
 
     // 5. JWT 발급
     return issueTokenPair(user);
+  }
+
+  @Transactional
+  public LoginResponseDto kakaoLogin(KakaoLoginRequestDto request) {
+
+    // 1. 카카오 사용자 정보 API 호출
+    Map<String, Object> kakaoProfile = fetchKakaoUserInfo(request.getAccessToken());
+
+    // 2. 이메일 추출 (사용자 동의 없으면 null)
+    String email = (String) kakaoProfile.get("email");
+    if (email == null) {
+      throw new CustomException(UserErrorCode.KAKAO_TOKEN_INVALID);
+    }
+
+    String kakaoNickname = (String) kakaoProfile.get("nickname");
+    String kakaoProfileImageUrl = (String) kakaoProfile.get("profile_image_url");
+
+    // 3. 같은 이메일로 이미 다른 방식으로 가입된 경우 차단
+    Optional<User> existingUser = userRepository.findByEmail(email);
+    if (existingUser.isPresent() && existingUser.get().getProvider() != Provider.KAKAO) {
+      throw new CustomException(UserErrorCode.OAUTH_PROVIDER_CONFLICT);
+    }
+
+    // 4. KAKAO 유저 조회 (없으면 자동 회원가입)
+    User user =
+        userRepository
+            .findByEmailAndProvider(email, Provider.KAKAO)
+            .orElseGet(() -> createNewKakaoUser(email, kakaoNickname, kakaoProfileImageUrl));
+
+    // 5. JWT 발급
+    return issueTokenPair(user);
+  }
+
+  @SuppressWarnings("unchecked")
+  private Map<String, Object> fetchKakaoUserInfo(String accessToken) {
+    try {
+      HttpHeaders headers = new HttpHeaders();
+      headers.setBearerAuth(accessToken);
+      HttpEntity<Void> entity = new HttpEntity<>(headers);
+
+      ResponseEntity<Map> response =
+          restTemplate.exchange(
+              "https://kapi.kakao.com/v2/user/me", HttpMethod.GET, entity, Map.class);
+
+      Map<String, Object> body = response.getBody();
+      if (body == null) {
+        throw new CustomException(UserErrorCode.KAKAO_TOKEN_INVALID);
+      }
+
+      Map<String, Object> kakaoAccount = (Map<String, Object>) body.get("kakao_account");
+      if (kakaoAccount == null) {
+        throw new CustomException(UserErrorCode.KAKAO_TOKEN_INVALID);
+      }
+
+      Map<String, Object> profile = (Map<String, Object>) kakaoAccount.get("profile");
+
+      Map<String, Object> result = new java.util.HashMap<>();
+      result.put("email", kakaoAccount.get("email"));
+      result.put("nickname", profile != null ? profile.get("nickname") : null);
+      result.put("profile_image_url", profile != null ? profile.get("profile_image_url") : null);
+      return result;
+    } catch (CustomException e) {
+      throw e;
+    } catch (Exception e) {
+      throw new CustomException(UserErrorCode.KAKAO_TOKEN_INVALID);
+    }
+  }
+
+  private User createNewKakaoUser(String email, String kakaoNickname, String kakaoProfileImageUrl) {
+    String nickname = kakaoNickname != null ? kakaoNickname : email.split("@")[0];
+    return userRepository.save(
+        User.builder()
+            .email(email)
+            .nickname(nickname)
+            .role(Role.ROLE_USER)
+            .provider(Provider.KAKAO)
+            .profileImage(kakaoProfileImageUrl)
+            .build());
   }
 
   @SuppressWarnings("unchecked")

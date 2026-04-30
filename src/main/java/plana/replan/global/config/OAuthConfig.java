@@ -5,7 +5,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.web.client.RestTemplate;
 
 @Configuration
-public class NaverOAuthConfig {
+public class OAuthConfig {
 
   @Bean
   public RestTemplate restTemplate() {
