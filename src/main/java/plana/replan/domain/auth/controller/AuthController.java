@@ -17,7 +17,9 @@ import plana.replan.domain.auth.dto.KakaoLoginRequestDto;
 import plana.replan.domain.auth.dto.LoginRequestDto;
 import plana.replan.domain.auth.dto.LoginResponseDto;
 import plana.replan.domain.auth.dto.NaverLoginRequestDto;
+import plana.replan.domain.auth.dto.NicknameCheckResponseDto;
 import plana.replan.domain.auth.dto.OAuthLoginResponseDto;
+import plana.replan.domain.auth.dto.OAuthRegisterRequestDto;
 import plana.replan.domain.auth.dto.SignUpRequestDto;
 import plana.replan.domain.auth.service.AuthService;
 import plana.replan.global.common.ApiResult;
@@ -749,5 +751,119 @@ public class AuthController {
   public ResponseEntity<ApiResult<OAuthLoginResponseDto>> kakaoLogin(
       @Valid @RequestBody KakaoLoginRequestDto request) {
     return ResponseEntity.ok(ApiResult.ok(authService.kakaoLogin(request)));
+  }
+
+  @Operation(
+      summary = "OAuth 신규유저 프로필 등록",
+      description =
+          """
+                  **호출 주체**: OAuth 로그인 후 신규유저 (tempToken 보유)
+
+                  **요청 방법**: `Authorization: Bearer {tempToken}` 헤더 필수
+
+                  **비즈니스 로직**
+                  1. tempToken으로 Redis에서 email, provider 조회 (5분 유효)
+                  2. 닉네임 중복 확인
+                  3. s3Key가 있으면 S3 temp → confirmed 이동 후 CloudFront URL 저장
+                  4. 유저 생성 및 DB 저장
+                  5. tempToken Redis에서 삭제
+                  6. AccessToken + RefreshToken 발급
+                  """)
+  @ApiResponses({
+    @ApiResponse(responseCode = "200", description = "프로필 등록 성공 - AccessToken, RefreshToken 반환"),
+    @ApiResponse(
+        responseCode = "400",
+        description = "nickname 누락",
+        content =
+            @Content(
+                examples =
+                    @ExampleObject(
+                        value =
+                            """
+                                {
+                                  "status": 400,
+                                  "success": false,
+                                  "data": null,
+                                  "error": {
+                                    "code": "INVALID_INPUT",
+                                    "message": "잘못된 입력입니다.",
+                                    "detail": "nickname: 닉네임은 필수입니다."
+                                  }
+                                }
+                                """))),
+    @ApiResponse(
+        responseCode = "401",
+        description = "tempToken 없음 또는 만료",
+        content =
+            @Content(
+                examples =
+                    @ExampleObject(
+                        value =
+                            """
+                                {
+                                  "status": 401,
+                                  "success": false,
+                                  "data": null,
+                                  "error": {
+                                    "code": "INVALID_TEMP_TOKEN",
+                                    "message": "유효하지 않은 임시 토큰입니다.",
+                                    "detail": null
+                                  }
+                                }
+                                """))),
+    @ApiResponse(
+        responseCode = "409",
+        description = "닉네임 중복",
+        content =
+            @Content(
+                examples =
+                    @ExampleObject(
+                        value =
+                            """
+                                {
+                                  "status": 409,
+                                  "success": false,
+                                  "data": null,
+                                  "error": {
+                                    "code": "DUPLICATE_NICKNAME",
+                                    "message": "이미 사용 중인 닉네임입니다.",
+                                    "detail": null
+                                  }
+                                }
+                                """)))
+  })
+  @PostMapping("/oauth/register")
+  public ResponseEntity<ApiResult<LoginResponseDto>> register(
+      @RequestHeader(value = "Authorization", required = false) String authHeader,
+      @Valid @RequestBody OAuthRegisterRequestDto request) {
+
+    if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+      throw new CustomException(JwtErrorCode.EMPTY_TOKEN);
+    }
+    String tempToken = authHeader.substring(7);
+    if (tempToken.isBlank()) {
+      throw new CustomException(JwtErrorCode.EMPTY_TOKEN);
+    }
+    return ResponseEntity.ok(ApiResult.ok(authService.register(request, tempToken)));
+  }
+
+  @Operation(
+      summary = "닉네임 중복 확인",
+      description =
+          """
+                  **호출 주체**: 비인증 사용자 (누구나 호출 가능)
+
+                  **비즈니스 로직**
+                  1. 입력한 닉네임이 DB에 존재하는지 확인
+                  2. available=true면 사용 가능, false면 중복
+                  """)
+  @ApiResponses({
+    @ApiResponse(responseCode = "200", description = "중복 확인 결과 반환"),
+  })
+  @GetMapping("/nickname/check")
+  public ResponseEntity<ApiResult<NicknameCheckResponseDto>> checkNickname(
+      @RequestParam String nickname) {
+    return ResponseEntity.ok(
+        ApiResult.ok(new NicknameCheckResponseDto(authService.checkNickname(nickname))));
   }
 }

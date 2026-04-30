@@ -22,6 +22,7 @@ import plana.replan.domain.auth.dto.LoginRequestDto;
 import plana.replan.domain.auth.dto.LoginResponseDto;
 import plana.replan.domain.auth.dto.NaverLoginRequestDto;
 import plana.replan.domain.auth.dto.OAuthLoginResponseDto;
+import plana.replan.domain.auth.dto.OAuthRegisterRequestDto;
 import plana.replan.domain.auth.dto.SignUpRequestDto;
 import plana.replan.domain.user.entity.Provider;
 import plana.replan.domain.user.entity.Role;
@@ -31,6 +32,7 @@ import plana.replan.domain.user.repository.UserRepository;
 import plana.replan.global.exception.CustomException;
 import plana.replan.global.jwt.JwtErrorCode;
 import plana.replan.global.jwt.JwtUtil;
+import plana.replan.global.s3.S3Service;
 
 @Service
 @RequiredArgsConstructor
@@ -42,6 +44,7 @@ public class AuthService {
   private final StringRedisTemplate redisTemplate;
   private final GoogleIdTokenVerifier googleIdTokenVerifier;
   private final RestTemplate restTemplate;
+  private final S3Service s3Service;
 
   @Transactional
   public void signUp(SignUpRequestDto request) {
@@ -122,6 +125,53 @@ public class AuthService {
 
     // 2. Redis에서 Refresh Token 삭제
     redisTemplate.delete("refresh:" + email);
+  }
+
+  @Transactional
+  public LoginResponseDto register(OAuthRegisterRequestDto request, String tempToken) {
+
+    // 1. Redis에서 tempToken 조회
+    String value = redisTemplate.opsForValue().get("oauth-temp:" + tempToken);
+    if (value == null) {
+      throw new CustomException(UserErrorCode.INVALID_TEMP_TOKEN);
+    }
+
+    // 2. email, provider 파싱
+    String[] parts = value.split(":");
+    String email = parts[0];
+    Provider provider = Provider.valueOf(parts[1]);
+
+    // 3. 닉네임 중복 확인
+    if (userRepository.existsByNickname(request.getNickname())) {
+      throw new CustomException(UserErrorCode.DUPLICATE_NICKNAME);
+    }
+
+    // 4. 이미지 있으면 S3 temp → confirmed 이동
+    String profileImageUrl = null;
+    if (request.getS3Key() != null && !request.getS3Key().isBlank()) {
+      profileImageUrl = s3Service.moveToConfirmed(request.getS3Key());
+    }
+
+    // 5. 유저 생성 및 저장
+    User user =
+        userRepository.save(
+            User.builder()
+                .email(email)
+                .nickname(request.getNickname())
+                .role(Role.ROLE_USER)
+                .provider(provider)
+                .profileImage(profileImageUrl)
+                .build());
+
+    // 6. tempToken 삭제
+    redisTemplate.delete("oauth-temp:" + tempToken);
+
+    // 7. JWT 발급
+    return issueTokenPair(user);
+  }
+
+  public boolean checkNickname(String nickname) {
+    return !userRepository.existsByNickname(nickname);
   }
 
   @Transactional
