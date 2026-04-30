@@ -48,7 +48,7 @@ public class S3Controller {
   public ResponseEntity<ApiResult<PresignedUrlResponseDto>> getPresignedUrl(
       @RequestHeader(value = "Authorization", required = false) String authHeader,
       @RequestParam String filename,
-      @RequestParam(defaultValue = "image/jpeg") String contentType) {
+      @RequestParam String contentType) {
 
     if (authHeader == null || !authHeader.startsWith("Bearer ")) {
       throw new CustomException(JwtErrorCode.EMPTY_TOKEN);
