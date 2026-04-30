@@ -14,7 +14,9 @@ public enum UserErrorCode implements ErrorCode {
   OAUTH_PROVIDER_CONFLICT(409, "해당 이메일은 이미 다른 방식으로 가입되어 있습니다."),
   GOOGLE_TOKEN_INVALID(401, "Google ID Token 검증에 실패했습니다."),
   NAVER_TOKEN_INVALID(401, "Naver Access Token 검증에 실패했습니다."),
-  KAKAO_TOKEN_INVALID(401, "Kakao Access Token 검증에 실패했습니다.");
+  KAKAO_TOKEN_INVALID(401, "Kakao Access Token 검증에 실패했습니다."),
+  INVALID_TEMP_TOKEN(401, "유효하지 않은 임시 토큰입니다."),
+  DUPLICATE_NICKNAME(409, "이미 사용 중인 닉네임입니다.");
 
   private final int status;
   private final String message;
