@@ -4,6 +4,7 @@ import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
 import com.google.api.client.googleapis.auth.oauth2.GoogleIdTokenVerifier;
 import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -20,6 +21,7 @@ import plana.replan.domain.auth.dto.KakaoLoginRequestDto;
 import plana.replan.domain.auth.dto.LoginRequestDto;
 import plana.replan.domain.auth.dto.LoginResponseDto;
 import plana.replan.domain.auth.dto.NaverLoginRequestDto;
+import plana.replan.domain.auth.dto.OAuthLoginResponseDto;
 import plana.replan.domain.auth.dto.SignUpRequestDto;
 import plana.replan.domain.user.entity.Provider;
 import plana.replan.domain.user.entity.Role;
@@ -123,7 +125,7 @@ public class AuthService {
   }
 
   @Transactional
-  public LoginResponseDto googleLogin(GoogleLoginRequestDto request) {
+  public OAuthLoginResponseDto googleLogin(GoogleLoginRequestDto request) {
 
     // 1. Google ID Token 검증 (서명, aud, iss, exp를 라이브러리가 자동으로 검증)
     GoogleIdToken idToken = verifyGoogleIdToken(request.getCredential());
@@ -138,7 +140,6 @@ public class AuthService {
     }
 
     String email = payload.getEmail();
-    String googleName = (String) payload.get("name");
 
     // 4. 같은 이메일로 이미 다른 방식으로 가입된 경우 차단
     Optional<User> existingUser = userRepository.findByEmail(email);
@@ -146,18 +147,20 @@ public class AuthService {
       throw new CustomException(UserErrorCode.OAUTH_PROVIDER_CONFLICT);
     }
 
-    // 5. GOOGLE 유저 조회 (없으면 자동 회원가입)
-    User user =
-        userRepository
-            .findByEmailAndProvider(email, Provider.GOOGLE)
-            .orElseGet(() -> createNewGoogleUser(email, googleName));
-
-    // 6. JWT 발급 (login()과 동일한 공통 메서드 사용)
-    return issueTokenPair(user);
+    // 5. 기존유저: JWT 발급 / 신규유저: tempToken 발급
+    return userRepository
+        .findByEmailAndProvider(email, Provider.GOOGLE)
+        .map(
+            user -> {
+              LoginResponseDto tokens = issueTokenPair(user);
+              return OAuthLoginResponseDto.existingUser(
+                  tokens.getAccessToken(), tokens.getRefreshToken());
+            })
+        .orElseGet(() -> OAuthLoginResponseDto.newUser(issueTempToken(email, Provider.GOOGLE)));
   }
 
   @Transactional
-  public LoginResponseDto naverLogin(NaverLoginRequestDto request) {
+  public OAuthLoginResponseDto naverLogin(NaverLoginRequestDto request) {
 
     // 1. 네이버 프로필 API 호출
     Map<String, Object> naverProfile = fetchNaverUserInfo(request.getAccessToken());
@@ -168,26 +171,26 @@ public class AuthService {
       throw new CustomException(UserErrorCode.NAVER_TOKEN_INVALID);
     }
 
-    String naverName = (String) naverProfile.get("name");
-
     // 3. 같은 이메일로 이미 다른 방식으로 가입된 경우 차단
     Optional<User> existingUser = userRepository.findByEmail(email);
     if (existingUser.isPresent() && existingUser.get().getProvider() != Provider.NAVER) {
       throw new CustomException(UserErrorCode.OAUTH_PROVIDER_CONFLICT);
     }
 
-    // 4. NAVER 유저 조회 (없으면 자동 회원가입)
-    User user =
-        userRepository
-            .findByEmailAndProvider(email, Provider.NAVER)
-            .orElseGet(() -> createNewNaverUser(email, naverName));
-
-    // 5. JWT 발급
-    return issueTokenPair(user);
+    // 4. 기존유저: JWT 발급 / 신규유저: tempToken 발급
+    return userRepository
+        .findByEmailAndProvider(email, Provider.NAVER)
+        .map(
+            user -> {
+              LoginResponseDto tokens = issueTokenPair(user);
+              return OAuthLoginResponseDto.existingUser(
+                  tokens.getAccessToken(), tokens.getRefreshToken());
+            })
+        .orElseGet(() -> OAuthLoginResponseDto.newUser(issueTempToken(email, Provider.NAVER)));
   }
 
   @Transactional
-  public LoginResponseDto kakaoLogin(KakaoLoginRequestDto request) {
+  public OAuthLoginResponseDto kakaoLogin(KakaoLoginRequestDto request) {
 
     // 1. 카카오 사용자 정보 API 호출
     Map<String, Object> kakaoProfile = fetchKakaoUserInfo(request.getAccessToken());
@@ -204,14 +207,16 @@ public class AuthService {
       throw new CustomException(UserErrorCode.OAUTH_PROVIDER_CONFLICT);
     }
 
-    // 4. KAKAO 유저 조회 (없으면 자동 회원가입)
-    User user =
-        userRepository
-            .findByEmailAndProvider(email, Provider.KAKAO)
-            .orElseGet(() -> createNewKakaoUser(email));
-
-    // 5. JWT 발급
-    return issueTokenPair(user);
+    // 4. 기존유저: JWT 발급 / 신규유저: tempToken 발급
+    return userRepository
+        .findByEmailAndProvider(email, Provider.KAKAO)
+        .map(
+            user -> {
+              LoginResponseDto tokens = issueTokenPair(user);
+              return OAuthLoginResponseDto.existingUser(
+                  tokens.getAccessToken(), tokens.getRefreshToken());
+            })
+        .orElseGet(() -> OAuthLoginResponseDto.newUser(issueTempToken(email, Provider.KAKAO)));
   }
 
   @SuppressWarnings("unchecked")
@@ -248,14 +253,12 @@ public class AuthService {
     }
   }
 
-  private User createNewKakaoUser(String email) {
-    return userRepository.save(
-        User.builder()
-            .email(email)
-            .nickname(email.split("@")[0])
-            .role(Role.ROLE_USER)
-            .provider(Provider.KAKAO)
-            .build());
+  private String issueTempToken(String email, Provider provider) {
+    String token = UUID.randomUUID().toString();
+    redisTemplate
+        .opsForValue()
+        .set("oauth-temp:" + token, email + ":" + provider.name(), 300, TimeUnit.SECONDS);
+    return token;
   }
 
   @SuppressWarnings("unchecked")
@@ -281,17 +284,6 @@ public class AuthService {
     }
   }
 
-  private User createNewNaverUser(String email, String naverName) {
-    String nickname = naverName != null ? naverName : email.split("@")[0];
-    return userRepository.save(
-        User.builder()
-            .email(email)
-            .nickname(nickname)
-            .role(Role.ROLE_USER)
-            .provider(Provider.NAVER)
-            .build());
-  }
-
   private GoogleIdToken verifyGoogleIdToken(String credential) {
     try {
       GoogleIdToken idToken = googleIdTokenVerifier.verify(credential);
@@ -304,17 +296,6 @@ public class AuthService {
     } catch (Exception e) {
       throw new CustomException(UserErrorCode.GOOGLE_TOKEN_INVALID);
     }
-  }
-
-  private User createNewGoogleUser(String email, String googleName) {
-    String nickname = googleName != null ? googleName : email.split("@")[0];
-    return userRepository.save(
-        User.builder()
-            .email(email)
-            .nickname(nickname)
-            .role(Role.ROLE_USER)
-            .provider(Provider.GOOGLE)
-            .build());
   }
 
   private LoginResponseDto issueTokenPair(User user) {

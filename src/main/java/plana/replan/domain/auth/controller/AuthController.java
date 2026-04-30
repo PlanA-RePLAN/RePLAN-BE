@@ -17,6 +17,7 @@ import plana.replan.domain.auth.dto.KakaoLoginRequestDto;
 import plana.replan.domain.auth.dto.LoginRequestDto;
 import plana.replan.domain.auth.dto.LoginResponseDto;
 import plana.replan.domain.auth.dto.NaverLoginRequestDto;
+import plana.replan.domain.auth.dto.OAuthLoginResponseDto;
 import plana.replan.domain.auth.dto.SignUpRequestDto;
 import plana.replan.domain.auth.service.AuthService;
 import plana.replan.global.common.ApiResult;
@@ -539,7 +540,7 @@ public class AuthController {
                                 """)))
   })
   @PostMapping("/oauth/google")
-  public ResponseEntity<ApiResult<LoginResponseDto>> googleLogin(
+  public ResponseEntity<ApiResult<OAuthLoginResponseDto>> googleLogin(
       @Valid @RequestBody GoogleLoginRequestDto request) {
     return ResponseEntity.ok(ApiResult.ok(authService.googleLogin(request)));
   }
@@ -641,7 +642,7 @@ public class AuthController {
                                 """)))
   })
   @PostMapping("/oauth/naver")
-  public ResponseEntity<ApiResult<LoginResponseDto>> naverLogin(
+  public ResponseEntity<ApiResult<OAuthLoginResponseDto>> naverLogin(
       @Valid @RequestBody NaverLoginRequestDto request) {
     return ResponseEntity.ok(ApiResult.ok(authService.naverLogin(request)));
   }
@@ -745,7 +746,7 @@ public class AuthController {
                                 """)))
   })
   @PostMapping("/oauth/kakao")
-  public ResponseEntity<ApiResult<LoginResponseDto>> kakaoLogin(
+  public ResponseEntity<ApiResult<OAuthLoginResponseDto>> kakaoLogin(
       @Valid @RequestBody KakaoLoginRequestDto request) {
     return ResponseEntity.ok(ApiResult.ok(authService.kakaoLogin(request)));
   }

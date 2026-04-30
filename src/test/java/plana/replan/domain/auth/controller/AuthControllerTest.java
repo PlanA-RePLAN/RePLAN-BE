@@ -18,6 +18,7 @@ import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import plana.replan.domain.auth.dto.LoginResponseDto;
+import plana.replan.domain.auth.dto.OAuthLoginResponseDto;
 import plana.replan.domain.auth.service.AuthService;
 import plana.replan.domain.user.exception.UserErrorCode;
 import plana.replan.global.config.SecurityConfig;
@@ -199,10 +200,11 @@ class AuthControllerTest {
   // ── Google OAuth ──────────────────────────────────────────────────────────
 
   @Test
-  @DisplayName("Google 로그인 성공: status=200, success=true, data.accessToken 존재")
+  @DisplayName("Google 로그인 성공 (기존유저): status=200, success=true, data.accessToken 존재")
   void googleLogin_success() throws Exception {
     given(authService.googleLogin(any()))
-        .willReturn(new LoginResponseDto("access-token-value", "refresh-token-value"));
+        .willReturn(
+            OAuthLoginResponseDto.existingUser("access-token-value", "refresh-token-value"));
 
     mockMvc
         .perform(
@@ -317,10 +319,11 @@ class AuthControllerTest {
   // ── Naver OAuth ──────────────────────────────────────────────────────────
 
   @Test
-  @DisplayName("Naver 로그인 성공: status=200, success=true, data.accessToken 존재")
+  @DisplayName("Naver 로그인 성공 (기존유저): status=200, success=true, data.accessToken 존재")
   void naverLogin_success() throws Exception {
     given(authService.naverLogin(any()))
-        .willReturn(new LoginResponseDto("access-token-value", "refresh-token-value"));
+        .willReturn(
+            OAuthLoginResponseDto.existingUser("access-token-value", "refresh-token-value"));
 
     mockMvc
         .perform(
@@ -414,10 +417,11 @@ class AuthControllerTest {
   // ── Kakao OAuth ──────────────────────────────────────────────────────────
 
   @Test
-  @DisplayName("Kakao 로그인 성공: status=200, success=true, data.accessToken 존재")
+  @DisplayName("Kakao 로그인 성공 (기존유저): status=200, success=true, data.accessToken 존재")
   void kakaoLogin_success() throws Exception {
     given(authService.kakaoLogin(any()))
-        .willReturn(new LoginResponseDto("access-token-value", "refresh-token-value"));
+        .willReturn(
+            OAuthLoginResponseDto.existingUser("access-token-value", "refresh-token-value"));
 
     mockMvc
         .perform(

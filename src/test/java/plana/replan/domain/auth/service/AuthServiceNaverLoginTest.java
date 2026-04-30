@@ -31,8 +31,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
-import plana.replan.domain.auth.dto.LoginResponseDto;
 import plana.replan.domain.auth.dto.NaverLoginRequestDto;
+import plana.replan.domain.auth.dto.OAuthLoginResponseDto;
 import plana.replan.domain.user.entity.Provider;
 import plana.replan.domain.user.entity.Role;
 import plana.replan.domain.user.entity.User;
@@ -85,35 +85,27 @@ class AuthServiceNaverLoginTest {
   }
 
   @Test
-  @DisplayName("신규 Naver 유저 최초 로그인 시 자동 회원가입 후 토큰 반환")
-  void naverLogin_newUser_success() {
+  @DisplayName("신규 Naver 유저 최초 로그인 시 tempToken 반환")
+  void naverLogin_newUser_returnsTempToken() {
     setupValidNaverResponse("new@naver.com", "신규유저");
 
     given(userRepository.findByEmail("new@naver.com")).willReturn(Optional.empty());
     given(userRepository.findByEmailAndProvider("new@naver.com", Provider.NAVER))
         .willReturn(Optional.empty());
 
-    User savedUser =
-        User.builder()
-            .email("new@naver.com")
-            .nickname("신규유저")
-            .role(Role.ROLE_USER)
-            .provider(Provider.NAVER)
-            .build();
-    given(userRepository.save(any(User.class))).willReturn(savedUser);
-
-    LoginResponseDto result =
+    OAuthLoginResponseDto result =
         authService.naverLogin(new NaverLoginRequestDto("valid-access-token"));
 
-    assertThat(result.getAccessToken()).isEqualTo("access-token");
-    assertThat(result.getRefreshToken()).isEqualTo("refresh-token");
-    verify(userRepository).save(any(User.class));
+    assertThat(result.isNewUser()).isTrue();
+    assertThat(result.getTempToken()).isNotNull();
+    assertThat(result.getAccessToken()).isNull();
+    verify(userRepository, never()).save(any(User.class));
     verify(valueOperations).set(anyString(), anyString(), any(Long.class), any(TimeUnit.class));
   }
 
   @Test
-  @DisplayName("기존 Naver 유저 재로그인 시 save 호출 없이 토큰 반환")
-  void naverLogin_existingUser_success() {
+  @DisplayName("기존 Naver 유저 재로그인 시 JWT 반환")
+  void naverLogin_existingUser_returnsJwt() {
     setupValidNaverResponse("existing@naver.com", "기존유저");
 
     User existingUser =
@@ -128,10 +120,12 @@ class AuthServiceNaverLoginTest {
     given(userRepository.findByEmailAndProvider("existing@naver.com", Provider.NAVER))
         .willReturn(Optional.of(existingUser));
 
-    LoginResponseDto result =
+    OAuthLoginResponseDto result =
         authService.naverLogin(new NaverLoginRequestDto("valid-access-token"));
 
+    assertThat(result.isNewUser()).isFalse();
     assertThat(result.getAccessToken()).isEqualTo("access-token");
+    assertThat(result.getTempToken()).isNull();
     verify(userRepository, never()).save(any(User.class));
   }
 
@@ -188,28 +182,6 @@ class AuthServiceNaverLoginTest {
             e ->
                 assertThat(((CustomException) e).getErrorCode())
                     .isEqualTo(UserErrorCode.NAVER_TOKEN_INVALID));
-  }
-
-  @Test
-  @DisplayName("name이 null이면 nickname을 email prefix(@앞)로 저장")
-  void naverLogin_nullName_usesEmailPrefixAsNickname() {
-    setupValidNaverResponse("nonick@naver.com", null);
-
-    given(userRepository.findByEmail("nonick@naver.com")).willReturn(Optional.empty());
-    given(userRepository.findByEmailAndProvider("nonick@naver.com", Provider.NAVER))
-        .willReturn(Optional.empty());
-
-    given(userRepository.save(any(User.class)))
-        .willAnswer(
-            invocation -> {
-              User saved = invocation.getArgument(0);
-              assertThat(saved.getNickname()).isEqualTo("nonick");
-              return saved;
-            });
-
-    authService.naverLogin(new NaverLoginRequestDto("valid-token"));
-
-    verify(userRepository).save(any(User.class));
   }
 
   @Test

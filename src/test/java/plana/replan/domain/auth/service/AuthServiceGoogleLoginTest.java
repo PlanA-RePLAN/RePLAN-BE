@@ -25,8 +25,9 @@ import org.mockito.quality.Strictness;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.web.client.RestTemplate;
 import plana.replan.domain.auth.dto.GoogleLoginRequestDto;
-import plana.replan.domain.auth.dto.LoginResponseDto;
+import plana.replan.domain.auth.dto.OAuthLoginResponseDto;
 import plana.replan.domain.user.entity.Provider;
 import plana.replan.domain.user.entity.Role;
 import plana.replan.domain.user.entity.User;
@@ -44,6 +45,7 @@ class AuthServiceGoogleLoginTest {
   @Mock private JwtUtil jwtUtil;
   @Mock private StringRedisTemplate redisTemplate;
   @Mock private GoogleIdTokenVerifier googleIdTokenVerifier;
+  @Mock private RestTemplate restTemplate;
 
   @InjectMocks private AuthService authService;
 
@@ -63,7 +65,7 @@ class AuthServiceGoogleLoginTest {
     given(jwtUtil.getRefreshExpiration()).willReturn(604800000L);
   }
 
-  private void setupValidToken(String email, String name, String picture) {
+  private void setupValidToken(String email) {
     try {
       given(googleIdTokenVerifier.verify(anyString())).willReturn(mockIdToken);
     } catch (Exception e) {
@@ -72,42 +74,31 @@ class AuthServiceGoogleLoginTest {
     given(mockIdToken.getPayload()).willReturn(mockPayload);
     given(mockPayload.getEmailVerified()).willReturn(true);
     given(mockPayload.getEmail()).willReturn(email);
-    given(mockPayload.get("name")).willReturn(name);
-    given(mockPayload.get("picture")).willReturn(picture);
   }
 
   @Test
-  @DisplayName("신규 Google 유저 최초 로그인 시 자동 회원가입 후 토큰 반환")
-  void googleLogin_newUser_success() {
-    setupValidToken("new@gmail.com", "신규유저", "https://picture.url/photo.jpg");
+  @DisplayName("신규 Google 유저 최초 로그인 시 tempToken 반환")
+  void googleLogin_newUser_returnsTempToken() {
+    setupValidToken("new@gmail.com");
 
     given(userRepository.findByEmail("new@gmail.com")).willReturn(Optional.empty());
     given(userRepository.findByEmailAndProvider("new@gmail.com", Provider.GOOGLE))
         .willReturn(Optional.empty());
 
-    User savedUser =
-        User.builder()
-            .email("new@gmail.com")
-            .nickname("신규유저")
-            .role(Role.ROLE_USER)
-            .provider(Provider.GOOGLE)
-            .profileImage("https://picture.url/photo.jpg")
-            .build();
-    given(userRepository.save(any(User.class))).willReturn(savedUser);
-
-    LoginResponseDto result =
+    OAuthLoginResponseDto result =
         authService.googleLogin(new GoogleLoginRequestDto("valid-credential"));
 
-    assertThat(result.getAccessToken()).isEqualTo("access-token");
-    assertThat(result.getRefreshToken()).isEqualTo("refresh-token");
-    verify(userRepository).save(any(User.class));
+    assertThat(result.isNewUser()).isTrue();
+    assertThat(result.getTempToken()).isNotNull();
+    assertThat(result.getAccessToken()).isNull();
+    verify(userRepository, never()).save(any(User.class));
     verify(valueOperations).set(anyString(), anyString(), any(Long.class), any(TimeUnit.class));
   }
 
   @Test
-  @DisplayName("기존 Google 유저 재로그인 시 save 호출 없이 토큰 반환")
-  void googleLogin_existingUser_success() {
-    setupValidToken("existing@gmail.com", "기존유저", null);
+  @DisplayName("기존 Google 유저 재로그인 시 JWT 반환")
+  void googleLogin_existingUser_returnsJwt() {
+    setupValidToken("existing@gmail.com");
 
     User existingUser =
         User.builder()
@@ -121,10 +112,12 @@ class AuthServiceGoogleLoginTest {
     given(userRepository.findByEmailAndProvider("existing@gmail.com", Provider.GOOGLE))
         .willReturn(Optional.of(existingUser));
 
-    LoginResponseDto result =
+    OAuthLoginResponseDto result =
         authService.googleLogin(new GoogleLoginRequestDto("valid-credential"));
 
+    assertThat(result.isNewUser()).isFalse();
     assertThat(result.getAccessToken()).isEqualTo("access-token");
+    assertThat(result.getTempToken()).isNull();
     verify(userRepository, never()).save(any(User.class));
   }
 
@@ -173,7 +166,7 @@ class AuthServiceGoogleLoginTest {
   @Test
   @DisplayName("동일 이메일이 LOCAL Provider로 가입된 경우: OAUTH_PROVIDER_CONFLICT 예외")
   void googleLogin_providerConflict_throws() {
-    setupValidToken("conflict@gmail.com", "충돌유저", null);
+    setupValidToken("conflict@gmail.com");
 
     User localUser =
         User.builder()
@@ -192,27 +185,5 @@ class AuthServiceGoogleLoginTest {
             e ->
                 assertThat(((CustomException) e).getErrorCode())
                     .isEqualTo(UserErrorCode.OAUTH_PROVIDER_CONFLICT));
-  }
-
-  @Test
-  @DisplayName("Google name이 null이면 nickname을 email prefix(@앞)로 저장")
-  void googleLogin_nullName_usesEmailPrefixAsNickname() {
-    setupValidToken("nonick@gmail.com", null, null);
-
-    given(userRepository.findByEmail("nonick@gmail.com")).willReturn(Optional.empty());
-    given(userRepository.findByEmailAndProvider("nonick@gmail.com", Provider.GOOGLE))
-        .willReturn(Optional.empty());
-
-    given(userRepository.save(any(User.class)))
-        .willAnswer(
-            invocation -> {
-              User saved = invocation.getArgument(0);
-              assertThat(saved.getNickname()).isEqualTo("nonick");
-              return saved;
-            });
-
-    authService.googleLogin(new GoogleLoginRequestDto("valid-credential"));
-
-    verify(userRepository).save(any(User.class));
   }
 }
