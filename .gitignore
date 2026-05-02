@@ -36,6 +36,9 @@ out/
 ### VS Code ###
 .vscode/
 
+### macOS ###
+.DS_Store
+
 # application.yml
 src/main/resources/application-local.yaml
 docker-compose.yml
