@@ -9,8 +9,10 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 import plana.replan.domain.auth.dto.GoogleLoginRequestDto;
 import plana.replan.domain.auth.dto.KakaoLoginRequestDto;
@@ -29,6 +31,7 @@ import plana.replan.global.jwt.JwtErrorCode;
 @Tag(name = "Auth", description = "인증 관련 API")
 @RestController
 @RequestMapping("/api/auth")
+@Validated
 @RequiredArgsConstructor
 public class AuthController {
 
@@ -856,21 +859,38 @@ public class AuthController {
         description = "tempToken 없음 또는 만료",
         content =
             @Content(
-                examples =
-                    @ExampleObject(
-                        value =
-                            """
-                                {
-                                  "status": 401,
-                                  "success": false,
-                                  "data": null,
-                                  "error": {
-                                    "code": "INVALID_TEMP_TOKEN",
-                                    "message": "유효하지 않은 임시 토큰입니다.",
-                                    "detail": null
-                                  }
+                examples = {
+                  @ExampleObject(
+                      name = "토큰 없음 (Authorization 헤더 누락 또는 Bearer 형식 오류)",
+                      value =
+                          """
+                              {
+                                "status": 401,
+                                "success": false,
+                                "data": null,
+                                "error": {
+                                  "code": "EMPTY_TOKEN",
+                                  "message": "토큰이 없습니다.",
+                                  "detail": null
                                 }
-                                """))),
+                              }
+                              """),
+                  @ExampleObject(
+                      name = "유효하지 않은 tempToken (만료 또는 Redis 미존재)",
+                      value =
+                          """
+                              {
+                                "status": 401,
+                                "success": false,
+                                "data": null,
+                                "error": {
+                                  "code": "INVALID_TEMP_TOKEN",
+                                  "message": "유효하지 않은 임시 토큰입니다.",
+                                  "detail": null
+                                }
+                              }
+                              """)
+                })),
     @ApiResponse(
         responseCode = "409",
         description = "닉네임 중복",
@@ -922,7 +942,7 @@ public class AuthController {
   })
   @GetMapping("/nickname/check")
   public ResponseEntity<ApiResult<NicknameCheckResponseDto>> checkNickname(
-      @RequestParam String nickname) {
+      @RequestParam @NotBlank String nickname) {
     return ResponseEntity.ok(
         ApiResult.ok(new NicknameCheckResponseDto(authService.checkNickname(nickname))));
   }

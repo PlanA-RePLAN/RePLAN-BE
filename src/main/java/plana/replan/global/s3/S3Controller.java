@@ -4,6 +4,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -12,6 +13,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import plana.replan.domain.auth.dto.PresignedUrlResponseDto;
+import plana.replan.domain.user.exception.UserErrorCode;
 import plana.replan.global.common.ApiResult;
 import plana.replan.global.exception.CustomException;
 import plana.replan.global.jwt.JwtErrorCode;
@@ -21,6 +23,9 @@ import plana.replan.global.jwt.JwtErrorCode;
 @RequestMapping("/api/s3")
 @RequiredArgsConstructor
 public class S3Controller {
+
+  private static final Set<String> ALLOWED_CONTENT_TYPES =
+      Set.of("image/jpeg", "image/png", "image/webp", "image/gif");
 
   private final S3Service s3Service;
 
@@ -56,6 +61,18 @@ public class S3Controller {
     String tempToken = authHeader.substring(7);
     if (tempToken.isBlank()) {
       throw new CustomException(JwtErrorCode.EMPTY_TOKEN);
+    }
+
+    if (filename == null
+        || filename.isBlank()
+        || filename.contains("..")
+        || filename.contains("/")) {
+      throw new CustomException(UserErrorCode.INVALID_FILENAME);
+    }
+    if (contentType == null
+        || contentType.isBlank()
+        || !ALLOWED_CONTENT_TYPES.contains(contentType)) {
+      throw new CustomException(UserErrorCode.UNSUPPORTED_CONTENT_TYPE);
     }
 
     return ResponseEntity.ok(
