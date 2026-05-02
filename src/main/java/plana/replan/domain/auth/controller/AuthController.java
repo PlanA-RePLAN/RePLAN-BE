@@ -57,7 +57,8 @@ public class AuthController {
                                 {
                                   "status": 200,
                                   "success": true,
-                                  "data": null
+                                  "data": null,
+                                  "error": null
                                 }
                                 """))),
     @ApiResponse(
@@ -72,6 +73,7 @@ public class AuthController {
                                 {
                                   "status": 400,
                                   "success": false,
+                                  "data": null,
                                   "error": {
                                     "code": "INVALID_INPUT",
                                     "message": "잘못된 입력입니다.",
@@ -91,6 +93,7 @@ public class AuthController {
                                 {
                                   "status": 409,
                                   "success": false,
+                                  "data": null,
                                   "error": {
                                     "code": "DUPLICATE_EMAIL",
                                     "message": "이미 사용 중인 이메일입니다.",
@@ -136,7 +139,8 @@ public class AuthController {
                                   "data": {
                                     "accessToken": "eyJhbGciOiJIUzI1NiJ9...",
                                     "refreshToken": "eyJhbGciOiJIUzI1NiJ9..."
-                                  }
+                                  },
+                                  "error": null
                                 }
                                 """))),
     @ApiResponse(
@@ -151,6 +155,7 @@ public class AuthController {
                                 {
                                   "status": 400,
                                   "success": false,
+                                  "data": null,
                                   "error": {
                                     "code": "INVALID_INPUT",
                                     "message": "잘못된 입력입니다.",
@@ -170,6 +175,7 @@ public class AuthController {
                                 {
                                   "status": 401,
                                   "success": false,
+                                  "data": null,
                                   "error": {
                                     "code": "LOGIN_FAILED",
                                     "message": "이메일 또는 비밀번호가 올바르지 않습니다.",
@@ -222,7 +228,8 @@ public class AuthController {
                                   "data": {
                                     "accessToken": "eyJhbGciOiJIUzI1NiJ9...(new)",
                                     "refreshToken": "eyJhbGciOiJIUzI1NiJ9...(new)"
-                                  }
+                                  },
+                                  "error": null
                                 }
                                 """))),
     @ApiResponse(
@@ -238,6 +245,7 @@ public class AuthController {
                                               {
                                                 "status": 401,
                                                 "success": false,
+                                                "data": null,
                                                 "error": {
                                                   "code": "EMPTY_TOKEN",
                                                   "message": "토큰이 없습니다.",
@@ -252,6 +260,7 @@ public class AuthController {
                                               {
                                                 "status": 401,
                                                 "success": false,
+                                                "data": null,
                                                 "error": {
                                                   "code": "EXPIRED_TOKEN",
                                                   "message": "만료된 토큰입니다.",
@@ -266,6 +275,7 @@ public class AuthController {
                                               {
                                                 "status": 401,
                                                 "success": false,
+                                                "data": null,
                                                 "error": {
                                                   "code": "REFRESH_TOKEN_NOT_FOUND",
                                                   "message": "Refresh Token이 존재하지 않습니다.",
@@ -280,6 +290,7 @@ public class AuthController {
                                               {
                                                 "status": 401,
                                                 "success": false,
+                                                "data": null,
                                                 "error": {
                                                   "code": "INVALID_REFRESH_TOKEN",
                                                   "message": "유효하지 않은 Refresh Token입니다.",
@@ -300,6 +311,7 @@ public class AuthController {
                                 {
                                   "status": 404,
                                   "success": false,
+                                  "data": null,
                                   "error": {
                                     "code": "USER_NOT_FOUND",
                                     "message": "유저를 찾을 수 없습니다.",
@@ -354,7 +366,8 @@ public class AuthController {
                                 {
                                   "status": 200,
                                   "success": true,
-                                  "data": null
+                                  "data": null,
+                                  "error": null
                                 }
                                 """))),
     @ApiResponse(
@@ -370,6 +383,7 @@ public class AuthController {
                                               {
                                                 "status": 401,
                                                 "success": false,
+                                                "data": null,
                                                 "error": {
                                                   "code": "EMPTY_TOKEN",
                                                   "message": "토큰이 없습니다.",
@@ -384,6 +398,7 @@ public class AuthController {
                                               {
                                                 "status": 401,
                                                 "success": false,
+                                                "data": null,
                                                 "error": {
                                                   "code": "INVALID_TOKEN",
                                                   "message": "유효하지 않은 토큰입니다.",
@@ -398,6 +413,7 @@ public class AuthController {
                                               {
                                                 "status": 401,
                                                 "success": false,
+                                                "data": null,
                                                 "error": {
                                                   "code": "EXPIRED_TOKEN",
                                                   "message": "만료된 토큰입니다.",

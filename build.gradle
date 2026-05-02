@@ -3,6 +3,7 @@ plugins {
     id 'org.springframework.boot' version '4.0.4'
     id 'io.spring.dependency-management' version '1.1.7'
     id 'com.diffplug.spotless' version '6.25.0'  // 추가
+    id 'org.hibernate.orm' version '7.2.7.Final'
 }
 
 group = 'planA'
@@ -49,6 +50,13 @@ dependencies {
 
 tasks.named('test') {
     useJUnitPlatform()
+}
+
+hibernate {
+    enhancement {
+        enableLazyInitialization = true
+        enableDirtyTracking = true
+    }
 }
 
 spotless {

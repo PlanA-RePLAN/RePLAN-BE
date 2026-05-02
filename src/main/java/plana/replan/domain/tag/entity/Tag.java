@@ -1,0 +1,41 @@
+package plana.replan.domain.tag.entity;
+
+import jakarta.persistence.*;
+import java.util.Objects;
+import lombok.AccessLevel;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import org.hibernate.annotations.SQLRestriction;
+import plana.replan.domain.user.entity.User;
+import plana.replan.global.entity.BaseTimeEntity;
+
+@Entity
+@Table(name = "tag")
+@Getter
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
+@SQLRestriction("deleted_at IS NULL")
+public class Tag extends BaseTimeEntity {
+
+  @Id
+  @GeneratedValue(strategy = GenerationType.IDENTITY)
+  private Long id;
+
+  @Column(nullable = false)
+  private String title;
+
+  @Enumerated(EnumType.STRING)
+  @Column
+  private TagColor color;
+
+  @ManyToOne(fetch = FetchType.LAZY)
+  @JoinColumn(name = "user_id", nullable = false)
+  private User user;
+
+  @Builder
+  public Tag(String title, TagColor color, User user) {
+    this.title = Objects.requireNonNull(title, "제목은 필수입니다.");
+    this.user = Objects.requireNonNull(user, "유저는 필수입니다.");
+    this.color = color;
+  }
+}

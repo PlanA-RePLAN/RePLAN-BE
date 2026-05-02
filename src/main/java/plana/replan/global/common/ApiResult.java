@@ -1,6 +1,5 @@
 package plana.replan.global.common;
 
-import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 import lombok.Getter;
 import plana.replan.global.exception.ErrorDetail;
@@ -11,9 +10,9 @@ public class ApiResult<T> {
 
   private final int status;
   private final boolean success;
+
   private final T data;
 
-  @JsonInclude(JsonInclude.Include.NON_NULL)
   private final ErrorDetail error;
 
   private ApiResult(int status, T data) {

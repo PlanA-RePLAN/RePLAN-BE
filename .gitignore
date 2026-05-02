@@ -36,8 +36,16 @@ out/
 ### VS Code ###
 .vscode/
 
+### macOS ###
+.DS_Store
+
 # application.yml
 src/main/resources/application-local.yaml
+docker-compose.yml
 
 # 클로드
 .claude
+
+#로컬 DB및 레디스
+postgres_data/
+redis_data/

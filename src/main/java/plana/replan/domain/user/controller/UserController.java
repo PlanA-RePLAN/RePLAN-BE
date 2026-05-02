@@ -63,7 +63,8 @@ public class UserController {
                                       "nickname": "일규",
                                       "role": "ROLE_USER",
                                       "provider": "LOCAL"
-                                    }
+                                    },
+                                    "error": null
                                   }
                                   """))),
     @ApiResponse(
@@ -79,6 +80,7 @@ public class UserController {
                                                 {
                                                   "status": 401,
                                                   "success": false,
+                                                  "data": null,
                                                   "error": {
                                                     "code": "EMPTY_TOKEN",
                                                     "message": "토큰이 없습니다.",
@@ -93,6 +95,7 @@ public class UserController {
                                                 {
                                                   "status": 401,
                                                   "success": false,
+                                                  "data": null,
                                                   "error": {
                                                     "code": "EXPIRED_TOKEN",
                                                     "message": "만료된 토큰입니다.",
@@ -113,6 +116,7 @@ public class UserController {
                                   {
                                     "status": 404,
                                     "success": false,
+                                    "data": null,
                                     "error": {
                                       "code": "USER_NOT_FOUND",
                                       "message": "유저를 찾을 수 없습니다.",
