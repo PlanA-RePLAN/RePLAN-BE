@@ -40,7 +40,7 @@ google:
 cloud:
   aws:
     region:
-      static: ${AWS_S3_REGION}
+      static: ${AWS_REGION}
     s3:
       bucket: ${AWS_S3_BUCKET}
     cloudfront:
