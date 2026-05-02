@@ -55,7 +55,7 @@ public class S3Service {
     if (tempKey == null || !tempKey.startsWith("profiles/temp/")) {
       throw new CustomException(UserErrorCode.INVALID_S3_KEY);
     }
-    String confirmedKey = tempKey.replace("profiles/temp/", "profiles/confirmed/");
+    String confirmedKey = "profiles/confirmed/" + tempKey.substring("profiles/temp/".length());
 
     s3Client.copyObject(
         CopyObjectRequest.builder()
