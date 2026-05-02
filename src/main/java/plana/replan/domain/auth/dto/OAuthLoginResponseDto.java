@@ -7,15 +7,15 @@ import lombok.Getter;
 public class OAuthLoginResponseDto {
 
   @JsonProperty("isNewUser")
-  private final boolean isNewUser;
+  private final boolean newUser;
 
   private final String tempToken;
   private final String accessToken;
   private final String refreshToken;
 
   private OAuthLoginResponseDto(
-      boolean isNewUser, String tempToken, String accessToken, String refreshToken) {
-    this.isNewUser = isNewUser;
+      boolean newUser, String tempToken, String accessToken, String refreshToken) {
+    this.newUser = newUser;
     this.tempToken = tempToken;
     this.accessToken = accessToken;
     this.refreshToken = refreshToken;
