@@ -14,6 +14,9 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import plana.replan.global.common.ApiResult;
 import plana.replan.global.exception.ErrorDetail;
 import plana.replan.global.jwt.JwtErrorCode;
@@ -34,11 +37,14 @@ public class SecurityConfig {
         // 1. CSRF 비활성화 (JWT는 세션 안 쓰니까 불필요)
         .csrf(AbstractHttpConfigurer::disable)
 
-        // 2. 세션 Stateless 설정
+        // 2. CORS 설정
+        .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+
+        // 3. 세션 Stateless 설정
         .sessionManagement(
             session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
 
-        // 3. URL 권한 설정
+        // 4. URL 권한 설정
         .authorizeHttpRequests(
             auth ->
                 auth.requestMatchers(
@@ -54,7 +60,7 @@ public class SecurityConfig {
                     .anyRequest()
                     .authenticated())
 
-        // 4. 미인증 요청 → 401, 인가 실패 → 403
+        // 5. 미인증 요청 → 401, 인가 실패 → 403
         .exceptionHandling(
             ex ->
                 ex.authenticationEntryPoint(
@@ -67,15 +73,27 @@ public class SecurityConfig {
                       response.getWriter().write(objectMapper.writeValueAsString(body));
                     }))
 
-        // 5. JwtFilter를 UsernamePasswordAuthenticationFilter 앞에 등록
+        // 6. JwtFilter를 UsernamePasswordAuthenticationFilter 앞에 등록
         .addFilterBefore(new JwtFilter(jwtUtil), UsernamePasswordAuthenticationFilter.class);
 
     return http.build();
   }
 
-  // 5. PasswordEncoder Bean 등록
   @Bean
   public PasswordEncoder passwordEncoder() {
     return new BCryptPasswordEncoder();
+  }
+
+  @Bean
+  public CorsConfigurationSource corsConfigurationSource() {
+    CorsConfiguration config = new CorsConfiguration();
+    config.addAllowedOrigin("http://localhost:3000");
+    config.addAllowedMethod("*");
+    config.addAllowedHeader("*");
+    config.setAllowCredentials(true);
+
+    UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+    source.registerCorsConfiguration("/**", config);
+    return source;
   }
 }
