@@ -35,8 +35,7 @@ jwt:
 google:
   client-ids:
     web: ${GOOGLE_WEB_CLIENT_ID}
-    android: ${GOOGLE_ANDROID_CLIENT_ID:}
-    ios: ${GOOGLE_IOS_CLIENT_ID:}
+
 
 cloud:
   aws:
