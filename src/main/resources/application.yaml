@@ -8,7 +8,7 @@ spring:
     driver-class-name: org.postgresql.Driver
   jpa:
     hibernate:
-      ddl-auto: update
+      ddl-auto: none
     show-sql: false
     properties:
       hibernate:
@@ -17,6 +17,8 @@ spring:
     redis:
       host: ${REDIS_HOST}
       port: ${REDIS_PORT}
+  flyway:
+    enabled: false  # 기본은 꺼두기
 
 management:
   endpoints:
@@ -31,3 +33,17 @@ jwt:
   secret: ${JWT_SECRET}
   access-expiration: 900000
   refresh-expiration: 604800000
+
+google:
+  client-ids:
+    web: ${GOOGLE_WEB_CLIENT_ID}
+
+
+cloud:
+  aws:
+    region:
+      static: ${AWS_REGION}
+    s3:
+      bucket: ${AWS_S3_BUCKET}
+    cloudfront:
+      domain: ${AWS_CLOUDFRONT_DOMAIN}

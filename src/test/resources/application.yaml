@@ -13,3 +13,18 @@ jwt:
   secret: testSecretKeyForTestingPurposeOnly1234
   access-expiration: 900000
   refresh-expiration: 604800000
+
+google:
+  client-ids:
+    web: test-web-client-id.apps.googleusercontent.com
+    android: ""
+    ios: ""
+
+cloud:
+  aws:
+    region:
+      static: ap-northeast-2
+    s3:
+      bucket: test-bucket
+    cloudfront:
+      domain: test.cloudfront.net
