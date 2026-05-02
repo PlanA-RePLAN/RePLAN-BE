@@ -56,10 +56,29 @@ jobs:
             # ECR 로그인
             aws ecr get-login-password --region ${{ secrets.AWS_REGION }} | \
               docker login --username AWS --password-stdin ${{ secrets.ECR_REGISTRY }}
+            
+            # SSM에서 시크릿 읽어서 .env 동적 생성
+            aws ssm get-parameter --name /replan/prod/DB_HOST --query Parameter.Value --output text --region ap-northeast-2 | xargs -I{} echo "DB_HOST={}" > /home/ubuntu/app/.env
+            aws ssm get-parameter --name /replan/prod/DB_PORT --query Parameter.Value --output text --region ap-northeast-2 | xargs -I{} echo "DB_PORT={}" >> /home/ubuntu/app/.env
+            aws ssm get-parameter --name /replan/prod/DB_NAME --query Parameter.Value --output text --region ap-northeast-2 | xargs -I{} echo "DB_NAME={}" >> /home/ubuntu/app/.env
+            aws ssm get-parameter --name /replan/prod/DB_USER --query Parameter.Value --output text --region ap-northeast-2 | xargs -I{} echo "DB_USER={}" >> /home/ubuntu/app/.env
+            aws ssm get-parameter --name /replan/prod/DB_PASSWORD --with-decryption --query Parameter.Value --output text --region ap-northeast-2 | xargs -I{} echo "DB_PASSWORD={}" >> /home/ubuntu/app/.env
+            aws ssm get-parameter --name /replan/prod/JWT_SECRET --with-decryption --query Parameter.Value --output text --region ap-northeast-2 | xargs -I{} echo "JWT_SECRET={}" >> /home/ubuntu/app/.env 
+            aws ssm get-parameter --name /replan/prod/AWS_S3_BUCKET --query Parameter.Value --output text --region ap-northeast-2 | xargs -I{} echo "AWS_S3_BUCKET={}" >> /home/ubuntu/app/.env
+            aws ssm get-parameter --name /replan/prod/AWS_CLOUDFRONT_DOMAIN --query Parameter.Value --output text --region ap-northeast-2 | xargs -I{} echo "AWS_CLOUDFRONT_DOMAIN={}" >> /home/ubuntu/app/.env
+            aws ssm get-parameter --name /replan/prod/GOOGLE_WEB_CLIENT_ID --with-decryption --query Parameter.Value --output text --region ap-northeast-2 | xargs -I{} echo "GOOGLE_WEB_CLIENT_ID={}" >> /home/ubuntu/app/.env
+            
+            # GitHub Secrets에서 ECR 정보 추가
+            echo "ECR_REGISTRY=${{ secrets.ECR_REGISTRY }}" >> /home/ubuntu/app/.env
+            echo "ECR_REPOSITORY=${{ secrets.ECR_REPOSITORY }}" >> /home/ubuntu/app/.env
+            echo "AWS_REGION=${{ secrets.AWS_REGION }}" >> /home/ubuntu/app/.env
+            
             # compose 파일이 있는 디렉토리로 이동 후 실행
             cd /home/ubuntu/app || exit 1
             docker compose pull
             docker compose up -d
+            # .env 파일 즉시 삭제 (민감 정보 파일시스템에 남기지 않음)
+            rm -f /home/ubuntu/app/.env
             # 사용하지 않는 이미지 정리
             docker image prune -f
 
