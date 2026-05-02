@@ -48,6 +48,8 @@ dependencies {
     implementation 'com.google.api-client:google-api-client:2.4.1'
     implementation platform('software.amazon.awssdk:bom:2.43.1')
     implementation 'software.amazon.awssdk:s3'
+    implementation 'org.flywaydb:flyway-core'
+    implementation 'org.flywaydb:flyway-database-postgresql'
 
 }
 
