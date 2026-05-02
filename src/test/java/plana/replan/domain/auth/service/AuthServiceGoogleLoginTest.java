@@ -25,7 +25,7 @@ import org.mockito.quality.Strictness;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.web.client.RestTemplate;
+import org.springframework.web.client.RestClient;
 import plana.replan.domain.auth.dto.GoogleLoginRequestDto;
 import plana.replan.domain.auth.dto.OAuthLoginResponseDto;
 import plana.replan.domain.user.entity.Provider;
@@ -45,7 +45,7 @@ class AuthServiceGoogleLoginTest {
   @Mock private JwtUtil jwtUtil;
   @Mock private StringRedisTemplate redisTemplate;
   @Mock private GoogleIdTokenVerifier googleIdTokenVerifier;
-  @Mock private RestTemplate restTemplate;
+  @Mock private RestClient restClient;
 
   @InjectMocks private AuthService authService;
 

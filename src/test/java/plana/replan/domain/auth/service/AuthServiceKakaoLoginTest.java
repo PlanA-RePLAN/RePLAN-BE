@@ -4,8 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
@@ -25,13 +25,10 @@ import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
-import org.springframework.http.HttpEntity;
-import org.springframework.http.HttpMethod;
-import org.springframework.http.ResponseEntity;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.client.ResourceAccessException;
+import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
-import org.springframework.web.client.RestTemplate;
 import plana.replan.domain.auth.dto.KakaoLoginRequestDto;
 import plana.replan.domain.auth.dto.OAuthLoginResponseDto;
 import plana.replan.domain.user.entity.Provider;
@@ -51,18 +48,36 @@ class AuthServiceKakaoLoginTest {
   @Mock private JwtUtil jwtUtil;
   @Mock private StringRedisTemplate redisTemplate;
   @Mock private GoogleIdTokenVerifier googleIdTokenVerifier;
-  @Mock private RestTemplate restTemplate;
+  @Mock private RestClient restClient;
+
+  @SuppressWarnings("rawtypes")
+  @Mock
+  private RestClient.RequestHeadersUriSpec requestHeadersUriSpec;
+
+  @SuppressWarnings("rawtypes")
+  @Mock
+  private RestClient.RequestHeadersSpec requestHeadersSpec;
+
+  @Mock private RestClient.ResponseSpec responseSpec;
 
   @InjectMocks private AuthService authService;
 
   @Mock private ValueOperations<String, String> valueOperations;
 
+  @SuppressWarnings("unchecked")
   @BeforeEach
   void setUp() {
     given(redisTemplate.opsForValue()).willReturn(valueOperations);
     given(jwtUtil.generateAccessToken(anyString(), anyString(), any())).willReturn("access-token");
     given(jwtUtil.generateRefreshToken(anyString())).willReturn("refresh-token");
     given(jwtUtil.getRefreshExpiration()).willReturn(604800000L);
+
+    lenient().when(restClient.get()).thenReturn(requestHeadersUriSpec);
+    lenient().when(requestHeadersUriSpec.uri(anyString())).thenReturn(requestHeadersSpec);
+    lenient()
+        .when(requestHeadersSpec.header(anyString(), anyString()))
+        .thenReturn(requestHeadersSpec);
+    lenient().when(requestHeadersSpec.retrieve()).thenReturn(responseSpec);
   }
 
   private void setupValidKakaoResponse(String email) {
@@ -73,13 +88,7 @@ class AuthServiceKakaoLoginTest {
     body.put("id", 1234567890L);
     body.put("kakao_account", kakaoAccount);
 
-    given(
-            restTemplate.exchange(
-                eq("https://kapi.kakao.com/v2/user/me"),
-                eq(HttpMethod.GET),
-                any(HttpEntity.class),
-                eq(Map.class)))
-        .willReturn(ResponseEntity.ok(body));
+    given(responseSpec.body(Map.class)).willReturn(body);
   }
 
   @Test
@@ -130,13 +139,7 @@ class AuthServiceKakaoLoginTest {
   @Test
   @DisplayName("카카오 API 타임아웃 발생 시: OAUTH_SERVER_UNAVAILABLE 예외")
   void kakaoLogin_timeout_throwsOAuthServerUnavailable() {
-    given(
-            restTemplate.exchange(
-                eq("https://kapi.kakao.com/v2/user/me"),
-                eq(HttpMethod.GET),
-                any(HttpEntity.class),
-                eq(Map.class)))
-        .willThrow(new ResourceAccessException("Read timed out"));
+    given(responseSpec.body(Map.class)).willThrow(new ResourceAccessException("Read timed out"));
 
     assertThatThrownBy(() -> authService.kakaoLogin(new KakaoLoginRequestDto("valid-token")))
         .isInstanceOf(CustomException.class)
@@ -149,13 +152,7 @@ class AuthServiceKakaoLoginTest {
   @Test
   @DisplayName("카카오 API 호출 중 예외 발생 시: KAKAO_TOKEN_INVALID 예외")
   void kakaoLogin_apiCallThrows_throws() {
-    given(
-            restTemplate.exchange(
-                eq("https://kapi.kakao.com/v2/user/me"),
-                eq(HttpMethod.GET),
-                any(HttpEntity.class),
-                eq(Map.class)))
-        .willThrow(new RestClientException("network error"));
+    given(responseSpec.body(Map.class)).willThrow(new RestClientException("network error"));
 
     assertThatThrownBy(() -> authService.kakaoLogin(new KakaoLoginRequestDto("bad-token")))
         .isInstanceOf(CustomException.class)
@@ -171,13 +168,7 @@ class AuthServiceKakaoLoginTest {
     Map<String, Object> body = new HashMap<>();
     body.put("id", 1234567890L);
 
-    given(
-            restTemplate.exchange(
-                eq("https://kapi.kakao.com/v2/user/me"),
-                eq(HttpMethod.GET),
-                any(HttpEntity.class),
-                eq(Map.class)))
-        .willReturn(ResponseEntity.ok(body));
+    given(responseSpec.body(Map.class)).willReturn(body);
 
     assertThatThrownBy(() -> authService.kakaoLogin(new KakaoLoginRequestDto("valid-token")))
         .isInstanceOf(CustomException.class)

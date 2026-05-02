@@ -8,15 +8,12 @@ import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.redis.core.StringRedisTemplate;
-import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpMethod;
-import org.springframework.http.ResponseEntity;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.ResourceAccessException;
-import org.springframework.web.client.RestTemplate;
+import org.springframework.web.client.RestClient;
 import plana.replan.domain.auth.dto.GoogleLoginRequestDto;
 import plana.replan.domain.auth.dto.KakaoLoginRequestDto;
 import plana.replan.domain.auth.dto.LoginRequestDto;
@@ -44,7 +41,7 @@ public class AuthService {
   private final JwtUtil jwtUtil;
   private final StringRedisTemplate redisTemplate;
   private final GoogleIdTokenVerifier googleIdTokenVerifier;
-  private final RestTemplate restTemplate;
+  private final RestClient restClient;
   private final S3Service s3Service;
 
   @Transactional
@@ -273,15 +270,14 @@ public class AuthService {
   @SuppressWarnings("unchecked")
   private Map<String, Object> fetchKakaoUserInfo(String accessToken) {
     try {
-      HttpHeaders headers = new HttpHeaders();
-      headers.setBearerAuth(accessToken);
-      HttpEntity<Void> entity = new HttpEntity<>(headers);
+      Map<String, Object> body =
+          restClient
+              .get()
+              .uri("https://kapi.kakao.com/v2/user/me")
+              .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+              .retrieve()
+              .body(Map.class);
 
-      ResponseEntity<Map> response =
-          restTemplate.exchange(
-              "https://kapi.kakao.com/v2/user/me", HttpMethod.GET, entity, Map.class);
-
-      Map<String, Object> body = response.getBody();
       if (body == null) {
         throw new CustomException(UserErrorCode.KAKAO_TOKEN_INVALID);
       }
@@ -317,15 +313,14 @@ public class AuthService {
   @SuppressWarnings("unchecked")
   private Map<String, Object> fetchNaverUserInfo(String accessToken) {
     try {
-      HttpHeaders headers = new HttpHeaders();
-      headers.setBearerAuth(accessToken);
-      HttpEntity<Void> entity = new HttpEntity<>(headers);
+      Map<String, Object> body =
+          restClient
+              .get()
+              .uri("https://openapi.naver.com/v1/nid/me")
+              .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+              .retrieve()
+              .body(Map.class);
 
-      ResponseEntity<Map> response =
-          restTemplate.exchange(
-              "https://openapi.naver.com/v1/nid/me", HttpMethod.GET, entity, Map.class);
-
-      Map<String, Object> body = response.getBody();
       if (body == null || !"00".equals(body.get("resultcode"))) {
         throw new CustomException(UserErrorCode.NAVER_TOKEN_INVALID);
       }
