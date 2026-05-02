@@ -52,6 +52,9 @@ public class S3Service {
   }
 
   public String moveToConfirmed(String tempKey) {
+    if (tempKey == null || !tempKey.startsWith("profiles/temp/")) {
+      throw new CustomException(UserErrorCode.INVALID_S3_KEY);
+    }
     String confirmedKey = tempKey.replace("profiles/temp/", "profiles/confirmed/");
 
     s3Client.copyObject(
