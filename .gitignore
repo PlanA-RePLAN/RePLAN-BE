@@ -39,8 +39,7 @@ out/
 ### macOS ###
 .DS_Store
 
-
- application.yml
+# application.yml
 src/main/resources/application-local.yaml
 docker-compose.yml
 
