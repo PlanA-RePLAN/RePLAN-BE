@@ -15,6 +15,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestTemplate;
 import plana.replan.domain.auth.dto.GoogleLoginRequestDto;
 import plana.replan.domain.auth.dto.KakaoLoginRequestDto;
@@ -298,6 +299,8 @@ public class AuthService {
       return result;
     } catch (CustomException e) {
       throw e;
+    } catch (ResourceAccessException e) {
+      throw new CustomException(UserErrorCode.OAUTH_SERVER_UNAVAILABLE);
     } catch (Exception e) {
       throw new CustomException(UserErrorCode.KAKAO_TOKEN_INVALID);
     }
@@ -329,6 +332,8 @@ public class AuthService {
       return (Map<String, Object>) body.get("response");
     } catch (CustomException e) {
       throw e;
+    } catch (ResourceAccessException e) {
+      throw new CustomException(UserErrorCode.OAUTH_SERVER_UNAVAILABLE);
     } catch (Exception e) {
       throw new CustomException(UserErrorCode.NAVER_TOKEN_INVALID);
     }
@@ -343,6 +348,8 @@ public class AuthService {
       return idToken;
     } catch (CustomException e) {
       throw e;
+    } catch (ResourceAccessException e) {
+      throw new CustomException(UserErrorCode.OAUTH_SERVER_UNAVAILABLE);
     } catch (Exception e) {
       throw new CustomException(UserErrorCode.GOOGLE_TOKEN_INVALID);
     }

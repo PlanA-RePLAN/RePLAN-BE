@@ -29,6 +29,7 @@ import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 import plana.replan.domain.auth.dto.KakaoLoginRequestDto;
@@ -124,6 +125,25 @@ class AuthServiceKakaoLoginTest {
     assertThat(result.getAccessToken()).isEqualTo("access-token");
     assertThat(result.getTempToken()).isNull();
     verify(userRepository, never()).save(any(User.class));
+  }
+
+  @Test
+  @DisplayName("카카오 API 타임아웃 발생 시: OAUTH_SERVER_UNAVAILABLE 예외")
+  void kakaoLogin_timeout_throwsOAuthServerUnavailable() {
+    given(
+            restTemplate.exchange(
+                eq("https://kapi.kakao.com/v2/user/me"),
+                eq(HttpMethod.GET),
+                any(HttpEntity.class),
+                eq(Map.class)))
+        .willThrow(new ResourceAccessException("Read timed out"));
+
+    assertThatThrownBy(() -> authService.kakaoLogin(new KakaoLoginRequestDto("valid-token")))
+        .isInstanceOf(CustomException.class)
+        .satisfies(
+            e ->
+                assertThat(((CustomException) e).getErrorCode())
+                    .isEqualTo(UserErrorCode.OAUTH_SERVER_UNAVAILABLE));
   }
 
   @Test

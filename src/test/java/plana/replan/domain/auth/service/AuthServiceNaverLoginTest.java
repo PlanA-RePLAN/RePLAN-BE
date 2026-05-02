@@ -29,6 +29,7 @@ import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 import plana.replan.domain.auth.dto.NaverLoginRequestDto;
@@ -150,6 +151,25 @@ class AuthServiceNaverLoginTest {
             e ->
                 assertThat(((CustomException) e).getErrorCode())
                     .isEqualTo(UserErrorCode.NAVER_TOKEN_INVALID));
+  }
+
+  @Test
+  @DisplayName("네이버 API 타임아웃 발생 시: OAUTH_SERVER_UNAVAILABLE 예외")
+  void naverLogin_timeout_throwsOAuthServerUnavailable() {
+    given(
+            restTemplate.exchange(
+                eq("https://openapi.naver.com/v1/nid/me"),
+                eq(HttpMethod.GET),
+                any(HttpEntity.class),
+                eq(Map.class)))
+        .willThrow(new ResourceAccessException("Read timed out"));
+
+    assertThatThrownBy(() -> authService.naverLogin(new NaverLoginRequestDto("valid-token")))
+        .isInstanceOf(CustomException.class)
+        .satisfies(
+            e ->
+                assertThat(((CustomException) e).getErrorCode())
+                    .isEqualTo(UserErrorCode.OAUTH_SERVER_UNAVAILABLE));
   }
 
   @Test

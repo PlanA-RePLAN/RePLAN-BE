@@ -17,7 +17,8 @@ public enum UserErrorCode implements ErrorCode {
   KAKAO_TOKEN_INVALID(401, "Kakao Access Token 검증에 실패했습니다."),
   INVALID_TEMP_TOKEN(401, "유효하지 않은 임시 토큰입니다."),
   DUPLICATE_NICKNAME(409, "이미 사용 중인 닉네임입니다."),
-  INVALID_S3_KEY(400, "유효하지 않은 S3 키입니다.");
+  INVALID_S3_KEY(400, "유효하지 않은 S3 키입니다."),
+  OAUTH_SERVER_UNAVAILABLE(503, "OAuth 서버와 통신에 실패했습니다.");
 
   private final int status;
   private final String message;
