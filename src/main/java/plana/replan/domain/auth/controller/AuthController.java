@@ -9,11 +9,19 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
+import plana.replan.domain.auth.dto.GoogleLoginRequestDto;
+import plana.replan.domain.auth.dto.KakaoLoginRequestDto;
 import plana.replan.domain.auth.dto.LoginRequestDto;
 import plana.replan.domain.auth.dto.LoginResponseDto;
+import plana.replan.domain.auth.dto.NaverLoginRequestDto;
+import plana.replan.domain.auth.dto.NicknameCheckResponseDto;
+import plana.replan.domain.auth.dto.OAuthLoginResponseDto;
+import plana.replan.domain.auth.dto.OAuthRegisterRequestDto;
 import plana.replan.domain.auth.dto.SignUpRequestDto;
 import plana.replan.domain.auth.service.AuthService;
 import plana.replan.global.common.ApiResult;
@@ -23,6 +31,7 @@ import plana.replan.global.jwt.JwtErrorCode;
 @Tag(name = "Auth", description = "인증 관련 API")
 @RestController
 @RequestMapping("/api/auth")
+@Validated
 @RequiredArgsConstructor
 public class AuthController {
 
@@ -435,5 +444,506 @@ public class AuthController {
     }
     authService.logout(accessToken);
     return ResponseEntity.ok(ApiResult.ok());
+  }
+
+  @Operation(
+      summary = "Google 소셜 로그인",
+      description =
+          """
+                  **호출 주체**: 비인증 사용자 (누구나 호출 가능)
+
+                  **지원 플랫폼**: 웹(GIS SDK) / Android(GoogleSignIn) / iOS(GIDSignIn) 공통 사용
+
+                  **비즈니스 로직**
+                  1. Google SDK에서 발급받은 credential(ID Token)을 전달
+                  2. 서버에서 Google ID Token 서명·audience·만료 검증
+                  3. 이메일 인증이 완료된 구글 계정인지 확인
+                  4. 동일 이메일이 다른 방식으로 가입된 경우 409 반환
+                  5. 기존유저: AccessToken + RefreshToken 즉시 발급 (isNewUser: false)
+                  6. 신규유저: tempToken(5분) 발급 (isNewUser: true) → 온보딩 화면 후 `/api/auth/oauth/register` 호출 필요
+                  """)
+  @ApiResponses({
+    @ApiResponse(
+        responseCode = "200",
+        description = "Google 로그인 성공 (기존유저: JWT 발급 / 신규유저: tempToken 발급)",
+        content =
+            @Content(
+                schema = @Schema(implementation = OAuthLoginResponseDto.class),
+                examples = {
+                  @ExampleObject(
+                      name = "기존유저",
+                      value =
+                          """
+                              {
+                                "status": 200,
+                                "success": true,
+                                "data": {
+                                  "isNewUser": false,
+                                  "tempToken": null,
+                                  "accessToken": "eyJhbGciOiJIUzI1NiJ9...",
+                                  "refreshToken": "eyJhbGciOiJIUzI1NiJ9..."
+                                },
+                                "error": null
+                              }
+                              """),
+                  @ExampleObject(
+                      name = "신규유저 (온보딩 필요)",
+                      value =
+                          """
+                              {
+                                "status": 200,
+                                "success": true,
+                                "data": {
+                                  "isNewUser": true,
+                                  "tempToken": "550e8400-e29b-41d4-a716-446655440000",
+                                  "accessToken": null,
+                                  "refreshToken": null
+                                },
+                                "error": null
+                              }
+                              """)
+                })),
+    @ApiResponse(
+        responseCode = "400",
+        description = "요청 값 유효성 검사 실패 (credential 누락/공백)",
+        content =
+            @Content(
+                examples =
+                    @ExampleObject(
+                        value =
+                            """
+                               {
+                                  "status": 400,
+                                  "success": false,
+                                  "data": null,
+                                  "error": {
+                                    "code": "INVALID_INPUT",
+                                    "message": "잘못된 입력입니다.",
+                                    "detail": "credential: Google ID Token은 필수입니다."
+                                  }
+                                }
+                               """))),
+    @ApiResponse(
+        responseCode = "401",
+        description = "Google ID Token 검증 실패 (만료, 위조, 이메일 미인증)",
+        content =
+            @Content(
+                examples =
+                    @ExampleObject(
+                        value =
+                            """
+                                {
+                                  "status": 401,
+                                  "success": false,
+                                  "data": null,
+                                  "error": {
+                                    "code": "GOOGLE_TOKEN_INVALID",
+                                    "message": "Google ID Token 검증에 실패했습니다.",
+                                    "detail": null
+                                  }
+                                }
+                                """))),
+    @ApiResponse(
+        responseCode = "409",
+        description = "동일 이메일이 이미 다른 방식으로 가입됨",
+        content =
+            @Content(
+                examples =
+                    @ExampleObject(
+                        value =
+                            """
+                                {
+                                  "status": 409,
+                                  "success": false,
+                                  "data": null,
+                                  "error": {
+                                    "code": "OAUTH_PROVIDER_CONFLICT",
+                                    "message": "해당 이메일은 이미 다른 방식으로 가입되어 있습니다.",
+                                    "detail": null
+                                  }
+                                }
+                                """)))
+  })
+  @PostMapping("/oauth/google")
+  public ResponseEntity<ApiResult<OAuthLoginResponseDto>> googleLogin(
+      @Valid @RequestBody GoogleLoginRequestDto request) {
+    return ResponseEntity.ok(ApiResult.ok(authService.googleLogin(request)));
+  }
+
+  @Operation(
+      summary = "Naver 소셜 로그인",
+      description =
+          """
+                  **호출 주체**: 비인증 사용자 (누구나 호출 가능)
+
+                  **비즈니스 로직**
+                  1. 네이버 SDK에서 발급받은 Access Token을 전달
+                  2. 서버에서 네이버 프로필 API(`/v1/nid/me`)를 호출하여 토큰 유효성 검증
+                  3. 이메일 제공에 동의하지 않은 경우 401 반환
+                  4. 동일 이메일이 다른 방식으로 가입된 경우 409 반환
+                  5. 기존유저: AccessToken + RefreshToken 즉시 발급 (isNewUser: false)
+                  6. 신규유저: tempToken(5분) 발급 (isNewUser: true) → 온보딩 화면 후 `/api/auth/oauth/register` 호출 필요
+                  """)
+  @ApiResponses({
+    @ApiResponse(
+        responseCode = "200",
+        description = "Naver 로그인 성공 (기존유저: JWT 발급 / 신규유저: tempToken 발급)",
+        content =
+            @Content(
+                schema = @Schema(implementation = OAuthLoginResponseDto.class),
+                examples = {
+                  @ExampleObject(
+                      name = "기존유저",
+                      value =
+                          """
+                              {
+                                "status": 200,
+                                "success": true,
+                                "data": {
+                                  "isNewUser": false,
+                                  "tempToken": null,
+                                  "accessToken": "eyJhbGciOiJIUzI1NiJ9...",
+                                  "refreshToken": "eyJhbGciOiJIUzI1NiJ9..."
+                                },
+                                "error": null
+                              }
+                              """),
+                  @ExampleObject(
+                      name = "신규유저 (온보딩 필요)",
+                      value =
+                          """
+                              {
+                                "status": 200,
+                                "success": true,
+                                "data": {
+                                  "isNewUser": true,
+                                  "tempToken": "550e8400-e29b-41d4-a716-446655440000",
+                                  "accessToken": null,
+                                  "refreshToken": null
+                                },
+                                "error": null
+                              }
+                              """)
+                })),
+    @ApiResponse(
+        responseCode = "400",
+        description = "요청 값 유효성 검사 실패 (accessToken 누락/공백)",
+        content =
+            @Content(
+                examples =
+                    @ExampleObject(
+                        value =
+                            """
+                               {
+                                  "status": 400,
+                                  "success": false,
+                                  "data": null,
+                                  "error": {
+                                    "code": "INVALID_INPUT",
+                                    "message": "잘못된 입력입니다.",
+                                    "detail": "accessToken: Naver Access Token은 필수입니다."
+                                  }
+                                }
+                               """))),
+    @ApiResponse(
+        responseCode = "401",
+        description = "Naver Access Token 검증 실패 또는 이메일 미제공",
+        content =
+            @Content(
+                examples =
+                    @ExampleObject(
+                        value =
+                            """
+                                {
+                                  "status": 401,
+                                  "success": false,
+                                  "data": null,
+                                  "error": {
+                                    "code": "NAVER_TOKEN_INVALID",
+                                    "message": "Naver Access Token 검증에 실패했습니다.",
+                                    "detail": null
+                                  }
+                                }
+                                """))),
+    @ApiResponse(
+        responseCode = "409",
+        description = "동일 이메일이 이미 다른 방식으로 가입됨",
+        content =
+            @Content(
+                examples =
+                    @ExampleObject(
+                        value =
+                            """
+                                {
+                                  "status": 409,
+                                  "success": false,
+                                  "data": null,
+                                  "error": {
+                                    "code": "OAUTH_PROVIDER_CONFLICT",
+                                    "message": "해당 이메일은 이미 다른 방식으로 가입되어 있습니다.",
+                                    "detail": null
+                                  }
+                                }
+                                """)))
+  })
+  @PostMapping("/oauth/naver")
+  public ResponseEntity<ApiResult<OAuthLoginResponseDto>> naverLogin(
+      @Valid @RequestBody NaverLoginRequestDto request) {
+    return ResponseEntity.ok(ApiResult.ok(authService.naverLogin(request)));
+  }
+
+  @Operation(
+      summary = "Kakao 소셜 로그인",
+      description =
+          """
+                  **호출 주체**: 비인증 사용자 (누구나 호출 가능)
+
+                  **지원 플랫폼**: 웹(Kakao JavaScript SDK) / Android(KakaoSDK) / iOS(KakaoSDKAuth) 공통 사용
+
+                  **비즈니스 로직**
+                  1. 카카오 SDK에서 발급받은 Access Token을 전달
+                  2. 서버에서 카카오 사용자 정보 API(`/v2/user/me`)를 호출하여 토큰 유효성 검증
+                  3. 이메일 제공에 동의하지 않은 경우 401 반환
+                  4. 동일 이메일이 다른 방식으로 가입된 경우 409 반환
+                  5. 기존유저: AccessToken + RefreshToken 즉시 발급 (isNewUser: false)
+                  6. 신규유저: tempToken(5분) 발급 (isNewUser: true) → 온보딩 화면 후 `/api/auth/oauth/register` 호출 필요
+                  """)
+  @ApiResponses({
+    @ApiResponse(
+        responseCode = "200",
+        description = "Kakao 로그인 성공 (기존유저: JWT 발급 / 신규유저: tempToken 발급)",
+        content =
+            @Content(
+                schema = @Schema(implementation = OAuthLoginResponseDto.class),
+                examples = {
+                  @ExampleObject(
+                      name = "기존유저",
+                      value =
+                          """
+                              {
+                                "status": 200,
+                                "success": true,
+                                "data": {
+                                  "isNewUser": false,
+                                  "tempToken": null,
+                                  "accessToken": "eyJhbGciOiJIUzI1NiJ9...",
+                                  "refreshToken": "eyJhbGciOiJIUzI1NiJ9..."
+                                },
+                                "error": null
+                              }
+                              """),
+                  @ExampleObject(
+                      name = "신규유저 (온보딩 필요)",
+                      value =
+                          """
+                              {
+                                "status": 200,
+                                "success": true,
+                                "data": {
+                                  "isNewUser": true,
+                                  "tempToken": "550e8400-e29b-41d4-a716-446655440000",
+                                  "accessToken": null,
+                                  "refreshToken": null
+                                },
+                                "error": null
+                              }
+                              """)
+                })),
+    @ApiResponse(
+        responseCode = "400",
+        description = "요청 값 유효성 검사 실패 (accessToken 누락/공백)",
+        content =
+            @Content(
+                examples =
+                    @ExampleObject(
+                        value =
+                            """
+                               {
+                                  "status": 400,
+                                  "success": false,
+                                  "data": null,
+                                  "error": {
+                                    "code": "INVALID_INPUT",
+                                    "message": "잘못된 입력입니다.",
+                                    "detail": "accessToken: Kakao Access Token은 필수입니다."
+                                  }
+                                }
+                               """))),
+    @ApiResponse(
+        responseCode = "401",
+        description = "Kakao Access Token 검증 실패 또는 이메일 미제공",
+        content =
+            @Content(
+                examples =
+                    @ExampleObject(
+                        value =
+                            """
+                                {
+                                  "status": 401,
+                                  "success": false,
+                                  "data": null,
+                                  "error": {
+                                    "code": "KAKAO_TOKEN_INVALID",
+                                    "message": "Kakao Access Token 검증에 실패했습니다.",
+                                    "detail": null
+                                  }
+                                }
+                                """))),
+    @ApiResponse(
+        responseCode = "409",
+        description = "동일 이메일이 이미 다른 방식으로 가입됨",
+        content =
+            @Content(
+                examples =
+                    @ExampleObject(
+                        value =
+                            """
+                                {
+                                  "status": 409,
+                                  "success": false,
+                                  "data": null,
+                                  "error": {
+                                    "code": "OAUTH_PROVIDER_CONFLICT",
+                                    "message": "해당 이메일은 이미 다른 방식으로 가입되어 있습니다.",
+                                    "detail": null
+                                  }
+                                }
+                                """)))
+  })
+  @PostMapping("/oauth/kakao")
+  public ResponseEntity<ApiResult<OAuthLoginResponseDto>> kakaoLogin(
+      @Valid @RequestBody KakaoLoginRequestDto request) {
+    return ResponseEntity.ok(ApiResult.ok(authService.kakaoLogin(request)));
+  }
+
+  @Operation(
+      summary = "OAuth 신규유저 프로필 등록",
+      description =
+          """
+                  **호출 주체**: OAuth 로그인 후 신규유저 (tempToken 보유)
+
+                  **요청 방법**: `Authorization: Bearer {tempToken}` 헤더 필수
+
+                  **비즈니스 로직**
+                  1. tempToken으로 Redis에서 email, provider 조회 (5분 유효)
+                  2. 닉네임 중복 확인
+                  3. s3Key가 있으면 S3 temp → confirmed 이동 후 CloudFront URL 저장
+                  4. 유저 생성 및 DB 저장
+                  5. tempToken Redis에서 삭제
+                  6. AccessToken + RefreshToken 발급
+                  """)
+  @ApiResponses({
+    @ApiResponse(responseCode = "200", description = "프로필 등록 성공 - AccessToken, RefreshToken 반환"),
+    @ApiResponse(
+        responseCode = "400",
+        description = "nickname 누락",
+        content =
+            @Content(
+                examples =
+                    @ExampleObject(
+                        value =
+                            """
+                                {
+                                  "status": 400,
+                                  "success": false,
+                                  "data": null,
+                                  "error": {
+                                    "code": "INVALID_INPUT",
+                                    "message": "잘못된 입력입니다.",
+                                    "detail": "nickname: 닉네임은 필수입니다."
+                                  }
+                                }
+                                """))),
+    @ApiResponse(
+        responseCode = "401",
+        description = "tempToken 없음 또는 만료",
+        content =
+            @Content(
+                examples = {
+                  @ExampleObject(
+                      name = "토큰 없음 (Authorization 헤더 누락 또는 Bearer 형식 오류)",
+                      value =
+                          """
+                              {
+                                "status": 401,
+                                "success": false,
+                                "data": null,
+                                "error": {
+                                  "code": "EMPTY_TOKEN",
+                                  "message": "토큰이 없습니다.",
+                                  "detail": null
+                                }
+                              }
+                              """),
+                  @ExampleObject(
+                      name = "유효하지 않은 tempToken (만료 또는 Redis 미존재)",
+                      value =
+                          """
+                              {
+                                "status": 401,
+                                "success": false,
+                                "data": null,
+                                "error": {
+                                  "code": "INVALID_TEMP_TOKEN",
+                                  "message": "유효하지 않은 임시 토큰입니다.",
+                                  "detail": null
+                                }
+                              }
+                              """)
+                })),
+    @ApiResponse(
+        responseCode = "409",
+        description = "닉네임 중복",
+        content =
+            @Content(
+                examples =
+                    @ExampleObject(
+                        value =
+                            """
+                                {
+                                  "status": 409,
+                                  "success": false,
+                                  "data": null,
+                                  "error": {
+                                    "code": "DUPLICATE_NICKNAME",
+                                    "message": "이미 사용 중인 닉네임입니다.",
+                                    "detail": null
+                                  }
+                                }
+                                """)))
+  })
+  @PostMapping("/oauth/register")
+  public ResponseEntity<ApiResult<LoginResponseDto>> register(
+      @RequestHeader(value = "Authorization", required = false) String authHeader,
+      @Valid @RequestBody OAuthRegisterRequestDto request) {
+
+    if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+      throw new CustomException(JwtErrorCode.EMPTY_TOKEN);
+    }
+    String tempToken = authHeader.substring(7);
+    if (tempToken.isBlank()) {
+      throw new CustomException(JwtErrorCode.EMPTY_TOKEN);
+    }
+    return ResponseEntity.ok(ApiResult.ok(authService.register(request, tempToken)));
+  }
+
+  @Operation(
+      summary = "닉네임 중복 확인",
+      description =
+          """
+                  **호출 주체**: 비인증 사용자 (누구나 호출 가능)
+
+                  **비즈니스 로직**
+                  1. 입력한 닉네임이 DB에 존재하는지 확인
+                  2. available=true면 사용 가능, false면 중복
+                  """)
+  @ApiResponses({
+    @ApiResponse(responseCode = "200", description = "중복 확인 결과 반환"),
+  })
+  @GetMapping("/nickname/check")
+  public ResponseEntity<ApiResult<NicknameCheckResponseDto>> checkNickname(
+      @RequestParam @NotBlank String nickname) {
+    return ResponseEntity.ok(
+        ApiResult.ok(new NicknameCheckResponseDto(authService.checkNickname(nickname))));
   }
 }

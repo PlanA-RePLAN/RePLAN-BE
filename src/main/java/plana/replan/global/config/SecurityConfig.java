@@ -47,7 +47,8 @@ public class SecurityConfig {
                         "/v3/api-docs",
                         "/swagger-ui.html",
                         "/actuator/health",
-                        "/api/auth/**" // 로그인, 회원가입은 인증 없이 허용
+                        "/api/auth/**", // 로그인, 회원가입은 인증 없이 허용
+                        "/api/s3/**" // tempToken 검증은 서비스 레이어에서 수동으로
                         )
                     .permitAll()
                     .anyRequest()
