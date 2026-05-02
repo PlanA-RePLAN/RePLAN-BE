@@ -456,30 +456,50 @@ public class AuthController {
                   2. 서버에서 Google ID Token 서명·audience·만료 검증
                   3. 이메일 인증이 완료된 구글 계정인지 확인
                   4. 동일 이메일이 다른 방식으로 가입된 경우 409 반환
-                  5. GOOGLE 유저가 있으면 로그인, 없으면 자동 회원가입 후 로그인
-                  6. 자체 AccessToken + RefreshToken 발급하여 반환
+                  5. 기존유저: AccessToken + RefreshToken 즉시 발급 (isNewUser: false)
+                  6. 신규유저: tempToken(5분) 발급 (isNewUser: true) → 온보딩 화면 후 `/api/auth/oauth/register` 호출 필요
                   """)
   @ApiResponses({
     @ApiResponse(
         responseCode = "200",
-        description = "Google 로그인 성공 - AccessToken, RefreshToken 반환",
+        description = "Google 로그인 성공 (기존유저: JWT 발급 / 신규유저: tempToken 발급)",
         content =
             @Content(
-                schema = @Schema(implementation = LoginResponseDto.class),
-                examples =
-                    @ExampleObject(
-                        value =
-                            """
-                                {
-                                  "status": 200,
-                                  "success": true,
-                                  "data": {
-                                    "accessToken": "eyJhbGciOiJIUzI1NiJ9...",
-                                    "refreshToken": "eyJhbGciOiJIUzI1NiJ9..."
-                                  },
-                                  "error": null
-                                }
-                                """))),
+                schema = @Schema(implementation = OAuthLoginResponseDto.class),
+                examples = {
+                  @ExampleObject(
+                      name = "기존유저",
+                      value =
+                          """
+                              {
+                                "status": 200,
+                                "success": true,
+                                "data": {
+                                  "isNewUser": false,
+                                  "tempToken": null,
+                                  "accessToken": "eyJhbGciOiJIUzI1NiJ9...",
+                                  "refreshToken": "eyJhbGciOiJIUzI1NiJ9..."
+                                },
+                                "error": null
+                              }
+                              """),
+                  @ExampleObject(
+                      name = "신규유저 (온보딩 필요)",
+                      value =
+                          """
+                              {
+                                "status": 200,
+                                "success": true,
+                                "data": {
+                                  "isNewUser": true,
+                                  "tempToken": "550e8400-e29b-41d4-a716-446655440000",
+                                  "accessToken": null,
+                                  "refreshToken": null
+                                },
+                                "error": null
+                              }
+                              """)
+                })),
     @ApiResponse(
         responseCode = "400",
         description = "요청 값 유효성 검사 실패 (credential 누락/공백)",
@@ -558,30 +578,50 @@ public class AuthController {
                   2. 서버에서 네이버 프로필 API(`/v1/nid/me`)를 호출하여 토큰 유효성 검증
                   3. 이메일 제공에 동의하지 않은 경우 401 반환
                   4. 동일 이메일이 다른 방식으로 가입된 경우 409 반환
-                  5. NAVER 유저가 있으면 로그인, 없으면 자동 회원가입 후 로그인
-                  6. 자체 AccessToken + RefreshToken 발급하여 반환
+                  5. 기존유저: AccessToken + RefreshToken 즉시 발급 (isNewUser: false)
+                  6. 신규유저: tempToken(5분) 발급 (isNewUser: true) → 온보딩 화면 후 `/api/auth/oauth/register` 호출 필요
                   """)
   @ApiResponses({
     @ApiResponse(
         responseCode = "200",
-        description = "Naver 로그인 성공 - AccessToken, RefreshToken 반환",
+        description = "Naver 로그인 성공 (기존유저: JWT 발급 / 신규유저: tempToken 발급)",
         content =
             @Content(
-                schema = @Schema(implementation = LoginResponseDto.class),
-                examples =
-                    @ExampleObject(
-                        value =
-                            """
-                                {
-                                  "status": 200,
-                                  "success": true,
-                                  "data": {
-                                    "accessToken": "eyJhbGciOiJIUzI1NiJ9...",
-                                    "refreshToken": "eyJhbGciOiJIUzI1NiJ9..."
-                                  },
-                                  "error": null
-                                }
-                                """))),
+                schema = @Schema(implementation = OAuthLoginResponseDto.class),
+                examples = {
+                  @ExampleObject(
+                      name = "기존유저",
+                      value =
+                          """
+                              {
+                                "status": 200,
+                                "success": true,
+                                "data": {
+                                  "isNewUser": false,
+                                  "tempToken": null,
+                                  "accessToken": "eyJhbGciOiJIUzI1NiJ9...",
+                                  "refreshToken": "eyJhbGciOiJIUzI1NiJ9..."
+                                },
+                                "error": null
+                              }
+                              """),
+                  @ExampleObject(
+                      name = "신규유저 (온보딩 필요)",
+                      value =
+                          """
+                              {
+                                "status": 200,
+                                "success": true,
+                                "data": {
+                                  "isNewUser": true,
+                                  "tempToken": "550e8400-e29b-41d4-a716-446655440000",
+                                  "accessToken": null,
+                                  "refreshToken": null
+                                },
+                                "error": null
+                              }
+                              """)
+                })),
     @ApiResponse(
         responseCode = "400",
         description = "요청 값 유효성 검사 실패 (accessToken 누락/공백)",
@@ -662,30 +702,50 @@ public class AuthController {
                   2. 서버에서 카카오 사용자 정보 API(`/v2/user/me`)를 호출하여 토큰 유효성 검증
                   3. 이메일 제공에 동의하지 않은 경우 401 반환
                   4. 동일 이메일이 다른 방식으로 가입된 경우 409 반환
-                  5. KAKAO 유저가 있으면 로그인, 없으면 자동 회원가입 후 로그인
-                  6. 자체 AccessToken + RefreshToken 발급하여 반환
+                  5. 기존유저: AccessToken + RefreshToken 즉시 발급 (isNewUser: false)
+                  6. 신규유저: tempToken(5분) 발급 (isNewUser: true) → 온보딩 화면 후 `/api/auth/oauth/register` 호출 필요
                   """)
   @ApiResponses({
     @ApiResponse(
         responseCode = "200",
-        description = "Kakao 로그인 성공 - AccessToken, RefreshToken 반환",
+        description = "Kakao 로그인 성공 (기존유저: JWT 발급 / 신규유저: tempToken 발급)",
         content =
             @Content(
-                schema = @Schema(implementation = LoginResponseDto.class),
-                examples =
-                    @ExampleObject(
-                        value =
-                            """
-                                {
-                                  "status": 200,
-                                  "success": true,
-                                  "data": {
-                                    "accessToken": "eyJhbGciOiJIUzI1NiJ9...",
-                                    "refreshToken": "eyJhbGciOiJIUzI1NiJ9..."
-                                  },
-                                  "error": null
-                                }
-                                """))),
+                schema = @Schema(implementation = OAuthLoginResponseDto.class),
+                examples = {
+                  @ExampleObject(
+                      name = "기존유저",
+                      value =
+                          """
+                              {
+                                "status": 200,
+                                "success": true,
+                                "data": {
+                                  "isNewUser": false,
+                                  "tempToken": null,
+                                  "accessToken": "eyJhbGciOiJIUzI1NiJ9...",
+                                  "refreshToken": "eyJhbGciOiJIUzI1NiJ9..."
+                                },
+                                "error": null
+                              }
+                              """),
+                  @ExampleObject(
+                      name = "신규유저 (온보딩 필요)",
+                      value =
+                          """
+                              {
+                                "status": 200,
+                                "success": true,
+                                "data": {
+                                  "isNewUser": true,
+                                  "tempToken": "550e8400-e29b-41d4-a716-446655440000",
+                                  "accessToken": null,
+                                  "refreshToken": null
+                                },
+                                "error": null
+                              }
+                              """)
+                })),
     @ApiResponse(
         responseCode = "400",
         description = "요청 값 유효성 검사 실패 (accessToken 누락/공백)",

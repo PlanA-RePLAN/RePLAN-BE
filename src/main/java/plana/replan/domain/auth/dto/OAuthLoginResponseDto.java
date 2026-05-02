@@ -1,11 +1,14 @@
 package plana.replan.domain.auth.dto;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Getter;
 
 @Getter
 public class OAuthLoginResponseDto {
 
+  @JsonProperty("isNewUser")
   private final boolean isNewUser;
+
   private final String tempToken;
   private final String accessToken;
   private final String refreshToken;
