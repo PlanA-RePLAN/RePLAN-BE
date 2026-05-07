@@ -43,8 +43,11 @@ out/
 src/main/resources/application-local.yaml
 docker-compose.yml
 
-# 클로드
+# 클로드 (rules는 팀 공유를 위해 추적)
 .claude
+!.claude/
+!.claude/rules/
+!.claude/rules/**
 
 #로컬 DB및 레디스
 postgres_data/
