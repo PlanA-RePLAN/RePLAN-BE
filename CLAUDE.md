@@ -11,6 +11,11 @@
 
 빌드가 실패하면 해당 작업은 완료된 것으로 간주하지 않는다.
 
+### PR / 커밋 작성 규칙
+- PR 본문, 커밋 메시지에 AI가 작성했다는 흔적을 절대 남기지 않는다.
+- `Co-Authored-By: Claude`, `🤖 Generated with Claude Code` 등 일체 금지.
+- 사람이 직접 작성한 것처럼 자연스럽게 작성한다.
+
 ### Swagger API 명세 (모든 API 필수)
 
 **Controller는 반드시 Docs 인터페이스와 구현 클래스로 분리한다.**
