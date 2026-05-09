@@ -6,3 +6,4 @@ ALTER TABLE todo ADD COLUMN created_at TIMESTAMP;
 ALTER TABLE failure_reason ADD COLUMN created_at TIMESTAMP;
 
 ALTER TABLE todo ALTER COLUMN is_pinned SET DEFAULT false;
+UPDATE todo SET is_pinned = false WHERE is_pinned IS NULL;
