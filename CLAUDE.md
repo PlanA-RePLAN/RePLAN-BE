@@ -62,3 +62,4 @@
 4. **`@Parameter`** — 쿼리/경로 파라미터마다 `description` + `example`
 
 5. **DTO** — 모든 필드에 `@Schema(description = "...", example = "...")`
+   > **예외:** `List<다른DTO>` 타입 필드는 참조 DTO에 example이 있으면 `example` 생략 가능. 직접 example 문자열을 작성하면 DTO 변경 시 문서가 낡아지는 문제가 생긴다.
