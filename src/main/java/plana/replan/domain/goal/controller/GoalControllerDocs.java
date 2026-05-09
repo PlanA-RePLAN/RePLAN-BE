@@ -73,8 +73,7 @@ public interface GoalControllerDocs {
                                 "id": 42,
                                 "title": "토익 900점 달성",
                                 "dueDate": "2025-12-31T00:00:00",
-                                "reference": "https://toeic.ets.org",
-                                "updatedAt": "2025-05-07T12:00:00"
+                                "reference": "https://toeic.ets.org"
                               },
                               "error": null
                             }
@@ -324,7 +323,6 @@ public interface GoalControllerDocs {
           | goals[].title | String | 목표 제목 |
           | goals[].dueDate | LocalDateTime | 목표 기한 (null 가능) |
           | goals[].reference | String | 참고 자료 (null 가능) |
-          | goals[].updatedAt | LocalDateTime | 마지막 수정 시간 |
           | nextCursor | Long | 다음 페이지 요청 시 cursor로 사용할 값. **마지막 페이지이면 null** |
           | hasNext | boolean | 다음 페이지 존재 여부. false이면 더 이상 데이터 없음 |
 
@@ -380,15 +378,13 @@ public interface GoalControllerDocs {
                                   "id": 42,
                                   "title": "토익 900점 달성",
                                   "dueDate": "2025-12-31T00:00:00",
-                                  "reference": "https://toeic.ets.org",
-                                  "updatedAt": "2025-05-07T12:00:00"
+                                  "reference": "https://toeic.ets.org"
                                 },
                                 {
                                   "id": 38,
                                   "title": "운동 습관 만들기",
                                   "dueDate": "2025-06-30T00:00:00",
-                                  "reference": null,
-                                  "updatedAt": "2025-05-01T09:00:00"
+                                  "reference": null
                                 }
                               ],
                               "nextCursor": 38,
@@ -410,8 +406,7 @@ public interface GoalControllerDocs {
                                   "id": 12,
                                   "title": "독서 50권",
                                   "dueDate": null,
-                                  "reference": null,
-                                  "updatedAt": "2025-01-10T08:00:00"
+                                  "reference": null
                                 }
                               ],
                               "nextCursor": null,

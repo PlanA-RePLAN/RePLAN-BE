@@ -62,12 +62,12 @@ public class GoalService {
       goals =
           cursor == null
               ? goalRepository.findByUserAndYear(user, year, pageable)
-              : goalRepository.findByUserAndYearAndIdLessThan(user, year, cursor, pageable);
+              : goalRepository.findByUserAndYearAndIdGreaterThan(user, year, cursor, pageable);
     } else {
       goals =
           cursor == null
-              ? goalRepository.findByUserOrderByIdDesc(user, pageable)
-              : goalRepository.findByUserAndIdLessThanOrderByIdDesc(user, cursor, pageable);
+              ? goalRepository.findByUserOrderByIdAsc(user, pageable)
+              : goalRepository.findByUserAndIdGreaterThanOrderByIdAsc(user, cursor, pageable);
     }
 
     boolean hasNext = goals.size() > size;

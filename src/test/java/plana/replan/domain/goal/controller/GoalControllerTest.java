@@ -53,11 +53,7 @@ class GoalControllerTest {
   void 목표_생성_성공() throws Exception {
     GoalResponse mockResponse =
         new GoalResponse(
-            42L,
-            "토익 900점 달성",
-            LocalDateTime.of(2025, 12, 31, 0, 0),
-            "https://toeic.ets.org",
-            LocalDateTime.of(2025, 5, 7, 12, 0));
+            42L, "토익 900점 달성", LocalDateTime.of(2025, 12, 31, 0, 0), "https://toeic.ets.org");
     given(goalService.createGoal(any(), any())).willReturn(mockResponse);
 
     mockMvc
@@ -175,7 +171,7 @@ class GoalControllerTest {
 
   @Test
   void 목표_조회_성공_기본() throws Exception {
-    GoalResponse goal = new GoalResponse(42L, "토익 900점", null, null, LocalDateTime.now());
+    GoalResponse goal = new GoalResponse(42L, "토익 900점", null, null);
     GoalPageResponse mockResponse = new GoalPageResponse(List.of(goal), null, false);
     given(goalService.getGoals(any(), any(), anyInt(), any())).willReturn(mockResponse);
 

@@ -51,7 +51,6 @@ class GoalServiceTest {
     given(savedGoal.getTitle()).willReturn("토익 900점 달성");
     given(savedGoal.getDueDate()).willReturn(LocalDateTime.of(2025, 12, 31, 0, 0));
     given(savedGoal.getReference()).willReturn("https://toeic.ets.org");
-    given(savedGoal.getUpdatedAt()).willReturn(LocalDateTime.of(2025, 5, 7, 12, 0));
     given(goalRepository.save(any())).willReturn(savedGoal);
 
     GoalCreateRequest request =
@@ -76,7 +75,6 @@ class GoalServiceTest {
     given(savedGoal.getTitle()).willReturn("독서 50권");
     given(savedGoal.getDueDate()).willReturn(null);
     given(savedGoal.getReference()).willReturn(null);
-    given(savedGoal.getUpdatedAt()).willReturn(LocalDateTime.now());
     given(goalRepository.save(any())).willReturn(savedGoal);
 
     GoalCreateRequest request = new GoalCreateRequest("독서 50권", null, null);
@@ -153,7 +151,7 @@ class GoalServiceTest {
     given(userRepository.findById(1L)).willReturn(Optional.of(user));
 
     Goal goal = mockGoal(10L, "운동 습관", null, null);
-    given(goalRepository.findByUserOrderByIdDesc(any(), any(Pageable.class)))
+    given(goalRepository.findByUserOrderByIdAsc(any(), any(Pageable.class)))
         .willReturn(List.of(goal));
 
     GoalPageResponse response = goalService.getGoals(1L, null, 10, null);
@@ -170,7 +168,7 @@ class GoalServiceTest {
 
     Goal goal = mockGoal(5L, "독서", null, null);
     given(
-            goalRepository.findByUserAndIdLessThanOrderByIdDesc(
+            goalRepository.findByUserAndIdGreaterThanOrderByIdAsc(
                 any(), any(Long.class), any(Pageable.class)))
         .willReturn(List.of(goal));
 
@@ -201,7 +199,7 @@ class GoalServiceTest {
 
     Goal goal = mockGoal(5L, "토익", LocalDateTime.of(2025, 6, 1, 0, 0), null);
     given(
-            goalRepository.findByUserAndYearAndIdLessThan(
+            goalRepository.findByUserAndYearAndIdGreaterThan(
                 any(), any(Integer.class), any(Long.class), any(Pageable.class)))
         .willReturn(List.of(goal));
 
@@ -220,7 +218,7 @@ class GoalServiceTest {
             mockGoal(10L, "목표1", null, null),
             mockGoal(9L, "목표2", null, null),
             mockGoal(8L, "목표3", null, null));
-    given(goalRepository.findByUserOrderByIdDesc(any(), any(Pageable.class))).willReturn(goals);
+    given(goalRepository.findByUserOrderByIdAsc(any(), any(Pageable.class))).willReturn(goals);
 
     GoalPageResponse response = goalService.getGoals(1L, null, 2, null);
 
@@ -235,7 +233,7 @@ class GoalServiceTest {
     given(userRepository.findById(1L)).willReturn(Optional.of(user));
 
     List<Goal> goals = List.of(mockGoal(10L, "목표1", null, null), mockGoal(9L, "목표2", null, null));
-    given(goalRepository.findByUserOrderByIdDesc(any(), any(Pageable.class))).willReturn(goals);
+    given(goalRepository.findByUserOrderByIdAsc(any(), any(Pageable.class))).willReturn(goals);
 
     GoalPageResponse response = goalService.getGoals(1L, null, 10, null);
 
@@ -282,7 +280,6 @@ class GoalServiceTest {
     given(goal.getTitle()).willReturn(title);
     given(goal.getDueDate()).willReturn(dueDate);
     given(goal.getReference()).willReturn(reference);
-    given(goal.getUpdatedAt()).willReturn(LocalDateTime.now());
     return goal;
   }
 }
