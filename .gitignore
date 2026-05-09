@@ -43,8 +43,9 @@ out/
 src/main/resources/application-local.yaml
 docker-compose.yml
 
-# 클로드
-.claude
+# 클로드 (rules만 추적, 나머지는 무시)
+.claude/commands
+.claude/settings*
 
 #로컬 DB및 레디스
 postgres_data/

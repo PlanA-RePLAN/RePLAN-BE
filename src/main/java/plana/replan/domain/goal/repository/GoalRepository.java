@@ -15,12 +15,12 @@ public interface GoalRepository extends JpaRepository<Goal, Long> {
   List<Goal> findByUserAndIdLessThanOrderByIdDesc(User user, Long cursor, Pageable pageable);
 
   @Query(
-      "SELECT g FROM Goal g WHERE g.user = :user AND FUNCTION('YEAR', g.dueDate) = :year ORDER BY g.id DESC")
+      "SELECT g FROM Goal g WHERE g.user = :user AND EXTRACT(YEAR FROM g.dueDate) = :year ORDER BY g.id DESC")
   List<Goal> findByUserAndYear(
       @Param("user") User user, @Param("year") int year, Pageable pageable);
 
   @Query(
-      "SELECT g FROM Goal g WHERE g.user = :user AND FUNCTION('YEAR', g.dueDate) = :year AND g.id < :cursor ORDER BY g.id DESC")
+      "SELECT g FROM Goal g WHERE g.user = :user AND EXTRACT(YEAR FROM g.dueDate) = :year AND g.id < :cursor ORDER BY g.id DESC")
   List<Goal> findByUserAndYearAndIdLessThan(
       @Param("user") User user,
       @Param("year") int year,
