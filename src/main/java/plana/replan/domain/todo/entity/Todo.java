@@ -41,7 +41,7 @@ public class Todo extends BaseTimeEntity {
   private double sortOrder = 10000.0;
 
   @Column(name = "is_pinned")
-  private Boolean isPinned;
+  private boolean isPinned = false;
 
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "user_id", nullable = false)
