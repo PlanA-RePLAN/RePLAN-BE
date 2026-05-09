@@ -15,6 +15,7 @@ import plana.replan.domain.user.entity.User;
 import plana.replan.domain.user.exception.UserErrorCode;
 import plana.replan.domain.user.repository.UserRepository;
 import plana.replan.global.exception.CustomException;
+import plana.replan.global.exception.GlobalErrorCode;
 
 @Service
 @RequiredArgsConstructor
@@ -50,6 +51,9 @@ public class GoalService {
 
   @Transactional(readOnly = true)
   public GoalPageResponse getGoals(Long userId, Long cursor, int size, Integer year) {
+    if (size < 1 || size > 100) {
+      throw new CustomException(GlobalErrorCode.INVALID_INPUT);
+    }
     User user = findUser(userId);
     PageRequest pageable = PageRequest.of(0, size + 1);
 

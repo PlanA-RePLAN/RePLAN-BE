@@ -28,6 +28,7 @@ import plana.replan.domain.user.entity.User;
 import plana.replan.domain.user.exception.UserErrorCode;
 import plana.replan.domain.user.repository.UserRepository;
 import plana.replan.global.exception.CustomException;
+import plana.replan.global.exception.GlobalErrorCode;
 
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
@@ -253,6 +254,26 @@ class GoalServiceTest {
             e ->
                 assertThat(((CustomException) e).getErrorCode())
                     .isEqualTo(UserErrorCode.USER_NOT_FOUND));
+  }
+
+  @Test
+  void 목표_조회_size_0이면_400() {
+    assertThatThrownBy(() -> goalService.getGoals(1L, null, 0, null))
+        .isInstanceOf(CustomException.class)
+        .satisfies(
+            e ->
+                assertThat(((CustomException) e).getErrorCode())
+                    .isEqualTo(GlobalErrorCode.INVALID_INPUT));
+  }
+
+  @Test
+  void 목표_조회_size_101이면_400() {
+    assertThatThrownBy(() -> goalService.getGoals(1L, null, 101, null))
+        .isInstanceOf(CustomException.class)
+        .satisfies(
+            e ->
+                assertThat(((CustomException) e).getErrorCode())
+                    .isEqualTo(GlobalErrorCode.INVALID_INPUT));
   }
 
   private Goal mockGoal(Long id, String title, LocalDateTime dueDate, String reference) {
