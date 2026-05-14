@@ -10,14 +10,15 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import java.util.List;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
-import plana.replan.domain.goal.dto.GoalCreateRequest;
-import plana.replan.domain.goal.dto.GoalPageResponse;
-import plana.replan.domain.goal.dto.GoalResponse;
+import plana.replan.domain.goal.dto.GoalCreateRequestDto;
+import plana.replan.domain.goal.dto.GoalSingleResponseDto;
+import plana.replan.domain.goal.dto.GoalsByDateResponseDto;
 import plana.replan.global.common.ApiResult;
 
 @Tag(name = "Goal", description = "목표(Goal) 관련 API. 모든 요청에 JWT 인증 필수.")
@@ -61,7 +62,7 @@ public interface GoalControllerDocs {
         description = "목표 생성 성공",
         content =
             @Content(
-                schema = @Schema(implementation = GoalResponse.class),
+                schema = @Schema(implementation = GoalSingleResponseDto.class),
                 examples =
                     @ExampleObject(
                         value =
@@ -156,8 +157,8 @@ public interface GoalControllerDocs {
                             }
                             """)))
   })
-  ResponseEntity<ApiResult<GoalResponse>> createGoal(
-      @AuthenticationPrincipal Long userId, @RequestBody GoalCreateRequest request);
+  ResponseEntity<ApiResult<GoalSingleResponseDto>> createGoal(
+      @AuthenticationPrincipal Long userId, @RequestBody GoalCreateRequestDto request);
 
   @Operation(
       summary = "목표 삭제",
@@ -289,10 +290,10 @@ public interface GoalControllerDocs {
       @AuthenticationPrincipal Long userId, @PathVariable Long id);
 
   @Operation(
-      summary = "목표 목록 조회 (커서 기반 무한스크롤)",
+      summary = "목표 목록 조회",
       description =
           """
-          목표 목록을 최신순(id 내림차순)으로 반환합니다. 커서 기반 페이지네이션으로 무한스크롤을 구현합니다.
+          목표 목록을 생성일 기준으로 날짜별로 묶어 반환합니다.
 
           ---
 
@@ -308,9 +309,8 @@ public interface GoalControllerDocs {
 
           | 파라미터명 | 필수 여부 | 타입 | 기본값 | 설명 | 예시 |
           |-----------|-----------|------|--------|------|------|
-          | cursor | ❌ 선택 | Long | 없음 (첫 페이지) | 이전 응답의 `nextCursor` 값. 없으면 첫 번째 페이지 반환 | `37` |
-          | size | ❌ 선택 | int | `10` | 한 번에 가져올 목표 수 | `10` |
-          | year | ❌ 선택 | int | 없음 (전체) | 조회할 연도 (`dueDate` 기준). 없으면 전체 목표 반환 | `2025` |
+          | year | ❌ 선택 | Integer | 없음 (전체) | 조회할 연도 (생성일 기준). 없으면 전체 목표 반환 | `2026` |
+          | month | ❌ 선택 | Integer | 없음 (연도 전체) | 조회할 월. **year 파라미터가 함께 있어야 함** | `5` |
 
           ---
 
@@ -318,44 +318,24 @@ public interface GoalControllerDocs {
 
           | 필드명 | 타입 | 설명 |
           |--------|------|------|
-          | goals | List\\<GoalResponse\\> | 목표 목록 |
-          | goals[].id | Long | 목표 ID |
-          | goals[].title | String | 목표 제목 |
-          | goals[].dueDate | LocalDateTime | 목표 기한 (null 가능) |
-          | goals[].reference | String | 참고 자료 (null 가능) |
-          | nextCursor | Long | 다음 페이지 요청 시 cursor로 사용할 값. **마지막 페이지이면 null** |
-          | hasNext | boolean | 다음 페이지 존재 여부. false이면 더 이상 데이터 없음 |
-
-          ---
-
-          ### 무한스크롤 구현 방법
-
-          **Step 1. 첫 번째 요청** — cursor 없이 호출
-          ```
-          GET /api/goals?size=10
-          GET /api/goals?year=2025&size=10
-          ```
-
-          **Step 2. 다음 페이지 요청** — 응답의 `nextCursor`를 cursor에 전달
-          ```
-          GET /api/goals?cursor=37&size=10
-          GET /api/goals?year=2025&cursor=37&size=10
-          ```
-
-          **Step 3. 종료 조건** — 응답의 `hasNext`가 `false`이거나 `nextCursor`가 `null`이면 마지막 페이지
+          | [].date | String (yyyy-MM-dd) | 생성 날짜 |
+          | [].goals | List | 해당 날짜에 생성된 목표 목록 |
+          | [].goals[].id | Long | 목표 ID |
+          | [].goals[].title | String | 목표 제목 |
+          | [].goals[].dueDate | LocalDateTime | 마감기한 (없으면 null) |
+          | [].goals[].reference | String | 참고 자료 (없으면 null) |
 
           ---
 
           ### 주의사항
-          - `cursor`는 **마지막으로 받은 목표의 id** (응답의 `nextCursor` 값 그대로 사용)
-          - `year` 파라미터가 없으면 `dueDate`가 null인 목표도 포함되어 반환됨
-          - `year` 파라미터를 사용하면 해당 연도에 `dueDate`가 설정된 목표만 반환 (`dueDate`가 null인 목표는 제외)
+          - `month`만 단독으로 전달하고 `year`가 없으면 400 반환
+          - 날짜 내림차순(최신 날짜 먼저) 반환
+          - 같은 날짜 내 목표는 생성 순서(ID 오름차순)로 반환
           """,
       security = @SecurityRequirement(name = "Bearer Authentication"))
   @Parameters({
-    @Parameter(name = "cursor", description = "이전 응답의 nextCursor 값. 없으면 첫 페이지.", example = "37"),
-    @Parameter(name = "size", description = "한 번에 가져올 목표 수. 기본값 10.", example = "10"),
-    @Parameter(name = "year", description = "조회할 연도 (dueDate 기준). 없으면 전체 조회.", example = "2025")
+    @Parameter(name = "year", description = "조회할 연도 (생성일 기준). 없으면 전체 조회.", example = "2026"),
+    @Parameter(name = "month", description = "조회할 월 (year 필수). 없으면 연도 전체 조회.", example = "5")
   })
   @ApiResponses({
     @ApiResponse(
@@ -363,59 +343,66 @@ public interface GoalControllerDocs {
         description = "조회 성공",
         content =
             @Content(
-                schema = @Schema(implementation = GoalPageResponse.class),
-                examples = {
-                  @ExampleObject(
-                      name = "중간 페이지 (hasNext=true)",
-                      value =
-                          """
-                          {
-                            "status": 200,
-                            "success": true,
-                            "data": {
-                              "goals": [
+                examples =
+                    @ExampleObject(
+                        value =
+                            """
+                            {
+                              "status": 200,
+                              "success": true,
+                              "data": [
                                 {
-                                  "id": 42,
-                                  "title": "토익 900점 달성",
-                                  "dueDate": "2025-12-31T00:00:00",
-                                  "reference": "https://toeic.ets.org"
+                                  "date": "2026-05-04",
+                                  "goals": [
+                                    {
+                                      "id": 10,
+                                      "title": "토익 850점 달성",
+                                      "dueDate": "2026-05-26T20:00:00",
+                                      "reference": "https://toeic.ets.org"
+                                    },
+                                    {
+                                      "id": 11,
+                                      "title": "컴퓨터활용능력 1급 취득",
+                                      "dueDate": null,
+                                      "reference": null
+                                    }
+                                  ]
                                 },
                                 {
-                                  "id": 38,
-                                  "title": "운동 습관 만들기",
-                                  "dueDate": "2025-06-30T00:00:00",
-                                  "reference": null
+                                  "date": "2026-05-03",
+                                  "goals": [
+                                    {
+                                      "id": 9,
+                                      "title": "토익 900점 달성",
+                                      "dueDate": "2026-05-11T00:00:00",
+                                      "reference": null
+                                    }
+                                  ]
                                 }
                               ],
-                              "nextCursor": 38,
-                              "hasNext": true
-                            },
-                            "error": null
-                          }
-                          """),
-                  @ExampleObject(
-                      name = "마지막 페이지 (hasNext=false)",
-                      value =
-                          """
-                          {
-                            "status": 200,
-                            "success": true,
-                            "data": {
-                              "goals": [
-                                {
-                                  "id": 12,
-                                  "title": "독서 50권",
-                                  "dueDate": null,
-                                  "reference": null
-                                }
-                              ],
-                              "nextCursor": null,
-                              "hasNext": false
-                            },
-                            "error": null
-                          }
-                          """)
-                })),
+                              "error": null
+                            }
+                            """))),
+    @ApiResponse(
+        responseCode = "400",
+        description = "year 없이 month만 전달한 경우",
+        content =
+            @Content(
+                examples =
+                    @ExampleObject(
+                        value =
+                            """
+                            {
+                              "status": 400,
+                              "success": false,
+                              "data": null,
+                              "error": {
+                                "code": "GOAL_INVALID_FILTER",
+                                "message": "월별 조회 시 연도(year)는 필수입니다.",
+                                "detail": null
+                              }
+                            }
+                            """))),
     @ApiResponse(
         responseCode = "401",
         description = "인증 실패 — 토큰 없음 또는 만료",
@@ -454,9 +441,8 @@ public interface GoalControllerDocs {
                           """)
                 }))
   })
-  ResponseEntity<ApiResult<GoalPageResponse>> getGoals(
+  ResponseEntity<ApiResult<List<GoalsByDateResponseDto>>> getGoals(
       @AuthenticationPrincipal Long userId,
-      @RequestParam(required = false) Long cursor,
-      @RequestParam(defaultValue = "10") int size,
-      @RequestParam(required = false) Integer year);
+      @RequestParam(required = false) Integer year,
+      @RequestParam(required = false) Integer month);
 }

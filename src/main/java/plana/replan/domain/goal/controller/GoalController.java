@@ -1,13 +1,14 @@
 package plana.replan.domain.goal.controller;
 
 import jakarta.validation.Valid;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
-import plana.replan.domain.goal.dto.GoalCreateRequest;
-import plana.replan.domain.goal.dto.GoalPageResponse;
-import plana.replan.domain.goal.dto.GoalResponse;
+import plana.replan.domain.goal.dto.GoalCreateRequestDto;
+import plana.replan.domain.goal.dto.GoalSingleResponseDto;
+import plana.replan.domain.goal.dto.GoalsByDateResponseDto;
 import plana.replan.domain.goal.service.GoalService;
 import plana.replan.global.common.ApiResult;
 
@@ -20,8 +21,8 @@ public class GoalController implements GoalControllerDocs {
 
   @Override
   @PostMapping
-  public ResponseEntity<ApiResult<GoalResponse>> createGoal(
-      @AuthenticationPrincipal Long userId, @Valid @RequestBody GoalCreateRequest request) {
+  public ResponseEntity<ApiResult<GoalSingleResponseDto>> createGoal(
+      @AuthenticationPrincipal Long userId, @Valid @RequestBody GoalCreateRequestDto request) {
     return ResponseEntity.ok(ApiResult.ok(goalService.createGoal(userId, request)));
   }
 
@@ -35,11 +36,10 @@ public class GoalController implements GoalControllerDocs {
 
   @Override
   @GetMapping
-  public ResponseEntity<ApiResult<GoalPageResponse>> getGoals(
+  public ResponseEntity<ApiResult<List<GoalsByDateResponseDto>>> getGoals(
       @AuthenticationPrincipal Long userId,
-      @RequestParam(required = false) Long cursor,
-      @RequestParam(defaultValue = "10") int size,
-      @RequestParam(required = false) Integer year) {
-    return ResponseEntity.ok(ApiResult.ok(goalService.getGoals(userId, cursor, size, year)));
+      @RequestParam(required = false) Integer year,
+      @RequestParam(required = false) Integer month) {
+    return ResponseEntity.ok(ApiResult.ok(goalService.getGoals(userId, year, month)));
   }
 }

@@ -1,13 +1,17 @@
 package plana.replan.domain.goal.service;
 
+import java.time.LocalDate;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import plana.replan.domain.goal.dto.GoalCreateRequest;
-import plana.replan.domain.goal.dto.GoalPageResponse;
-import plana.replan.domain.goal.dto.GoalResponse;
+import plana.replan.domain.goal.dto.GoalCreateRequestDto;
+import plana.replan.domain.goal.dto.GoalSingleResponseDto;
+import plana.replan.domain.goal.dto.GoalsByDateResponseDto;
 import plana.replan.domain.goal.entity.Goal;
 import plana.replan.domain.goal.exception.GoalErrorCode;
 import plana.replan.domain.goal.repository.GoalRepository;
@@ -15,7 +19,6 @@ import plana.replan.domain.user.entity.User;
 import plana.replan.domain.user.exception.UserErrorCode;
 import plana.replan.domain.user.repository.UserRepository;
 import plana.replan.global.exception.CustomException;
-import plana.replan.global.exception.GlobalErrorCode;
 
 @Service
 @RequiredArgsConstructor
@@ -25,7 +28,7 @@ public class GoalService {
   private final UserRepository userRepository;
 
   @Transactional
-  public GoalResponse createGoal(Long userId, GoalCreateRequest request) {
+  public GoalSingleResponseDto createGoal(Long userId, GoalCreateRequestDto request) {
     User user = findUser(userId);
     Goal goal =
         Goal.builder()
@@ -34,7 +37,7 @@ public class GoalService {
             .reference(request.reference())
             .user(user)
             .build();
-    return GoalResponse.from(goalRepository.save(goal));
+    return GoalSingleResponseDto.from(goalRepository.save(goal));
   }
 
   @Transactional
@@ -50,31 +53,37 @@ public class GoalService {
   }
 
   @Transactional(readOnly = true)
-  public GoalPageResponse getGoals(Long userId, Long cursor, int size, Integer year) {
-    if (size < 1 || size > 100) {
-      throw new CustomException(GlobalErrorCode.INVALID_INPUT);
+  public List<GoalsByDateResponseDto> getGoals(Long userId, Integer year, Integer month) {
+    if (year == null && month != null) {
+      throw new CustomException(GoalErrorCode.GOAL_INVALID_FILTER);
     }
     User user = findUser(userId);
-    PageRequest pageable = PageRequest.of(0, size + 1);
 
     List<Goal> goals;
-    if (year != null) {
-      goals =
-          cursor == null
-              ? goalRepository.findByUserAndYear(user, year, pageable)
-              : goalRepository.findByUserAndYearAndIdGreaterThan(user, year, cursor, pageable);
+    if (year != null && month != null) {
+      goals = goalRepository.findByUserAndCreatedAtYearAndMonth(user, year, month);
+    } else if (year != null) {
+      goals = goalRepository.findByUserAndCreatedAtYear(user, year);
     } else {
-      goals =
-          cursor == null
-              ? goalRepository.findByUserOrderByIdAsc(user, pageable)
-              : goalRepository.findByUserAndIdGreaterThanOrderByIdAsc(user, cursor, pageable);
+      goals = goalRepository.findByUserOrderByCreatedAtDescIdAsc(user);
     }
 
-    boolean hasNext = goals.size() > size;
-    List<GoalResponse> content = goals.stream().limit(size).map(GoalResponse::from).toList();
-    Long nextCursor = hasNext ? content.get(content.size() - 1).id() : null;
+    Map<LocalDate, List<Goal>> byDate =
+        goals.stream()
+            .collect(
+                Collectors.groupingBy(
+                    g -> g.getCreatedAt().toLocalDate(), LinkedHashMap::new, Collectors.toList()));
 
-    return new GoalPageResponse(content, nextCursor, hasNext);
+    return byDate.entrySet().stream()
+        .map(
+            e ->
+                new GoalsByDateResponseDto(
+                    e.getKey(),
+                    e.getValue().stream()
+                        .sorted(Comparator.comparing(Goal::getId))
+                        .map(GoalSingleResponseDto::from)
+                        .toList()))
+        .toList();
   }
 
   private User findUser(Long userId) {
