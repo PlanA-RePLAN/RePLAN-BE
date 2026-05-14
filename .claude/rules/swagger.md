@@ -4,7 +4,7 @@
 
 모든 Controller는 Docs 인터페이스와 구현 클래스로 **반드시 분리**한다.
 
-```
+```text
 XxxControllerDocs.java  ← 모든 Swagger 어노테이션 (@Operation, @ApiResponses, @Parameter, @Tag)
 XxxController.java      ← implements XxxControllerDocs, HTTP 매핑 어노테이션 + 메서드 구현만
 ```
@@ -46,7 +46,7 @@ public class XxxController implements XxxControllerDocs {
 | `LocalDate` | `string` | 설명 열에 `(yyyy-MM-dd 형식)` 추가, 예시 열에 실제 값 |
 
 예시:
-```
+```text
 | dueDate | ❌ 선택 | string | 목표 기한 (ISO 8601 형식). 생략 가능 | `"2025-12-31T00:00:00"` |
 ```
 
@@ -61,7 +61,7 @@ public class XxxController implements XxxControllerDocs {
 ## description 표 구조
 
 ### 모든 API — Request Headers 표
-```
+```text
 | 헤더명 | 필수 여부 | 타입 | 설명 |
 |--------|-----------|------|------|
 | Authorization | ✅ 필수 | string | `Bearer {accessToken}` 형식의 JWT 액세스 토큰 |
@@ -69,7 +69,7 @@ public class XxxController implements XxxControllerDocs {
 ```
 
 ### POST/PUT — Request Body 표
-```
+```text
 | 필드명 | 필수 여부 | 타입 | 설명 | 예시 |
 |--------|-----------|------|------|------|
 | field1 | ✅ 필수 | string | 설명 | `"예시"` |
@@ -77,14 +77,14 @@ public class XxxController implements XxxControllerDocs {
 ```
 
 ### DELETE/GET with path — Path Variable 표
-```
+```text
 | 파라미터명 | 필수 여부 | 타입 | 설명 | 예시 |
 |-----------|-----------|------|------|------|
 | id | ✅ 필수 | integer | 대상 ID | `42` |
 ```
 
 ### GET with query — Query Parameters 표
-```
+```text
 | 파라미터명 | 필수 여부 | 타입 | 기본값 | 설명 | 예시 |
 |-----------|-----------|------|--------|------|------|
 | cursor | ❌ 선택 | integer | 없음 | 이전 응답의 nextCursor 값 | `37` |
@@ -92,7 +92,7 @@ public class XxxController implements XxxControllerDocs {
 ```
 
 ### GET 조회 API — Response Elements 표
-```
+```text
 | 필드명 | 타입 | 설명 |
 |--------|------|------|
 | items  | array | 목록 |
@@ -101,7 +101,7 @@ public class XxxController implements XxxControllerDocs {
 ```
 
 ### 무한스크롤 API — 사용법 설명 (description에 포함)
-```
+```text
 **Step 1. 첫 번째 요청** — cursor 없이 호출
 GET /api/xxx?size=10
 
@@ -166,3 +166,15 @@ public record GoalCreateRequestDto(
 
 > **예외:** `List<다른DTO>` 타입 필드는 참조 DTO에 example이 있으면 `example` 생략 가능.
 > 직접 example 문자열을 작성하면 DTO 변경 시 문서가 낡아지는 문제가 생긴다.
+
+## 마크다운 코드 블록 언어 지정 (필수)
+
+문서, 블로그 글, PR 본문 등 모든 마크다운 작성 시 코드 블록에 반드시 언어 식별자를 붙인다.
+
+```text
+```java      ← Java 코드
+```json      ← JSON 예시
+```bash      ← 쉘 명령어
+```text      ← 표·일반 텍스트 (언어 없을 때 fallback)
+```sql       ← SQL
+```
