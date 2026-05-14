@@ -36,8 +36,8 @@ public interface GoalControllerDocs {
 
           | 헤더명 | 필수 여부 | 타입 | 설명 |
           |--------|-----------|------|------|
-          | Authorization | ✅ 필수 | String | `Bearer {accessToken}` 형식의 JWT 액세스 토큰 |
-          | Content-Type | ✅ 필수 | String | `application/json` |
+          | Authorization | ✅ 필수 | string | `Bearer {accessToken}` 형식의 JWT 액세스 토큰 |
+          | Content-Type | ✅ 필수 | string | `application/json` |
 
           ---
 
@@ -45,9 +45,11 @@ public interface GoalControllerDocs {
 
           | 필드명 | 필수 여부 | 타입 | 설명 | 예시 |
           |--------|-----------|------|------|------|
-          | title | ✅ 필수 | String | 목표 제목. 공백만 있으면 유효성 오류 | `"토익 900점 달성"` |
-          | dueDate | ❌ 선택 | LocalDateTime | 목표 기한. ISO 8601 형식 | `"2025-12-31T00:00:00"` |
-          | reference | ❌ 선택 | String | 참고 자료 (URL 또는 자유 텍스트) | `"https://toeic.ets.org"` |
+          | title | ✅ 필수 | string | 목표 제목. 공백만 있으면 유효성 오류 | `"토익 900점 달성"` |
+          | dueDate | ❌ 선택 | string | 목표 기한 (ISO 8601 형식). 생략 가능 | `"2025-12-31T00:00:00"` |
+          | reference | ❌ 선택 | string | 참고 자료 (URL 또는 자유 텍스트). 생략 가능 | `"https://toeic.ets.org"` |
+
+          > ❌ 선택 필드는 생략하거나 null로 전달해도 동일하게 처리됩니다.
 
           ---
 
@@ -211,7 +213,7 @@ public interface GoalControllerDocs {
 
           | 헤더명 | 필수 여부 | 타입 | 설명 |
           |--------|-----------|------|------|
-          | Authorization | ✅ 필수 | String | `Bearer {accessToken}` 형식의 JWT 액세스 토큰 |
+          | Authorization | ✅ 필수 | string | `Bearer {accessToken}` 형식의 JWT 액세스 토큰 |
 
           ---
 
@@ -219,7 +221,7 @@ public interface GoalControllerDocs {
 
           | 파라미터명 | 필수 여부 | 타입 | 설명 | 예시 |
           |-----------|-----------|------|------|------|
-          | id | ✅ 필수 | Long | 삭제할 목표의 ID | `42` |
+          | id | ✅ 필수 | integer | 삭제할 목표의 ID | `42` |
 
           ---
 
@@ -340,7 +342,7 @@ public interface GoalControllerDocs {
 
           | 헤더명 | 필수 여부 | 타입 | 설명 |
           |--------|-----------|------|------|
-          | Authorization | ✅ 필수 | String | `Bearer {accessToken}` 형식의 JWT 액세스 토큰 |
+          | Authorization | ✅ 필수 | string | `Bearer {accessToken}` 형식의 JWT 액세스 토큰 |
 
           ---
 
@@ -348,8 +350,8 @@ public interface GoalControllerDocs {
 
           | 파라미터명 | 필수 여부 | 타입 | 기본값 | 설명 | 예시 |
           |-----------|-----------|------|--------|------|------|
-          | year | ❌ 선택 | Integer | 없음 (전체) | 조회할 연도 (생성일 기준). 없으면 전체 목표 반환 | `2026` |
-          | month | ❌ 선택 | Integer | 없음 (연도 전체) | 조회할 월 (1~12). **year 파라미터가 함께 있어야 함**. 범위 밖 값이면 400 | `5` |
+          | year | ❌ 선택 | integer | 없음 (전체) | 조회할 연도 (생성일 기준). 없으면 전체 목표 반환 | `2026` |
+          | month | ❌ 선택 | integer | 없음 (연도 전체) | 조회할 월 (1~12). **year 파라미터가 함께 있어야 함**. 범위 밖 값이면 400 | `5` |
 
           ---
 
@@ -357,12 +359,12 @@ public interface GoalControllerDocs {
 
           | 필드명 | 타입 | 설명 |
           |--------|------|------|
-          | [].date | String (yyyy-MM-dd) | 생성 날짜 |
-          | [].goals | List | 해당 날짜에 생성된 목표 목록 |
-          | [].goals[].id | Long | 목표 ID |
-          | [].goals[].title | String | 목표 제목 |
-          | [].goals[].dueDate | LocalDateTime | 마감기한 (없으면 null) |
-          | [].goals[].reference | String | 참고 자료 (없으면 null) |
+          | [].date | string (yyyy-MM-dd) | 생성 날짜 |
+          | [].goals | array | 해당 날짜에 생성된 목표 목록 |
+          | [].goals[].id | integer | 목표 ID |
+          | [].goals[].title | string | 목표 제목 |
+          | [].goals[].dueDate | string (ISO 8601) | 마감기한 (없으면 null). 예: `"2026-05-26T20:00:00"` |
+          | [].goals[].reference | string | 참고 자료 (없으면 null) |
 
           ---
 
