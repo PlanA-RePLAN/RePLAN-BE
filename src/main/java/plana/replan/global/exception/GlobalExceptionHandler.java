@@ -1,10 +1,6 @@
 package plana.replan.global.exception;
 
-import com.fasterxml.jackson.core.JsonParseException;
-import com.fasterxml.jackson.databind.exc.InvalidFormatException;
-import com.fasterxml.jackson.databind.exc.MismatchedInputException;
 import java.util.UUID;
-import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -12,6 +8,9 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import plana.replan.global.common.ApiResult;
+import tools.jackson.core.exc.StreamReadException;
+import tools.jackson.databind.exc.InvalidFormatException;
+import tools.jackson.databind.exc.MismatchedInputException;
 
 @Slf4j
 @RestControllerAdvice
@@ -40,8 +39,11 @@ public class GlobalExceptionHandler {
   @ExceptionHandler(HttpMessageNotReadableException.class)
   public ResponseEntity<ApiResult<?>> handleHttpMessageNotReadable(
       HttpMessageNotReadableException e) {
+    log.error(
+        "HttpMessageNotReadableException cause: {}",
+        e.getCause() != null ? e.getCause().getClass().getName() : "null");
     String detail = resolveParseDetail(e.getCause());
-    log.error("HttpMessageNotReadableException: {}", detail);
+    log.error("HttpMessageNotReadableException detail: {}", detail);
     return ResponseEntity.badRequest()
         .body(ApiResult.error(400, ErrorDetail.of(GlobalErrorCode.INVALID_INPUT, detail)));
   }
@@ -59,26 +61,14 @@ public class GlobalExceptionHandler {
   }
 
   private String resolveParseDetail(Throwable cause) {
-    if (cause instanceof JsonParseException) {
+    if (cause instanceof StreamReadException) {
       return "JSON 형식이 올바르지 않습니다";
     }
-    if (cause instanceof InvalidFormatException ife) {
-      String path =
-          ife.getPath().stream()
-              .map(
-                  ref ->
-                      ref.getFieldName() != null ? ref.getFieldName() : "[" + ref.getIndex() + "]")
-              .collect(Collectors.joining("."));
-      return path.isBlank() ? "값 형식이 올바르지 않습니다" : path + ": 값 형식이 올바르지 않습니다";
+    if (cause instanceof InvalidFormatException) {
+      return "값 형식이 올바르지 않습니다";
     }
-    if (cause instanceof MismatchedInputException mie) {
-      String path =
-          mie.getPath().stream()
-              .map(
-                  ref ->
-                      ref.getFieldName() != null ? ref.getFieldName() : "[" + ref.getIndex() + "]")
-              .collect(Collectors.joining("."));
-      return path.isBlank() ? "입력 형식이 올바르지 않습니다" : path + ": 입력 형식이 올바르지 않습니다";
+    if (cause instanceof MismatchedInputException) {
+      return "입력 형식이 올바르지 않습니다";
     }
     return "요청 본문을 읽을 수 없습니다";
   }
