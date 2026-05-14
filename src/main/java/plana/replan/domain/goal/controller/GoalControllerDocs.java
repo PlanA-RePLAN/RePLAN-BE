@@ -53,7 +53,8 @@ public interface GoalControllerDocs {
 
           ### 주의사항
           - `title`이 없거나 공백이면 400 반환
-          - `dueDate`를 전달하지 않으면 null로 저장됨
+          - `dueDate`, `reference`는 생략하거나 null로 전달해도 동일하게 처리됨 (null 저장)
+          - JSON 파싱 실패(잘못된 형식, 타입 불일치 등)도 400 반환
           """,
       security = @SecurityRequirement(name = "Bearer Authentication"))
   @ApiResponses({
@@ -81,7 +82,7 @@ public interface GoalControllerDocs {
                             """))),
     @ApiResponse(
         responseCode = "400",
-        description = "요청 데이터 유효성 오류 (title 누락 또는 공백)",
+        description = "요청 데이터 유효성 오류 (title 누락/공백) 또는 JSON 파싱 실패",
         content =
             @Content(
                 examples =
@@ -158,7 +159,45 @@ public interface GoalControllerDocs {
                             """)))
   })
   ResponseEntity<ApiResult<GoalSingleResponseDto>> createGoal(
-      @AuthenticationPrincipal Long userId, @RequestBody GoalCreateRequestDto request);
+      @AuthenticationPrincipal Long userId,
+      @io.swagger.v3.oas.annotations.parameters.RequestBody(
+              content =
+                  @Content(
+                      mediaType = "application/json",
+                      examples = {
+                        @ExampleObject(
+                            name = "전체 필드 포함",
+                            value =
+                                """
+                                {
+                                  "title": "토익 900점 달성",
+                                  "dueDate": "2025-12-31T00:00:00",
+                                  "reference": "https://toeic.ets.org"
+                                }
+                                """),
+                        @ExampleObject(
+                            name = "title만 (optional 생략)",
+                            summary = "dueDate, reference를 생략하면 null로 처리됨",
+                            value =
+                                """
+                                {
+                                  "title": "토익 900점 달성"
+                                }
+                                """),
+                        @ExampleObject(
+                            name = "optional null 명시",
+                            summary = "생략과 동일한 동작",
+                            value =
+                                """
+                                {
+                                  "title": "토익 900점 달성",
+                                  "dueDate": null,
+                                  "reference": null
+                                }
+                                """)
+                      }))
+          @RequestBody
+          GoalCreateRequestDto request);
 
   @Operation(
       summary = "목표 삭제",

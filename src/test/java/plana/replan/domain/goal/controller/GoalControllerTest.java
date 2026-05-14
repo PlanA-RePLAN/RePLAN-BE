@@ -78,6 +78,28 @@ class GoalControllerTest {
   }
 
   @Test
+  void 목표_생성_optional_필드_생략해도_200() throws Exception {
+    GoalSingleResponseDto mockResponse = new GoalSingleResponseDto(42L, "토익", null, null);
+    given(goalService.createGoal(any(), any())).willReturn(mockResponse);
+
+    mockMvc
+        .perform(
+            post("/api/goals")
+                .with(authentication(authToken(1L)))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """
+                    {
+                      "title": "토익"
+                    }
+                    """))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.id").value(42))
+        .andExpect(jsonPath("$.data.dueDate").value(nullValue()))
+        .andExpect(jsonPath("$.data.reference").value(nullValue()));
+  }
+
+  @Test
   void 목표_생성_title_없으면_400() throws Exception {
     mockMvc
         .perform(
