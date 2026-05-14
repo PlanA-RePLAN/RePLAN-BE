@@ -57,6 +57,9 @@ public class GoalService {
     if (year == null && month != null) {
       throw new CustomException(GoalErrorCode.GOAL_INVALID_FILTER);
     }
+    if (month != null && (month < 1 || month > 12)) {
+      throw new CustomException(GoalErrorCode.GOAL_INVALID_MONTH);
+    }
     User user = findUser(userId);
 
     List<Goal> goals;

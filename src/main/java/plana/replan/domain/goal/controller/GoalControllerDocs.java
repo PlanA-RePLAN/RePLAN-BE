@@ -310,7 +310,7 @@ public interface GoalControllerDocs {
           | 파라미터명 | 필수 여부 | 타입 | 기본값 | 설명 | 예시 |
           |-----------|-----------|------|--------|------|------|
           | year | ❌ 선택 | Integer | 없음 (전체) | 조회할 연도 (생성일 기준). 없으면 전체 목표 반환 | `2026` |
-          | month | ❌ 선택 | Integer | 없음 (연도 전체) | 조회할 월. **year 파라미터가 함께 있어야 함** | `5` |
+          | month | ❌ 선택 | Integer | 없음 (연도 전체) | 조회할 월 (1~12). **year 파라미터가 함께 있어야 함**. 범위 밖 값이면 400 | `5` |
 
           ---
 
@@ -385,24 +385,41 @@ public interface GoalControllerDocs {
                             """))),
     @ApiResponse(
         responseCode = "400",
-        description = "year 없이 month만 전달한 경우",
+        description = "잘못된 필터 파라미터 (year 없이 month만 전달, 또는 month 범위 오류)",
         content =
             @Content(
-                examples =
-                    @ExampleObject(
-                        value =
-                            """
-                            {
-                              "status": 400,
-                              "success": false,
-                              "data": null,
-                              "error": {
-                                "code": "GOAL_INVALID_FILTER",
-                                "message": "월별 조회 시 연도(year)는 필수입니다.",
-                                "detail": null
-                              }
+                examples = {
+                  @ExampleObject(
+                      name = "year 없이 month만 전달",
+                      value =
+                          """
+                          {
+                            "status": 400,
+                            "success": false,
+                            "data": null,
+                            "error": {
+                              "code": "GOAL_INVALID_FILTER",
+                              "message": "월별 조회 시 연도(year)는 필수입니다.",
+                              "detail": null
                             }
-                            """))),
+                          }
+                          """),
+                  @ExampleObject(
+                      name = "월 범위 오류",
+                      value =
+                          """
+                          {
+                            "status": 400,
+                            "success": false,
+                            "data": null,
+                            "error": {
+                              "code": "GOAL_INVALID_MONTH",
+                              "message": "월은 1 이상 12 이하여야 합니다.",
+                              "detail": null
+                            }
+                          }
+                          """)
+                })),
     @ApiResponse(
         responseCode = "401",
         description = "인증 실패 — 토큰 없음 또는 만료",
