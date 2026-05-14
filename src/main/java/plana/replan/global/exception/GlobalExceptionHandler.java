@@ -1,6 +1,7 @@
 package plana.replan.global.exception;
 
 import java.util.UUID;
+import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -8,6 +9,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import plana.replan.global.common.ApiResult;
+import tools.jackson.core.JacksonException;
 import tools.jackson.core.exc.StreamReadException;
 import tools.jackson.databind.exc.InvalidFormatException;
 import tools.jackson.databind.exc.MismatchedInputException;
@@ -64,11 +66,27 @@ public class GlobalExceptionHandler {
     if (cause instanceof StreamReadException) {
       return "JSON 형식이 올바르지 않습니다";
     }
-    if (cause instanceof InvalidFormatException) {
-      return "값 형식이 올바르지 않습니다";
+    if (cause instanceof InvalidFormatException ife) {
+      String path =
+          ife.getPath().stream()
+              .map(
+                  (JacksonException.Reference ref) ->
+                      ref.getPropertyName() != null
+                          ? ref.getPropertyName()
+                          : "[" + ref.getIndex() + "]")
+              .collect(Collectors.joining("."));
+      return path.isBlank() ? "값 형식이 올바르지 않습니다" : path + ": 값 형식이 올바르지 않습니다";
     }
-    if (cause instanceof MismatchedInputException) {
-      return "입력 형식이 올바르지 않습니다";
+    if (cause instanceof MismatchedInputException mie) {
+      String path =
+          mie.getPath().stream()
+              .map(
+                  (JacksonException.Reference ref) ->
+                      ref.getPropertyName() != null
+                          ? ref.getPropertyName()
+                          : "[" + ref.getIndex() + "]")
+              .collect(Collectors.joining("."));
+      return path.isBlank() ? "입력 형식이 올바르지 않습니다" : path + ": 입력 형식이 올바르지 않습니다";
     }
     return "요청 본문을 읽을 수 없습니다";
   }
