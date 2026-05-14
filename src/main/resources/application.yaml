@@ -1,6 +1,9 @@
 spring:
   application:
     name: replan
+  jackson:
+    deserialization:
+      fail-on-missing-creator-properties: false
   datasource:
     url: jdbc:postgresql://${DB_HOST}:${DB_PORT}/${DB_NAME}
     username: ${DB_USER}
