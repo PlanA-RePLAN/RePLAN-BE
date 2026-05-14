@@ -2,8 +2,6 @@ package plana.replan.domain.goal.controller;
 
 import static org.hamcrest.Matchers.nullValue;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyInt;
-import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.willDoNothing;
 import static org.mockito.BDDMockito.willThrow;
@@ -14,6 +12,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -25,8 +24,8 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
-import plana.replan.domain.goal.dto.GoalPageResponse;
-import plana.replan.domain.goal.dto.GoalResponse;
+import plana.replan.domain.goal.dto.GoalSingleResponseDto;
+import plana.replan.domain.goal.dto.GoalsByDateResponseDto;
 import plana.replan.domain.goal.exception.GoalErrorCode;
 import plana.replan.domain.goal.service.GoalService;
 import plana.replan.global.config.SecurityConfig;
@@ -51,8 +50,8 @@ class GoalControllerTest {
 
   @Test
   void 목표_생성_성공() throws Exception {
-    GoalResponse mockResponse =
-        new GoalResponse(
+    GoalSingleResponseDto mockResponse =
+        new GoalSingleResponseDto(
             42L, "토익 900점 달성", LocalDateTime.of(2025, 12, 31, 0, 0), "https://toeic.ets.org");
     given(goalService.createGoal(any(), any())).willReturn(mockResponse);
 
@@ -170,36 +169,48 @@ class GoalControllerTest {
   // ========== GET /api/goals ==========
 
   @Test
-  void 목표_조회_성공_기본() throws Exception {
-    GoalResponse goal = new GoalResponse(42L, "토익 900점", null, null);
-    GoalPageResponse mockResponse = new GoalPageResponse(List.of(goal), null, false);
-    given(goalService.getGoals(any(), any(), anyInt(), any())).willReturn(mockResponse);
+  void 목표_조회_성공_전체() throws Exception {
+    GoalSingleResponseDto goal =
+        new GoalSingleResponseDto(10L, "토익 900점", LocalDateTime.of(2026, 5, 26, 20, 0), null);
+    GoalsByDateResponseDto dateGroup =
+        new GoalsByDateResponseDto(LocalDate.of(2026, 5, 4), List.of(goal));
+    given(goalService.getGoals(any(), any(), any())).willReturn(List.of(dateGroup));
 
     mockMvc
         .perform(get("/api/goals").with(authentication(authToken(1L))))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.status").value(200))
         .andExpect(jsonPath("$.success").value(true))
-        .andExpect(jsonPath("$.data.goals[0].id").value(42))
-        .andExpect(jsonPath("$.data.goals[0].title").value("토익 900점"))
-        .andExpect(jsonPath("$.data.hasNext").value(false))
-        .andExpect(jsonPath("$.data.nextCursor").value(nullValue()));
+        .andExpect(jsonPath("$.data[0].date").value("2026-05-04"))
+        .andExpect(jsonPath("$.data[0].goals[0].id").value(10))
+        .andExpect(jsonPath("$.data[0].goals[0].title").value("토익 900점"));
   }
 
   @Test
-  void 목표_조회_성공_커서와_연도_파라미터() throws Exception {
-    GoalPageResponse mockResponse = new GoalPageResponse(List.of(), null, false);
-    given(goalService.getGoals(any(), anyLong(), anyInt(), anyInt())).willReturn(mockResponse);
+  void 목표_조회_성공_연도_월_파라미터() throws Exception {
+    given(goalService.getGoals(any(), any(), any())).willReturn(List.of());
 
     mockMvc
         .perform(
             get("/api/goals")
-                .param("cursor", "37")
-                .param("size", "5")
-                .param("year", "2025")
+                .param("year", "2026")
+                .param("month", "5")
                 .with(authentication(authToken(1L))))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.status").value(200));
+  }
+
+  @Test
+  void 목표_조회_year없이_month만_전달하면_400() throws Exception {
+    willThrow(new CustomException(GoalErrorCode.GOAL_INVALID_FILTER))
+        .given(goalService)
+        .getGoals(any(), any(), any());
+
+    mockMvc
+        .perform(get("/api/goals").param("month", "5").with(authentication(authToken(1L))))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.status").value(400))
+        .andExpect(jsonPath("$.error.code").value("GOAL_INVALID_FILTER"));
   }
 
   @Test

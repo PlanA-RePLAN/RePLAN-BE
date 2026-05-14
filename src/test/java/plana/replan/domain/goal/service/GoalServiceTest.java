@@ -7,6 +7,7 @@ import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -15,12 +16,9 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.mockito.junit.jupiter.MockitoSettings;
-import org.mockito.quality.Strictness;
-import org.springframework.data.domain.Pageable;
-import plana.replan.domain.goal.dto.GoalCreateRequest;
-import plana.replan.domain.goal.dto.GoalPageResponse;
-import plana.replan.domain.goal.dto.GoalResponse;
+import plana.replan.domain.goal.dto.GoalCreateRequestDto;
+import plana.replan.domain.goal.dto.GoalSingleResponseDto;
+import plana.replan.domain.goal.dto.GoalsByDateResponseDto;
 import plana.replan.domain.goal.entity.Goal;
 import plana.replan.domain.goal.exception.GoalErrorCode;
 import plana.replan.domain.goal.repository.GoalRepository;
@@ -28,10 +26,8 @@ import plana.replan.domain.user.entity.User;
 import plana.replan.domain.user.exception.UserErrorCode;
 import plana.replan.domain.user.repository.UserRepository;
 import plana.replan.global.exception.CustomException;
-import plana.replan.global.exception.GlobalErrorCode;
 
 @ExtendWith(MockitoExtension.class)
-@MockitoSettings(strictness = Strictness.LENIENT)
 class GoalServiceTest {
 
   @Mock private GoalRepository goalRepository;
@@ -53,11 +49,11 @@ class GoalServiceTest {
     given(savedGoal.getReference()).willReturn("https://toeic.ets.org");
     given(goalRepository.save(any())).willReturn(savedGoal);
 
-    GoalCreateRequest request =
-        new GoalCreateRequest(
+    GoalCreateRequestDto request =
+        new GoalCreateRequestDto(
             "토익 900점 달성", LocalDateTime.of(2025, 12, 31, 0, 0), "https://toeic.ets.org");
 
-    GoalResponse response = goalService.createGoal(1L, request);
+    GoalSingleResponseDto response = goalService.createGoal(1L, request);
 
     assertThat(response.id()).isEqualTo(42L);
     assertThat(response.title()).isEqualTo("토익 900점 달성");
@@ -77,9 +73,9 @@ class GoalServiceTest {
     given(savedGoal.getReference()).willReturn(null);
     given(goalRepository.save(any())).willReturn(savedGoal);
 
-    GoalCreateRequest request = new GoalCreateRequest("독서 50권", null, null);
+    GoalCreateRequestDto request = new GoalCreateRequestDto("독서 50권", null, null);
 
-    GoalResponse response = goalService.createGoal(1L, request);
+    GoalSingleResponseDto response = goalService.createGoal(1L, request);
 
     assertThat(response.title()).isEqualTo("독서 50권");
     assertThat(response.dueDate()).isNull();
@@ -90,7 +86,8 @@ class GoalServiceTest {
   void 목표_생성_유저_없음_404() {
     given(userRepository.findById(999L)).willReturn(Optional.empty());
 
-    assertThatThrownBy(() -> goalService.createGoal(999L, new GoalCreateRequest("제목", null, null)))
+    assertThatThrownBy(
+            () -> goalService.createGoal(999L, new GoalCreateRequestDto("제목", null, null)))
         .isInstanceOf(CustomException.class)
         .satisfies(
             e ->
@@ -146,107 +143,105 @@ class GoalServiceTest {
   // ========== getGoals ==========
 
   @Test
-  void 목표_조회_첫_페이지_커서없음() {
+  void 목표_조회_전체_날짜_내림차순_그룹핑() {
     User user = mock(User.class);
     given(userRepository.findById(1L)).willReturn(Optional.of(user));
 
-    Goal goal = mockGoal(10L, "운동 습관", null, null);
-    given(goalRepository.findByUserOrderByIdAsc(any(), any(Pageable.class)))
+    Goal goal1 =
+        mockGoal(
+            10L,
+            "목표A",
+            LocalDateTime.of(2026, 5, 4, 10, 0),
+            null,
+            LocalDateTime.of(2026, 5, 4, 10, 0));
+    Goal goal2 = mockGoal(9L, "목표B", null, null, LocalDateTime.of(2026, 5, 3, 9, 0));
+    given(goalRepository.findByUserOrderByCreatedAtDescIdAsc(user))
+        .willReturn(List.of(goal1, goal2));
+
+    List<GoalsByDateResponseDto> result = goalService.getGoals(1L, null, null);
+
+    assertThat(result).hasSize(2);
+    assertThat(result.get(0).date()).isEqualTo(LocalDate.of(2026, 5, 4));
+    assertThat(result.get(0).goals()).hasSize(1);
+    assertThat(result.get(0).goals().get(0).title()).isEqualTo("목표A");
+    assertThat(result.get(1).date()).isEqualTo(LocalDate.of(2026, 5, 3));
+  }
+
+  @Test
+  void 목표_조회_같은날_목표_ID_오름차순() {
+    User user = mock(User.class);
+    given(userRepository.findById(1L)).willReturn(Optional.of(user));
+
+    LocalDateTime sameDay = LocalDateTime.of(2026, 5, 4, 0, 0);
+    Goal goal1 = mockGoal(10L, "나중 목표", null, null, LocalDateTime.of(2026, 5, 4, 12, 0));
+    Goal goal2 = mockGoal(8L, "먼저 목표", null, null, LocalDateTime.of(2026, 5, 4, 9, 0));
+    // DB에서 createdAt DESC로 오지만 같은 날이면 id ASC로 재정렬
+    given(goalRepository.findByUserOrderByCreatedAtDescIdAsc(user))
+        .willReturn(List.of(goal1, goal2));
+
+    List<GoalsByDateResponseDto> result = goalService.getGoals(1L, null, null);
+
+    assertThat(result).hasSize(1);
+    assertThat(result.get(0).goals().get(0).id()).isEqualTo(8L);
+    assertThat(result.get(0).goals().get(1).id()).isEqualTo(10L);
+  }
+
+  @Test
+  void 목표_조회_연도별() {
+    User user = mock(User.class);
+    given(userRepository.findById(1L)).willReturn(Optional.of(user));
+
+    Goal goal = mockGoal(10L, "토익", null, null, LocalDateTime.of(2026, 5, 4, 10, 0));
+    given(goalRepository.findByUserAndCreatedAtYear(user, 2026)).willReturn(List.of(goal));
+
+    List<GoalsByDateResponseDto> result = goalService.getGoals(1L, 2026, null);
+
+    assertThat(result).hasSize(1);
+    assertThat(result.get(0).goals().get(0).title()).isEqualTo("토익");
+  }
+
+  @Test
+  void 목표_조회_월별() {
+    User user = mock(User.class);
+    given(userRepository.findById(1L)).willReturn(Optional.of(user));
+
+    Goal goal = mockGoal(10L, "토익", null, null, LocalDateTime.of(2026, 5, 4, 10, 0));
+    given(goalRepository.findByUserAndCreatedAtYearAndMonth(user, 2026, 5))
         .willReturn(List.of(goal));
 
-    GoalPageResponse response = goalService.getGoals(1L, null, 10, null);
+    List<GoalsByDateResponseDto> result = goalService.getGoals(1L, 2026, 5);
 
-    assertThat(response.goals()).hasSize(1);
-    assertThat(response.hasNext()).isFalse();
-    assertThat(response.nextCursor()).isNull();
+    assertThat(result).hasSize(1);
   }
 
   @Test
-  void 목표_조회_커서_있는_페이지() {
-    User user = mock(User.class);
-    given(userRepository.findById(1L)).willReturn(Optional.of(user));
-
-    Goal goal = mockGoal(5L, "독서", null, null);
-    given(
-            goalRepository.findByUserAndIdGreaterThanOrderByIdAsc(
-                any(), any(Long.class), any(Pageable.class)))
-        .willReturn(List.of(goal));
-
-    GoalPageResponse response = goalService.getGoals(1L, 10L, 10, null);
-
-    assertThat(response.goals()).hasSize(1);
-    assertThat(response.hasNext()).isFalse();
+  void 목표_조회_year_없이_month만_전달하면_400() {
+    assertThatThrownBy(() -> goalService.getGoals(1L, null, 5))
+        .isInstanceOf(CustomException.class)
+        .satisfies(
+            e ->
+                assertThat(((CustomException) e).getErrorCode())
+                    .isEqualTo(GoalErrorCode.GOAL_INVALID_FILTER));
   }
 
   @Test
-  void 목표_조회_연도_필터_첫_페이지() {
+  void 목표_조회_dueDate_null_목표_포함() {
     User user = mock(User.class);
     given(userRepository.findById(1L)).willReturn(Optional.of(user));
 
-    Goal goal = mockGoal(10L, "토익", LocalDateTime.of(2025, 6, 1, 0, 0), null);
-    given(goalRepository.findByUserAndYear(any(), any(Integer.class), any(Pageable.class)))
-        .willReturn(List.of(goal));
+    Goal goal = mockGoal(10L, "마감없는 목표", null, null, LocalDateTime.of(2026, 5, 4, 10, 0));
+    given(goalRepository.findByUserOrderByCreatedAtDescIdAsc(user)).willReturn(List.of(goal));
 
-    GoalPageResponse response = goalService.getGoals(1L, null, 10, 2025);
+    List<GoalsByDateResponseDto> result = goalService.getGoals(1L, null, null);
 
-    assertThat(response.goals()).hasSize(1);
-  }
-
-  @Test
-  void 목표_조회_연도_필터_커서_있는_페이지() {
-    User user = mock(User.class);
-    given(userRepository.findById(1L)).willReturn(Optional.of(user));
-
-    Goal goal = mockGoal(5L, "토익", LocalDateTime.of(2025, 6, 1, 0, 0), null);
-    given(
-            goalRepository.findByUserAndYearAndIdGreaterThan(
-                any(), any(Integer.class), any(Long.class), any(Pageable.class)))
-        .willReturn(List.of(goal));
-
-    GoalPageResponse response = goalService.getGoals(1L, 10L, 10, 2025);
-
-    assertThat(response.goals()).hasSize(1);
-  }
-
-  @Test
-  void 목표_조회_다음_페이지_있음() {
-    User user = mock(User.class);
-    given(userRepository.findById(1L)).willReturn(Optional.of(user));
-
-    List<Goal> goals =
-        List.of(
-            mockGoal(10L, "목표1", null, null),
-            mockGoal(9L, "목표2", null, null),
-            mockGoal(8L, "목표3", null, null));
-    given(goalRepository.findByUserOrderByIdAsc(any(), any(Pageable.class))).willReturn(goals);
-
-    GoalPageResponse response = goalService.getGoals(1L, null, 2, null);
-
-    assertThat(response.goals()).hasSize(2);
-    assertThat(response.hasNext()).isTrue();
-    assertThat(response.nextCursor()).isEqualTo(9L);
-  }
-
-  @Test
-  void 목표_조회_마지막_페이지() {
-    User user = mock(User.class);
-    given(userRepository.findById(1L)).willReturn(Optional.of(user));
-
-    List<Goal> goals = List.of(mockGoal(10L, "목표1", null, null), mockGoal(9L, "목표2", null, null));
-    given(goalRepository.findByUserOrderByIdAsc(any(), any(Pageable.class))).willReturn(goals);
-
-    GoalPageResponse response = goalService.getGoals(1L, null, 10, null);
-
-    assertThat(response.goals()).hasSize(2);
-    assertThat(response.hasNext()).isFalse();
-    assertThat(response.nextCursor()).isNull();
+    assertThat(result.get(0).goals().get(0).dueDate()).isNull();
   }
 
   @Test
   void 목표_조회_유저_없음_404() {
     given(userRepository.findById(999L)).willReturn(Optional.empty());
 
-    assertThatThrownBy(() -> goalService.getGoals(999L, null, 10, null))
+    assertThatThrownBy(() -> goalService.getGoals(999L, null, null))
         .isInstanceOf(CustomException.class)
         .satisfies(
             e ->
@@ -254,32 +249,14 @@ class GoalServiceTest {
                     .isEqualTo(UserErrorCode.USER_NOT_FOUND));
   }
 
-  @Test
-  void 목표_조회_size_0이면_400() {
-    assertThatThrownBy(() -> goalService.getGoals(1L, null, 0, null))
-        .isInstanceOf(CustomException.class)
-        .satisfies(
-            e ->
-                assertThat(((CustomException) e).getErrorCode())
-                    .isEqualTo(GlobalErrorCode.INVALID_INPUT));
-  }
-
-  @Test
-  void 목표_조회_size_101이면_400() {
-    assertThatThrownBy(() -> goalService.getGoals(1L, null, 101, null))
-        .isInstanceOf(CustomException.class)
-        .satisfies(
-            e ->
-                assertThat(((CustomException) e).getErrorCode())
-                    .isEqualTo(GlobalErrorCode.INVALID_INPUT));
-  }
-
-  private Goal mockGoal(Long id, String title, LocalDateTime dueDate, String reference) {
+  private Goal mockGoal(
+      Long id, String title, LocalDateTime dueDate, String reference, LocalDateTime createdAt) {
     Goal goal = mock(Goal.class);
     given(goal.getId()).willReturn(id);
     given(goal.getTitle()).willReturn(title);
     given(goal.getDueDate()).willReturn(dueDate);
     given(goal.getReference()).willReturn(reference);
+    given(goal.getCreatedAt()).willReturn(createdAt);
     return goal;
   }
 }
