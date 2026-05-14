@@ -214,6 +214,23 @@ class GoalControllerTest {
   }
 
   @Test
+  void 목표_조회_month_범위_벗어나면_400() throws Exception {
+    willThrow(new CustomException(GoalErrorCode.GOAL_INVALID_MONTH))
+        .given(goalService)
+        .getGoals(any(), any(), any());
+
+    mockMvc
+        .perform(
+            get("/api/goals")
+                .param("year", "2026")
+                .param("month", "13")
+                .with(authentication(authToken(1L))))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.status").value(400))
+        .andExpect(jsonPath("$.error.code").value("GOAL_INVALID_MONTH"));
+  }
+
+  @Test
   void 목표_조회_인증_없으면_401() throws Exception {
     mockMvc
         .perform(get("/api/goals"))

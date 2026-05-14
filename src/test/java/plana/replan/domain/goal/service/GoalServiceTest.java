@@ -225,6 +225,26 @@ class GoalServiceTest {
   }
 
   @Test
+  void 목표_조회_month_0이면_400() {
+    assertThatThrownBy(() -> goalService.getGoals(1L, 2026, 0))
+        .isInstanceOf(CustomException.class)
+        .satisfies(
+            e ->
+                assertThat(((CustomException) e).getErrorCode())
+                    .isEqualTo(GoalErrorCode.GOAL_INVALID_MONTH));
+  }
+
+  @Test
+  void 목표_조회_month_13이면_400() {
+    assertThatThrownBy(() -> goalService.getGoals(1L, 2026, 13))
+        .isInstanceOf(CustomException.class)
+        .satisfies(
+            e ->
+                assertThat(((CustomException) e).getErrorCode())
+                    .isEqualTo(GoalErrorCode.GOAL_INVALID_MONTH));
+  }
+
+  @Test
   void 목표_조회_dueDate_null_목표_포함() {
     User user = mock(User.class);
     given(userRepository.findById(1L)).willReturn(Optional.of(user));
