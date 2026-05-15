@@ -54,7 +54,8 @@ class RoutineControllerTest {
         .perform(
             post("/api/routines")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("""
+                .content(
+                    """
                     { "title": "루틴", "routineType": "DAILY" }
                     """))
         .andExpect(status().isUnauthorized())
@@ -95,8 +96,7 @@ class RoutineControllerTest {
   void createRoutine_weekly_success_fullFields() throws Exception {
     LocalDateTime dueDate = LocalDateTime.of(2025, 12, 31, 0, 0);
     given(routineService.createRoutine(any(), any()))
-        .willReturn(
-            new RoutineResponseDto(2L, "영어 단어", dueDate, RoutineType.WEEKLY, 21, 5L, 2L));
+        .willReturn(new RoutineResponseDto(2L, "영어 단어", dueDate, RoutineType.WEEKLY, 21, 5L, 2L));
 
     mockMvc
         .perform(
@@ -128,8 +128,7 @@ class RoutineControllerTest {
   @DisplayName("MONTHLY 루틴 생성 성공: routineDate=15")
   void createRoutine_monthly_success() throws Exception {
     given(routineService.createRoutine(any(), any()))
-        .willReturn(
-            new RoutineResponseDto(3L, "월간 회고", null, RoutineType.MONTHLY, 15, null, null));
+        .willReturn(new RoutineResponseDto(3L, "월간 회고", null, RoutineType.MONTHLY, 15, null, null));
 
     mockMvc
         .perform(
@@ -153,7 +152,8 @@ class RoutineControllerTest {
             post("/api/routines")
                 .with(authentication(authToken(1L)))
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("""
+                .content(
+                    """
                     { "routineType": "DAILY" }
                     """))
         .andExpect(status().isBadRequest())
