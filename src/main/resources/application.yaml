@@ -20,9 +20,6 @@ spring:
     redis:
       host: ${REDIS_HOST}
       port: ${REDIS_PORT}
-  flyway:
-    enabled: false  # 기본은 꺼두기
-
 management:
   endpoints:
     web:
