@@ -24,3 +24,5 @@ UPDATE failure_reason SET created_at = CURRENT_TIMESTAMP WHERE created_at IS NUL
 
 ALTER TABLE todo ALTER COLUMN is_pinned SET DEFAULT false;
 UPDATE todo SET is_pinned = false WHERE is_pinned IS NULL;
+
+ALTER TABLE todo ADD COLUMN parent_id BIGINT REFERENCES todo(id);
