@@ -4,11 +4,17 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
+import java.time.Clock;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.util.List;
 import java.util.Optional;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -28,10 +34,11 @@ import plana.replan.domain.tag.entity.Tag;
 import plana.replan.domain.tag.entity.TagColor;
 import plana.replan.domain.tag.exception.TagErrorCode;
 import plana.replan.domain.tag.repository.TagRepository;
+import plana.replan.domain.todo.entity.Todo;
+import plana.replan.domain.todo.repository.TodoRepository;
 import plana.replan.domain.user.entity.Provider;
 import plana.replan.domain.user.entity.Role;
 import plana.replan.domain.user.entity.User;
-import plana.replan.domain.todo.repository.TodoRepository;
 import plana.replan.domain.user.exception.UserErrorCode;
 import plana.replan.domain.user.repository.UserRepository;
 import plana.replan.global.exception.CustomException;
@@ -39,6 +46,11 @@ import plana.replan.global.exception.CustomException;
 @ExtendWith(MockitoExtension.class)
 class RoutineServiceTest {
 
+  // 2024-01-15: Monday(DayOfWeek=1, bit=1), day of month=15
+  private static final LocalDate TEST_DATE = LocalDate.of(2024, 1, 15);
+  private static final ZoneId KST = ZoneId.of("Asia/Seoul");
+
+  @Mock private Clock clock;
   @Mock private RoutineRepository routineRepository;
   @Mock private UserRepository userRepository;
   @Mock private TagRepository tagRepository;
@@ -46,6 +58,13 @@ class RoutineServiceTest {
   @Mock private TodoRepository todoRepository;
 
   @InjectMocks private RoutineService routineService;
+
+  @BeforeEach
+  void setUpClock() {
+    // 예외 발생 테스트에서는 clock이 호출되지 않으므로 lenient 처리
+    lenient().when(clock.instant()).thenReturn(TEST_DATE.atStartOfDay(KST).toInstant());
+    lenient().when(clock.getZone()).thenReturn(KST);
+  }
 
   private User testUser() {
     User user =
@@ -344,5 +363,148 @@ class RoutineServiceTest {
                     .isEqualTo(GoalErrorCode.GOAL_NOT_FOUND));
 
     verify(routineRepository, never()).save(any());
+  }
+
+  // ========== Todo 즉시 생성 (createRoutine) ==========
+
+  @Test
+  void 루틴_생성_DAILY_Todo_즉시_생성됨() {
+    given(userRepository.findById(1L)).willReturn(Optional.of(testUser()));
+    given(routineRepository.save(any(Routine.class))).willAnswer(inv -> inv.getArgument(0));
+
+    routineService.createRoutine(
+        1L, new RoutineCreateRequestDto("아침 스트레칭", null, RoutineType.DAILY, null, null, null));
+
+    verify(todoRepository).save(any(Todo.class));
+  }
+
+  @Test
+  void 루틴_생성_WEEKLY_오늘_요일_포함_Todo_생성됨() {
+    // TEST_DATE = Monday(bit=1). routineDate=1 → Monday만 포함 → 일치
+    given(userRepository.findById(1L)).willReturn(Optional.of(testUser()));
+    given(routineRepository.save(any(Routine.class))).willAnswer(inv -> inv.getArgument(0));
+
+    routineService.createRoutine(
+        1L, new RoutineCreateRequestDto("루틴", null, RoutineType.WEEKLY, 1, null, null));
+
+    verify(todoRepository).save(any(Todo.class));
+  }
+
+  @Test
+  void 루틴_생성_WEEKLY_오늘_요일_미포함_Todo_생성_안됨() {
+    // TEST_DATE = Monday(bit=1). routineDate=2 → Tuesday만 포함 → 불일치
+    given(userRepository.findById(1L)).willReturn(Optional.of(testUser()));
+    given(routineRepository.save(any(Routine.class))).willAnswer(inv -> inv.getArgument(0));
+
+    routineService.createRoutine(
+        1L, new RoutineCreateRequestDto("루틴", null, RoutineType.WEEKLY, 2, null, null));
+
+    verify(todoRepository, never()).save(any(Todo.class));
+  }
+
+  @Test
+  void 루틴_생성_MONTHLY_오늘_날짜_일치_Todo_생성됨() {
+    // TEST_DATE = 15일. routineDate=15 → 일치
+    given(userRepository.findById(1L)).willReturn(Optional.of(testUser()));
+    given(routineRepository.save(any(Routine.class))).willAnswer(inv -> inv.getArgument(0));
+
+    routineService.createRoutine(
+        1L, new RoutineCreateRequestDto("루틴", null, RoutineType.MONTHLY, 15, null, null));
+
+    verify(todoRepository).save(any(Todo.class));
+  }
+
+  @Test
+  void 루틴_생성_MONTHLY_오늘_날짜_불일치_Todo_생성_안됨() {
+    // TEST_DATE = 15일. routineDate=16 → 불일치
+    given(userRepository.findById(1L)).willReturn(Optional.of(testUser()));
+    given(routineRepository.save(any(Routine.class))).willAnswer(inv -> inv.getArgument(0));
+
+    routineService.createRoutine(
+        1L, new RoutineCreateRequestDto("루틴", null, RoutineType.MONTHLY, 16, null, null));
+
+    verify(todoRepository, never()).save(any(Todo.class));
+  }
+
+  @Test
+  void 루틴_생성_오늘_이미_Todo_존재시_중복_생성_안됨() {
+    given(userRepository.findById(1L)).willReturn(Optional.of(testUser()));
+    given(routineRepository.save(any(Routine.class))).willAnswer(inv -> inv.getArgument(0));
+    given(todoRepository.existsByRoutineAndDueDateBetween(any(), any(), any())).willReturn(true);
+
+    routineService.createRoutine(
+        1L, new RoutineCreateRequestDto("아침 스트레칭", null, RoutineType.DAILY, null, null, null));
+
+    verify(todoRepository, never()).save(any(Todo.class));
+  }
+
+  // ========== generateDailyTodos (배치) ==========
+
+  private Routine buildRoutine(RoutineType type, Integer routineDate) {
+    return Routine.builder()
+        .title("테스트 루틴")
+        .routineType(type)
+        .routineDate(routineDate)
+        .user(testUser())
+        .build();
+  }
+
+  @Test
+  void generateDailyTodos_DAILY_루틴_Todo_생성됨() {
+    given(routineRepository.findAll()).willReturn(List.of(buildRoutine(RoutineType.DAILY, null)));
+
+    routineService.generateDailyTodos();
+
+    verify(todoRepository).save(any(Todo.class));
+  }
+
+  @Test
+  void generateDailyTodos_WEEKLY_오늘_요일_포함_Todo_생성됨() {
+    // TEST_DATE = Monday(bit=1). routineDate=1 → 일치
+    given(routineRepository.findAll()).willReturn(List.of(buildRoutine(RoutineType.WEEKLY, 1)));
+
+    routineService.generateDailyTodos();
+
+    verify(todoRepository).save(any(Todo.class));
+  }
+
+  @Test
+  void generateDailyTodos_WEEKLY_오늘_요일_미포함_Todo_생성_안됨() {
+    // TEST_DATE = Monday(bit=1). routineDate=2 → Tuesday만 → 불일치
+    given(routineRepository.findAll()).willReturn(List.of(buildRoutine(RoutineType.WEEKLY, 2)));
+
+    routineService.generateDailyTodos();
+
+    verify(todoRepository, never()).save(any(Todo.class));
+  }
+
+  @Test
+  void generateDailyTodos_MONTHLY_오늘_날짜_일치_Todo_생성됨() {
+    // TEST_DATE = 15일. routineDate=15 → 일치
+    given(routineRepository.findAll()).willReturn(List.of(buildRoutine(RoutineType.MONTHLY, 15)));
+
+    routineService.generateDailyTodos();
+
+    verify(todoRepository).save(any(Todo.class));
+  }
+
+  @Test
+  void generateDailyTodos_MONTHLY_오늘_날짜_불일치_Todo_생성_안됨() {
+    // TEST_DATE = 15일. routineDate=16 → 불일치
+    given(routineRepository.findAll()).willReturn(List.of(buildRoutine(RoutineType.MONTHLY, 16)));
+
+    routineService.generateDailyTodos();
+
+    verify(todoRepository, never()).save(any(Todo.class));
+  }
+
+  @Test
+  void generateDailyTodos_이미_오늘_Todo_존재시_중복_생성_안됨() {
+    given(routineRepository.findAll()).willReturn(List.of(buildRoutine(RoutineType.DAILY, null)));
+    given(todoRepository.existsByRoutineAndDueDateBetween(any(), any(), any())).willReturn(true);
+
+    routineService.generateDailyTodos();
+
+    verify(todoRepository, never()).save(any(Todo.class));
   }
 }
