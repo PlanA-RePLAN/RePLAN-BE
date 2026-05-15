@@ -1,8 +1,8 @@
 package plana.replan.domain.routine.service;
 
+import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.ZoneId;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -30,8 +30,7 @@ import plana.replan.global.exception.CustomException;
 @RequiredArgsConstructor
 public class RoutineService {
 
-  private static final ZoneId KST = ZoneId.of("Asia/Seoul");
-
+  private final Clock clock;
   private final RoutineRepository routineRepository;
   private final UserRepository userRepository;
   private final TagRepository tagRepository;
@@ -89,7 +88,7 @@ public class RoutineService {
   }
 
   private boolean isTodayMatch(Routine routine) {
-    LocalDate today = LocalDate.now(KST);
+    LocalDate today = LocalDate.now(clock);
     return switch (routine.getRoutineType()) {
       case DAILY -> true;
       case WEEKLY -> {
@@ -102,7 +101,7 @@ public class RoutineService {
   }
 
   private void createTodoFromRoutine(Routine routine) {
-    LocalDateTime todayStart = LocalDate.now(KST).atStartOfDay();
+    LocalDateTime todayStart = LocalDate.now(clock).atStartOfDay();
     if (todoRepository.existsByRoutineAndDueDateBetween(
         routine, todayStart, todayStart.plusDays(1))) {
       return;
