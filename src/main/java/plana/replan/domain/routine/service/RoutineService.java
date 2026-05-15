@@ -1,5 +1,9 @@
 package plana.replan.domain.routine.service;
 
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -15,6 +19,8 @@ import plana.replan.domain.routine.repository.RoutineRepository;
 import plana.replan.domain.tag.entity.Tag;
 import plana.replan.domain.tag.exception.TagErrorCode;
 import plana.replan.domain.tag.repository.TagRepository;
+import plana.replan.domain.todo.entity.Todo;
+import plana.replan.domain.todo.repository.TodoRepository;
 import plana.replan.domain.user.entity.User;
 import plana.replan.domain.user.exception.UserErrorCode;
 import plana.replan.domain.user.repository.UserRepository;
@@ -24,10 +30,13 @@ import plana.replan.global.exception.CustomException;
 @RequiredArgsConstructor
 public class RoutineService {
 
+  private static final ZoneId KST = ZoneId.of("Asia/Seoul");
+
   private final RoutineRepository routineRepository;
   private final UserRepository userRepository;
   private final TagRepository tagRepository;
   private final GoalRepository goalRepository;
+  private final TodoRepository todoRepository;
 
   @Transactional
   public RoutineResponseDto createRoutine(Long userId, RoutineCreateRequestDto request) {
@@ -55,17 +64,59 @@ public class RoutineService {
     }
 
     Routine routine =
-        Routine.builder()
-            .title(request.title())
-            .dueDate(request.dueDate())
-            .routineType(request.routineType())
-            .routineDate(request.routineDate())
-            .user(user)
-            .tag(tag)
-            .goal(goal)
-            .build();
+        routineRepository.save(
+            Routine.builder()
+                .title(request.title())
+                .dueDate(request.dueDate())
+                .routineType(request.routineType())
+                .routineDate(request.routineDate())
+                .user(user)
+                .tag(tag)
+                .goal(goal)
+                .build());
 
-    return RoutineResponseDto.from(routineRepository.save(routine));
+    if (isTodayMatch(routine)) {
+      createTodoFromRoutine(routine);
+    }
+
+    return RoutineResponseDto.from(routine);
+  }
+
+  @Transactional
+  public void generateDailyTodos() {
+    List<Routine> routines = routineRepository.findAll();
+    routines.stream().filter(this::isTodayMatch).forEach(this::createTodoFromRoutine);
+  }
+
+  private boolean isTodayMatch(Routine routine) {
+    LocalDate today = LocalDate.now(KST);
+    return switch (routine.getRoutineType()) {
+      case DAILY -> true;
+      case WEEKLY -> {
+        int dayBit = 1 << (today.getDayOfWeek().getValue() - 1);
+        yield routine.getRoutineDate() != null && (routine.getRoutineDate() & dayBit) != 0;
+      }
+      case MONTHLY -> routine.getRoutineDate() != null
+          && routine.getRoutineDate() == today.getDayOfMonth();
+    };
+  }
+
+  private void createTodoFromRoutine(Routine routine) {
+    LocalDateTime todayStart = LocalDate.now(KST).atStartOfDay();
+    if (todoRepository.existsByRoutineAndDueDateBetween(
+        routine, todayStart, todayStart.plusDays(1))) {
+      return;
+    }
+    todoRepository.save(
+        Todo.builder()
+            .title(routine.getTitle())
+            .dueDate(todayStart)
+            .isPinned(false)
+            .user(routine.getUser())
+            .tag(routine.getTag())
+            .goal(routine.getGoal())
+            .routine(routine)
+            .build());
   }
 
   private void validateRoutineDate(RoutineType routineType, Integer routineDate) {

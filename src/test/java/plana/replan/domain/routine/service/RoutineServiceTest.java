@@ -31,6 +31,7 @@ import plana.replan.domain.tag.repository.TagRepository;
 import plana.replan.domain.user.entity.Provider;
 import plana.replan.domain.user.entity.Role;
 import plana.replan.domain.user.entity.User;
+import plana.replan.domain.todo.repository.TodoRepository;
 import plana.replan.domain.user.exception.UserErrorCode;
 import plana.replan.domain.user.repository.UserRepository;
 import plana.replan.global.exception.CustomException;
@@ -42,6 +43,7 @@ class RoutineServiceTest {
   @Mock private UserRepository userRepository;
   @Mock private TagRepository tagRepository;
   @Mock private GoalRepository goalRepository;
+  @Mock private TodoRepository todoRepository;
 
   @InjectMocks private RoutineService routineService;
 
@@ -193,8 +195,7 @@ class RoutineServiceTest {
     assertThatThrownBy(
             () ->
                 routineService.createRoutine(
-                    1L,
-                    new RoutineCreateRequestDto("루틴", null, RoutineType.WEEKLY, 0, null, null)))
+                    1L, new RoutineCreateRequestDto("루틴", null, RoutineType.WEEKLY, 0, null, null)))
         .isInstanceOf(CustomException.class)
         .satisfies(
             e ->
@@ -316,8 +317,7 @@ class RoutineServiceTest {
             () ->
                 routineService.createRoutine(
                     1L,
-                    new RoutineCreateRequestDto(
-                        "루틴", null, RoutineType.DAILY, null, 999L, null)))
+                    new RoutineCreateRequestDto("루틴", null, RoutineType.DAILY, null, 999L, null)))
         .isInstanceOf(CustomException.class)
         .satisfies(
             e ->
@@ -336,8 +336,7 @@ class RoutineServiceTest {
             () ->
                 routineService.createRoutine(
                     1L,
-                    new RoutineCreateRequestDto(
-                        "루틴", null, RoutineType.DAILY, null, null, 999L)))
+                    new RoutineCreateRequestDto("루틴", null, RoutineType.DAILY, null, null, 999L)))
         .isInstanceOf(CustomException.class)
         .satisfies(
             e ->
