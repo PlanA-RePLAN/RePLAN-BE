@@ -2,6 +2,8 @@ package plana.replan.domain.todo.entity;
 
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Objects;
 import lombok.AccessLevel;
 import lombok.Builder;
@@ -58,6 +60,13 @@ public class Todo extends BaseTimeEntity {
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "routine_id")
   private Routine routine;
+
+  @ManyToOne(fetch = FetchType.LAZY)
+  @JoinColumn(name = "parent_id")
+  private Todo parent;
+
+  @OneToMany(mappedBy = "parent", fetch = FetchType.LAZY)
+  private List<Todo> children = new ArrayList<>();
 
   @OneToOne(mappedBy = "todo", fetch = FetchType.LAZY)
   private FailureReason failureReason;
