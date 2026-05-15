@@ -9,6 +9,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.SQLRestriction;
 import plana.replan.domain.goal.entity.Goal;
+import plana.replan.domain.tag.entity.Tag;
 import plana.replan.domain.user.entity.User;
 import plana.replan.global.entity.BaseTimeEntity;
 
@@ -41,6 +42,10 @@ public class Routine extends BaseTimeEntity {
   private User user;
 
   @ManyToOne(fetch = FetchType.LAZY)
+  @JoinColumn(name = "tag_id")
+  private Tag tag;
+
+  @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "goal_id")
   private Goal goal;
 
@@ -51,12 +56,14 @@ public class Routine extends BaseTimeEntity {
       RoutineType routineType,
       Integer routineDate,
       User user,
+      Tag tag,
       Goal goal) {
     this.title = Objects.requireNonNull(title, "제목은 필수입니다.");
     this.user = Objects.requireNonNull(user, "유저는 필수입니다.");
     this.dueDate = dueDate;
     this.routineType = routineType;
     this.routineDate = routineDate;
+    this.tag = tag;
     this.goal = goal;
   }
 }
