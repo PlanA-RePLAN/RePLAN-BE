@@ -134,13 +134,13 @@ class RoutineServiceTest {
     given(userRepository.findById(1L)).willReturn(Optional.of(testUser()));
     given(routineRepository.save(any(Routine.class))).willAnswer(inv -> inv.getArgument(0));
 
-    // DAILY에서 routineDate=999를 넘겨도 검증 없이 저장됨
+    // DAILY에서 routineDate=999를 넘겨도 null로 정규화되어 저장됨
     RoutineResponseDto result =
         routineService.createRoutine(
             1L, new RoutineCreateRequestDto("루틴", null, RoutineType.DAILY, 999, null, null));
 
     assertThat(result.getRoutineType()).isEqualTo(RoutineType.DAILY);
-    assertThat(result.getRoutineDate()).isEqualTo(999);
+    assertThat(result.getRoutineDate()).isNull();
   }
 
   // ========== WEEKLY ==========

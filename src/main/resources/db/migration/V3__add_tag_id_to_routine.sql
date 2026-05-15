@@ -1,2 +1,2 @@
 ALTER TABLE routine
-    ADD COLUMN tag_id BIGINT REFERENCES tag (id);
+    ADD COLUMN tag_id BIGINT REFERENCES tag (id) ON DELETE SET NULL;

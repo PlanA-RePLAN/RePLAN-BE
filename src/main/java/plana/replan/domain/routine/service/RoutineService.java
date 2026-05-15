@@ -62,13 +62,15 @@ public class RoutineService {
               .orElseThrow(() -> new CustomException(GoalErrorCode.GOAL_NOT_FOUND));
     }
 
+    Integer routineDate = request.routineType() == RoutineType.DAILY ? null : request.routineDate();
+
     Routine routine =
         routineRepository.save(
             Routine.builder()
                 .title(request.title())
                 .dueDate(request.dueDate())
                 .routineType(request.routineType())
-                .routineDate(request.routineDate())
+                .routineDate(routineDate)
                 .user(user)
                 .tag(tag)
                 .goal(goal)
