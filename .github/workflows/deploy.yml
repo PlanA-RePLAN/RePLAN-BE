@@ -75,6 +75,7 @@ jobs:
             echo "ECR_REGISTRY=${{ secrets.ECR_REGISTRY }}" >> /home/ubuntu/app/.env
             echo "ECR_REPOSITORY=${{ secrets.ECR_REPOSITORY }}" >> /home/ubuntu/app/.env
             echo "AWS_REGION=${{ secrets.AWS_REGION }}" >> /home/ubuntu/app/.env
+            echo "SPRING_PROFILES_ACTIVE=prod" >> /home/ubuntu/app/.env
             
             # compose 파일이 있는 디렉토리로 이동 후 실행
             cd /home/ubuntu/app || exit 1
