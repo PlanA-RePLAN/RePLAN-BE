@@ -22,6 +22,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import plana.replan.domain.tag.exception.TagErrorCode;
 import plana.replan.domain.todo.dto.TodoResponseDto;
+import plana.replan.domain.todo.exception.TodoErrorCode;
 import plana.replan.domain.todo.service.TodoService;
 import plana.replan.domain.user.exception.UserErrorCode;
 import plana.replan.global.config.SecurityConfig;
@@ -182,5 +183,73 @@ class TodoControllerTest {
         .andExpect(jsonPath("$.success").value(false))
         .andExpect(jsonPath("$.error.code").value("USER_NOT_FOUND"))
         .andExpect(jsonPath("$.data").value(nullValue()));
+  }
+
+  @Test
+  @DisplayName("인증 없이 하위 투두 생성 호출: Security가 차단, 401 반환")
+  void createSubTodo_unauthenticated() throws Exception {
+    mockMvc
+        .perform(
+            post("/api/todos/10/sub-todos")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    { "title": "하위 투두" }
+                    """))
+        .andExpect(status().isUnauthorized())
+        .andExpect(jsonPath("$.error.code").value("EMPTY_TOKEN"));
+  }
+
+  @Test
+  @DisplayName("하위 투두 생성 성공: status=201, parentId 포함")
+  void createSubTodo_success() throws Exception {
+    given(todoService.createSubTodo(any(), any(), any()))
+        .willReturn(new TodoResponseDto(43L, "하위 투두", null, false, null, 10L));
+
+    mockMvc
+        .perform(
+            post("/api/todos/10/sub-todos")
+                .with(authentication(authToken(1L)))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    { "title": "하위 투두" }
+                    """))
+        .andExpect(status().isCreated())
+        .andExpect(jsonPath("$.success").value(true))
+        .andExpect(jsonPath("$.data.todoId").value(43))
+        .andExpect(jsonPath("$.data.title").value("하위 투두"))
+        .andExpect(jsonPath("$.data.parentId").value(10))
+        .andExpect(jsonPath("$.error").value(nullValue()));
+  }
+
+  @Test
+  @DisplayName("title 누락: status=400, error.code=INVALID_INPUT")
+  void createSubTodo_missingTitle() throws Exception {
+    mockMvc
+        .perform(
+            post("/api/todos/10/sub-todos")
+                .with(authentication(authToken(1L)))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{}"))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.error.code").value("INVALID_INPUT"));
+  }
+
+  @Test
+  @DisplayName("존재하지 않는 parentId: status=404, error.code=TODO_NOT_FOUND")
+  void createSubTodo_parentNotFound() throws Exception {
+    willThrow(new CustomException(TodoErrorCode.TODO_NOT_FOUND))
+        .given(todoService)
+        .createSubTodo(any(), any(), any());
+
+    mockMvc
+        .perform(
+            post("/api/todos/999/sub-todos")
+                .with(authentication(authToken(1L)))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    { "title": "하위 투두" }
+                    """))
+        .andExpect(status().isNotFound())
+        .andExpect(jsonPath("$.error.code").value("TODO_NOT_FOUND"));
   }
 }
