@@ -21,9 +21,11 @@ import plana.replan.domain.tag.entity.Tag;
 import plana.replan.domain.tag.entity.TagColor;
 import plana.replan.domain.tag.exception.TagErrorCode;
 import plana.replan.domain.tag.repository.TagRepository;
+import plana.replan.domain.todo.dto.SubTodoCreateRequestDto;
 import plana.replan.domain.todo.dto.TodoCreateRequestDto;
 import plana.replan.domain.todo.dto.TodoResponseDto;
 import plana.replan.domain.todo.entity.Todo;
+import plana.replan.domain.todo.exception.TodoErrorCode;
 import plana.replan.domain.todo.repository.TodoRepository;
 import plana.replan.domain.user.entity.Provider;
 import plana.replan.domain.user.entity.Role;
@@ -143,5 +145,104 @@ class TodoServiceTest {
     assertThat(result.getTitle()).isEqualTo("제목");
     assertThat(result.getDueDate()).isEqualTo(dueDate);
     assertThat(result.getTagId()).isEqualTo(5L);
+  }
+
+  private SubTodoCreateRequestDto subRequest(String title) {
+    SubTodoCreateRequestDto dto = new SubTodoCreateRequestDto();
+    ReflectionTestUtils.setField(dto, "title", title);
+    return dto;
+  }
+
+  private Todo testTodo(Long id, User user) {
+    Todo todo = Todo.builder().title("부모 투두").user(user).isPinned(false).build();
+    ReflectionTestUtils.setField(todo, "id", id);
+    return todo;
+  }
+
+  @Test
+  @DisplayName("userId null: USER_NOT_FOUND 예외, save 미호출")
+  void createSubTodo_nullUserId_throws() {
+    assertThatThrownBy(() -> todoService.createSubTodo(null, 1L, subRequest("하위 투두")))
+        .isInstanceOf(CustomException.class)
+        .satisfies(
+            e ->
+                assertThat(((CustomException) e).getErrorCode())
+                    .isEqualTo(UserErrorCode.USER_NOT_FOUND));
+
+    verify(todoRepository, never()).save(any());
+  }
+
+  @Test
+  @DisplayName("userId가 DB에 없음: USER_NOT_FOUND 예외, save 미호출")
+  void createSubTodo_userNotFound_throws() {
+    given(userRepository.findById(1L)).willReturn(Optional.empty());
+
+    assertThatThrownBy(() -> todoService.createSubTodo(1L, 10L, subRequest("하위 투두")))
+        .isInstanceOf(CustomException.class)
+        .satisfies(
+            e ->
+                assertThat(((CustomException) e).getErrorCode())
+                    .isEqualTo(UserErrorCode.USER_NOT_FOUND));
+
+    verify(todoRepository, never()).save(any());
+  }
+
+  @Test
+  @DisplayName("parentId가 DB에 없음: TODO_NOT_FOUND 예외, save 미호출")
+  void createSubTodo_parentNotFound_throws() {
+    given(userRepository.findById(1L)).willReturn(Optional.of(testUser()));
+    given(todoRepository.findById(99L)).willReturn(Optional.empty());
+
+    assertThatThrownBy(() -> todoService.createSubTodo(1L, 99L, subRequest("하위 투두")))
+        .isInstanceOf(CustomException.class)
+        .satisfies(
+            e ->
+                assertThat(((CustomException) e).getErrorCode())
+                    .isEqualTo(TodoErrorCode.TODO_NOT_FOUND));
+
+    verify(todoRepository, never()).save(any());
+  }
+
+  @Test
+  @DisplayName("parent 투두가 다른 유저 소유: TODO_NOT_FOUND 예외, save 미호출")
+  void createSubTodo_parentOwnedByOtherUser_throws() {
+    User otherUser =
+        User.builder()
+            .email("other@test.com")
+            .nickname("타인")
+            .role(Role.ROLE_USER)
+            .provider(Provider.LOCAL)
+            .build();
+    ReflectionTestUtils.setField(otherUser, "id", 2L);
+
+    given(userRepository.findById(1L)).willReturn(Optional.of(testUser()));
+    Todo parentOwnedByOther = testTodo(10L, otherUser);
+    given(todoRepository.findById(10L)).willReturn(Optional.of(parentOwnedByOther));
+
+    assertThatThrownBy(() -> todoService.createSubTodo(1L, 10L, subRequest("하위 투두")))
+        .isInstanceOf(CustomException.class)
+        .satisfies(
+            e ->
+                assertThat(((CustomException) e).getErrorCode())
+                    .isEqualTo(TodoErrorCode.TODO_NOT_FOUND));
+
+    verify(todoRepository, never()).save(any());
+  }
+
+  @Test
+  @DisplayName("성공: 하위 투두 생성, parentId 포함된 DTO 반환")
+  void createSubTodo_success() {
+    User user = testUser();
+    Todo parent = testTodo(10L, user);
+
+    given(userRepository.findById(1L)).willReturn(Optional.of(user));
+    given(todoRepository.findById(10L)).willReturn(Optional.of(parent));
+    given(todoRepository.save(any(Todo.class))).willAnswer(inv -> inv.getArgument(0));
+
+    TodoResponseDto result = todoService.createSubTodo(1L, 10L, subRequest("하위 투두"));
+
+    assertThat(result.getTitle()).isEqualTo("하위 투두");
+    assertThat(result.getParentId()).isEqualTo(10L);
+    assertThat(result.getTagId()).isNull();
   }
 }
