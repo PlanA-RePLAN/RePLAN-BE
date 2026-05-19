@@ -235,6 +235,42 @@ class TodoControllerTest {
   }
 
   @Test
+  @DisplayName("title 빈 문자열: status=400, error.code=INVALID_INPUT")
+  void createSubTodo_blankTitle() throws Exception {
+    mockMvc
+        .perform(
+            post("/api/todos/10/sub-todos")
+                .with(authentication(authToken(1L)))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    { "title": "" }
+                    """))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.error.code").value("INVALID_INPUT"))
+        .andExpect(jsonPath("$.data").value(nullValue()));
+  }
+
+  @Test
+  @DisplayName("userId가 DB에 없는 경우: status=404, error.code=USER_NOT_FOUND")
+  void createSubTodo_userNotFound() throws Exception {
+    willThrow(new CustomException(UserErrorCode.USER_NOT_FOUND))
+        .given(todoService)
+        .createSubTodo(any(), any(), any());
+
+    mockMvc
+        .perform(
+            post("/api/todos/10/sub-todos")
+                .with(authentication(authToken(999L)))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    { "title": "하위 투두" }
+                    """))
+        .andExpect(status().isNotFound())
+        .andExpect(jsonPath("$.error.code").value("USER_NOT_FOUND"))
+        .andExpect(jsonPath("$.data").value(nullValue()));
+  }
+
+  @Test
   @DisplayName("존재하지 않는 parentId: status=404, error.code=TODO_NOT_FOUND")
   void createSubTodo_parentNotFound() throws Exception {
     willThrow(new CustomException(TodoErrorCode.TODO_NOT_FOUND))

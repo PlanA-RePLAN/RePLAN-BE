@@ -245,4 +245,27 @@ class TodoServiceTest {
     assertThat(result.getParentId()).isEqualTo(10L);
     assertThat(result.getTagId()).isNull();
   }
+
+  @Test
+  @DisplayName("성공: 저장되는 엔티티에 parent 연결, isPinned=false, tag/goal/routine null")
+  void createSubTodo_success_entityProperties() {
+    User user = testUser();
+    Todo parent = testTodo(10L, user);
+
+    given(userRepository.findById(1L)).willReturn(Optional.of(user));
+    given(todoRepository.findById(10L)).willReturn(Optional.of(parent));
+    given(todoRepository.save(any(Todo.class))).willAnswer(inv -> inv.getArgument(0));
+
+    todoService.createSubTodo(1L, 10L, subRequest("하위 투두"));
+
+    ArgumentCaptor<Todo> captor = ArgumentCaptor.forClass(Todo.class);
+    verify(todoRepository).save(captor.capture());
+    Todo saved = captor.getValue();
+
+    assertThat(ReflectionTestUtils.getField(saved, "isPinned")).isEqualTo(false);
+    assertThat(ReflectionTestUtils.getField(saved, "parent")).isSameAs(parent);
+    assertThat(ReflectionTestUtils.getField(saved, "tag")).isNull();
+    assertThat(ReflectionTestUtils.getField(saved, "goal")).isNull();
+    assertThat(ReflectionTestUtils.getField(saved, "routine")).isNull();
+  }
 }
