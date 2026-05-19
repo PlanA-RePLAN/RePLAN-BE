@@ -63,7 +63,7 @@ class TodoControllerTest {
   @DisplayName("투두 생성 성공 (tagId 없음): status=201, success=true, data 필드 검증")
   void createTodo_success_withoutTag() throws Exception {
     given(todoService.createTodo(any(), any()))
-        .willReturn(new TodoResponseDto(1L, "테스트 투두", null, false, null));
+        .willReturn(new TodoResponseDto(1L, "테스트 투두", null, false, null, null));
 
     mockMvc
         .perform(
@@ -87,7 +87,7 @@ class TodoControllerTest {
   @DisplayName("투두 생성 성공 (tagId 있음): status=201, data.tagId 포함")
   void createTodo_success_withTag() throws Exception {
     given(todoService.createTodo(any(), any()))
-        .willReturn(new TodoResponseDto(1L, "테스트 투두", null, false, 5L));
+        .willReturn(new TodoResponseDto(1L, "테스트 투두", null, false, 5L, null));
 
     mockMvc
         .perform(
