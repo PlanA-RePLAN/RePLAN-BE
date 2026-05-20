@@ -55,7 +55,7 @@ public interface TodoControllerDocs {
                               "success": false,
                               "data": null,
                               "error": {
-                                "code": "VALIDATION_ERROR",
+                                "code": "INVALID_INPUT",
                                 "message": "제목은 필수입니다.",
                                 "detail": null
                               }
