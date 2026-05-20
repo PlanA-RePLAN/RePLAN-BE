@@ -14,6 +14,7 @@ public class TodoResponseDto {
   private LocalDateTime dueDate;
   private boolean isCompleted;
   private Long tagId;
+  private Long parentId;
 
   public static TodoResponseDto from(Todo todo) {
     return new TodoResponseDto(
@@ -21,6 +22,7 @@ public class TodoResponseDto {
         todo.getTitle(),
         todo.getDueDate(),
         todo.isCompleted(),
-        todo.getTag() != null ? todo.getTag().getId() : null);
+        todo.getTag() != null ? todo.getTag().getId() : null,
+        todo.getParent() != null ? todo.getParent().getId() : null);
   }
 }

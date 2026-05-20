@@ -71,6 +71,10 @@ public class Todo extends BaseTimeEntity {
   @OneToOne(mappedBy = "todo", fetch = FetchType.LAZY)
   private FailureReason failureReason;
 
+  public void updateTitle(String title) {
+    this.title = Objects.requireNonNull(title, "제목은 필수입니다.");
+  }
+
   @Builder
   public Todo(
       String title,
@@ -80,7 +84,8 @@ public class Todo extends BaseTimeEntity {
       User user,
       Tag tag,
       Goal goal,
-      Routine routine) {
+      Routine routine,
+      Todo parent) {
     this.title = Objects.requireNonNull(title, "제목은 필수입니다.");
     this.user = Objects.requireNonNull(user, "유저는 필수입니다.");
     this.dueDate = dueDate;
@@ -89,5 +94,6 @@ public class Todo extends BaseTimeEntity {
     this.tag = tag;
     this.goal = goal;
     this.routine = routine;
+    this.parent = parent;
   }
 }
