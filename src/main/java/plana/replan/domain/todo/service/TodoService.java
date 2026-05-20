@@ -7,6 +7,7 @@ import plana.replan.domain.tag.entity.Tag;
 import plana.replan.domain.tag.exception.TagErrorCode;
 import plana.replan.domain.tag.repository.TagRepository;
 import plana.replan.domain.todo.dto.SubTodoCreateRequestDto;
+import plana.replan.domain.todo.dto.SubTodoUpdateRequestDto;
 import plana.replan.domain.todo.dto.TodoCreateRequestDto;
 import plana.replan.domain.todo.dto.TodoResponseDto;
 import plana.replan.domain.todo.entity.Todo;
@@ -81,5 +82,49 @@ public class TodoService {
 
     todoRepository.save(subTodo);
     return TodoResponseDto.from(subTodo);
+  }
+
+  @Transactional
+  public TodoResponseDto updateSubTodo(
+      Long userId, Long parentId, Long subTodoId, SubTodoUpdateRequestDto request) {
+    if (userId == null) {
+      throw new CustomException(UserErrorCode.USER_NOT_FOUND);
+    }
+    Todo subTodo =
+        todoRepository
+            .findById(subTodoId)
+            .orElseThrow(() -> new CustomException(TodoErrorCode.TODO_NOT_FOUND));
+
+    if (!subTodo.getUser().getId().equals(userId)) {
+      throw new CustomException(TodoErrorCode.TODO_NOT_FOUND);
+    }
+
+    if (subTodo.getParent() == null || !subTodo.getParent().getId().equals(parentId)) {
+      throw new CustomException(TodoErrorCode.TODO_NOT_FOUND);
+    }
+
+    subTodo.updateTitle(request.getTitle());
+    return TodoResponseDto.from(subTodo);
+  }
+
+  @Transactional
+  public void deleteSubTodo(Long userId, Long parentId, Long subTodoId) {
+    if (userId == null) {
+      throw new CustomException(UserErrorCode.USER_NOT_FOUND);
+    }
+    Todo subTodo =
+        todoRepository
+            .findById(subTodoId)
+            .orElseThrow(() -> new CustomException(TodoErrorCode.TODO_NOT_FOUND));
+
+    if (!subTodo.getUser().getId().equals(userId)) {
+      throw new CustomException(TodoErrorCode.TODO_NOT_FOUND);
+    }
+
+    if (subTodo.getParent() == null || !subTodo.getParent().getId().equals(parentId)) {
+      throw new CustomException(TodoErrorCode.TODO_NOT_FOUND);
+    }
+
+    subTodo.softDelete();
   }
 }
