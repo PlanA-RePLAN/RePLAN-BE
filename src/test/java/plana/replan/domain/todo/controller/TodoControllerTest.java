@@ -3,9 +3,12 @@ package plana.replan.domain.todo.controller;
 import static org.hamcrest.Matchers.nullValue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.BDDMockito.willDoNothing;
 import static org.mockito.BDDMockito.willThrow;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -285,6 +288,110 @@ class TodoControllerTest {
                 .content("""
                     { "title": "하위 투두" }
                     """))
+        .andExpect(status().isNotFound())
+        .andExpect(jsonPath("$.error.code").value("TODO_NOT_FOUND"));
+  }
+
+  // ── updateSubTodo ──────────────────────────────────────────────────────────
+
+  @Test
+  @DisplayName("인증 없이 하위 투두 수정 호출: 401 반환")
+  void updateSubTodo_unauthenticated() throws Exception {
+    mockMvc
+        .perform(
+            put("/api/todos/10/sub-todos/43")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    { "title": "수정 제목" }
+                    """))
+        .andExpect(status().isUnauthorized())
+        .andExpect(jsonPath("$.error.code").value("EMPTY_TOKEN"));
+  }
+
+  @Test
+  @DisplayName("하위 투두 수정 성공: status=200, 수정된 title 반환")
+  void updateSubTodo_success() throws Exception {
+    given(todoService.updateSubTodo(any(), any(), any(), any()))
+        .willReturn(new TodoResponseDto(43L, "수정 제목", null, false, null, 10L));
+
+    mockMvc
+        .perform(
+            put("/api/todos/10/sub-todos/43")
+                .with(authentication(authToken(1L)))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    { "title": "수정 제목" }
+                    """))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.success").value(true))
+        .andExpect(jsonPath("$.data.todoId").value(43))
+        .andExpect(jsonPath("$.data.title").value("수정 제목"))
+        .andExpect(jsonPath("$.data.parentId").value(10))
+        .andExpect(jsonPath("$.error").value(nullValue()));
+  }
+
+  @Test
+  @DisplayName("title 누락 (수정): status=400, error.code=INVALID_INPUT")
+  void updateSubTodo_missingTitle() throws Exception {
+    mockMvc
+        .perform(
+            put("/api/todos/10/sub-todos/43")
+                .with(authentication(authToken(1L)))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{}"))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.error.code").value("INVALID_INPUT"));
+  }
+
+  @Test
+  @DisplayName("존재하지 않거나 본인 소유가 아닌 하위 투두 수정: status=404, error.code=TODO_NOT_FOUND")
+  void updateSubTodo_notFound() throws Exception {
+    willThrow(new CustomException(TodoErrorCode.TODO_NOT_FOUND))
+        .given(todoService)
+        .updateSubTodo(any(), any(), any(), any());
+
+    mockMvc
+        .perform(
+            put("/api/todos/10/sub-todos/999")
+                .with(authentication(authToken(1L)))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    { "title": "수정 제목" }
+                    """))
+        .andExpect(status().isNotFound())
+        .andExpect(jsonPath("$.error.code").value("TODO_NOT_FOUND"));
+  }
+
+  // ── deleteSubTodo ──────────────────────────────────────────────────────────
+
+  @Test
+  @DisplayName("인증 없이 하위 투두 삭제 호출: 401 반환")
+  void deleteSubTodo_unauthenticated() throws Exception {
+    mockMvc
+        .perform(delete("/api/todos/10/sub-todos/43"))
+        .andExpect(status().isUnauthorized())
+        .andExpect(jsonPath("$.error.code").value("EMPTY_TOKEN"));
+  }
+
+  @Test
+  @DisplayName("하위 투두 삭제 성공: status=204, 응답 바디 없음")
+  void deleteSubTodo_success() throws Exception {
+    willDoNothing().given(todoService).deleteSubTodo(any(), any(), any());
+
+    mockMvc
+        .perform(delete("/api/todos/10/sub-todos/43").with(authentication(authToken(1L))))
+        .andExpect(status().isNoContent());
+  }
+
+  @Test
+  @DisplayName("존재하지 않거나 본인 소유가 아닌 하위 투두 삭제: status=404, error.code=TODO_NOT_FOUND")
+  void deleteSubTodo_notFound() throws Exception {
+    willThrow(new CustomException(TodoErrorCode.TODO_NOT_FOUND))
+        .given(todoService)
+        .deleteSubTodo(any(), any(), any());
+
+    mockMvc
+        .perform(delete("/api/todos/10/sub-todos/999").with(authentication(authToken(1L))))
         .andExpect(status().isNotFound())
         .andExpect(jsonPath("$.error.code").value("TODO_NOT_FOUND"));
   }
