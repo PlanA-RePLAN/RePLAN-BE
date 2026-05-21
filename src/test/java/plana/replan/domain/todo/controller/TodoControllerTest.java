@@ -25,6 +25,8 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import plana.replan.domain.tag.exception.TagErrorCode;
+import plana.replan.domain.todo.dto.TodoDetailResponseDto;
+import plana.replan.domain.todo.dto.TodoDetailResponseDto.SubTodoDto;
 import plana.replan.domain.todo.dto.TodoListResponseDto;
 import plana.replan.domain.todo.dto.TodoResponseDto;
 import plana.replan.domain.todo.exception.TodoErrorCode;
@@ -516,6 +518,65 @@ class TodoControllerTest {
         .perform(get("/api/todos").with(authentication(authToken(999L))))
         .andExpect(status().isNotFound())
         .andExpect(jsonPath("$.error.code").value("USER_NOT_FOUND"))
+        .andExpect(jsonPath("$.data").value(nullValue()));
+  }
+
+  // ── getTodoDetail ──────────────────────────────────────────────────────────
+
+  @Test
+  @DisplayName("인증 없이 투두 상세 조회: 401 반환")
+  void getTodoDetail_unauthenticated() throws Exception {
+    mockMvc
+        .perform(get("/api/todos/1"))
+        .andExpect(status().isUnauthorized())
+        .andExpect(jsonPath("$.error.code").value("EMPTY_TOKEN"));
+  }
+
+  @Test
+  @DisplayName("투두 상세 조회 성공 (하위 투두 있음): status=200, 모든 필드 검증")
+  void getTodoDetail_success() throws Exception {
+    TodoDetailResponseDto response =
+        new TodoDetailResponseDto(
+            1L,
+            "토익 단어 50개 외우기",
+            null,
+            false,
+            3L,
+            "영어",
+            "BLUE",
+            "DAILY",
+            List.of(new SubTodoDto(10L, "챕터 1 읽기", false)));
+
+    given(todoService.getTodoDetail(any(), any())).willReturn(response);
+
+    mockMvc
+        .perform(get("/api/todos/1").with(authentication(authToken(1L))))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.status").value(200))
+        .andExpect(jsonPath("$.success").value(true))
+        .andExpect(jsonPath("$.data.todoId").value(1))
+        .andExpect(jsonPath("$.data.title").value("토익 단어 50개 외우기"))
+        .andExpect(jsonPath("$.data.tagId").value(3))
+        .andExpect(jsonPath("$.data.tagTitle").value("영어"))
+        .andExpect(jsonPath("$.data.tagColor").value("BLUE"))
+        .andExpect(jsonPath("$.data.routineType").value("DAILY"))
+        .andExpect(jsonPath("$.data.subTodos[0].todoId").value(10))
+        .andExpect(jsonPath("$.data.subTodos[0].title").value("챕터 1 읽기"))
+        .andExpect(jsonPath("$.data.subTodos[0].isCompleted").value(false))
+        .andExpect(jsonPath("$.error").value(nullValue()));
+  }
+
+  @Test
+  @DisplayName("존재하지 않는 todoId: status=404, error.code=TODO_NOT_FOUND")
+  void getTodoDetail_notFound() throws Exception {
+    willThrow(new CustomException(TodoErrorCode.TODO_NOT_FOUND))
+        .given(todoService)
+        .getTodoDetail(any(), any());
+
+    mockMvc
+        .perform(get("/api/todos/99").with(authentication(authToken(1L))))
+        .andExpect(status().isNotFound())
+        .andExpect(jsonPath("$.error.code").value("TODO_NOT_FOUND"))
         .andExpect(jsonPath("$.data").value(nullValue()));
   }
 }

@@ -708,4 +708,89 @@ class TodoServiceTest {
     assertThat(dto.getTagColor()).isEqualTo("BLUE");
     assertThat(dto.getRoutineType()).isEqualTo("WEEKLY");
   }
+
+  // ── getTodoDetail ──────────────────────────────────────────────────────────
+
+  @Test
+  @DisplayName("존재하지 않는 todoId: TODO_NOT_FOUND 예외")
+  void getTodoDetail_notFound_throws() {
+    given(todoRepository.findById(99L)).willReturn(Optional.empty());
+
+    assertThatThrownBy(() -> todoService.getTodoDetail(1L, 99L))
+        .isInstanceOf(CustomException.class)
+        .satisfies(
+            e ->
+                assertThat(((CustomException) e).getErrorCode())
+                    .isEqualTo(TodoErrorCode.TODO_NOT_FOUND));
+  }
+
+  @Test
+  @DisplayName("다른 유저 소유 투두: TODO_NOT_FOUND 예외")
+  void getTodoDetail_otherUserTodo_throws() {
+    User otherUser =
+        User.builder()
+            .email("other@test.com")
+            .nickname("타인")
+            .role(Role.ROLE_USER)
+            .provider(Provider.LOCAL)
+            .build();
+    ReflectionTestUtils.setField(otherUser, "id", 2L);
+
+    Todo todo = testTodo(1L, otherUser);
+    given(todoRepository.findById(1L)).willReturn(Optional.of(todo));
+
+    assertThatThrownBy(() -> todoService.getTodoDetail(1L, 1L))
+        .isInstanceOf(CustomException.class)
+        .satisfies(
+            e ->
+                assertThat(((CustomException) e).getErrorCode())
+                    .isEqualTo(TodoErrorCode.TODO_NOT_FOUND));
+  }
+
+  @Test
+  @DisplayName("성공 (태그 없음, 반복 없음, 하위 투두 없음): 기본 필드 검증")
+  void getTodoDetail_success_noTagNoRoutineNoSubTodos() {
+    User user = testUser();
+    Todo todo = testTodo(1L, user);
+    given(todoRepository.findById(1L)).willReturn(Optional.of(todo));
+
+    plana.replan.domain.todo.dto.TodoDetailResponseDto result = todoService.getTodoDetail(1L, 1L);
+
+    assertThat(result.getTodoId()).isEqualTo(1L);
+    assertThat(result.getTitle()).isEqualTo("부모 투두");
+    assertThat(result.getTagId()).isNull();
+    assertThat(result.getTagTitle()).isNull();
+    assertThat(result.getTagColor()).isNull();
+    assertThat(result.getRoutineType()).isNull();
+    assertThat(result.getSubTodos()).isEmpty();
+  }
+
+  @Test
+  @DisplayName("성공 (태그, 루틴, 하위 투두 있음): 모든 필드 검증")
+  void getTodoDetail_success_withTagRoutineSubTodos() {
+    User user = testUser();
+    Todo parent = testTodo(1L, user);
+
+    Tag tag = testTag(5L);
+    ReflectionTestUtils.setField(parent, "tag", tag);
+
+    Routine routine =
+        Routine.builder().title("루틴").routineType(RoutineType.DAILY).user(user).build();
+    ReflectionTestUtils.setField(parent, "routine", routine);
+
+    Todo child = testTodo(10L, user);
+    ReflectionTestUtils.setField(parent, "children", List.of(child));
+
+    given(todoRepository.findById(1L)).willReturn(Optional.of(parent));
+
+    plana.replan.domain.todo.dto.TodoDetailResponseDto result = todoService.getTodoDetail(1L, 1L);
+
+    assertThat(result.getTagId()).isEqualTo(5L);
+    assertThat(result.getTagTitle()).isEqualTo("업무");
+    assertThat(result.getTagColor()).isEqualTo("BLUE");
+    assertThat(result.getRoutineType()).isEqualTo("DAILY");
+    assertThat(result.getSubTodos()).hasSize(1);
+    assertThat(result.getSubTodos().get(0).getTodoId()).isEqualTo(10L);
+    assertThat(result.getSubTodos().get(0).getTitle()).isEqualTo("부모 투두");
+  }
 }
