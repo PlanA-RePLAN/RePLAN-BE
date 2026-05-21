@@ -1,20 +1,24 @@
 package plana.replan.domain.todo.controller;
 
 import jakarta.validation.Valid;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import plana.replan.domain.todo.dto.SubTodoCreateRequestDto;
 import plana.replan.domain.todo.dto.SubTodoUpdateRequestDto;
 import plana.replan.domain.todo.dto.TodoCreateRequestDto;
+import plana.replan.domain.todo.dto.TodoListResponseDto;
 import plana.replan.domain.todo.dto.TodoResponseDto;
 import plana.replan.domain.todo.service.TodoService;
 import plana.replan.global.common.ApiResult;
@@ -25,6 +29,13 @@ import plana.replan.global.common.ApiResult;
 public class TodoController implements TodoControllerDocs {
 
   private final TodoService todoService;
+
+  @Override
+  @GetMapping
+  public ResponseEntity<ApiResult<List<TodoListResponseDto>>> getTodos(
+      @AuthenticationPrincipal Long userId, @RequestParam(defaultValue = "all") String filter) {
+    return ResponseEntity.ok(ApiResult.ok(todoService.getTodos(userId, filter)));
+  }
 
   @Override
   @PostMapping("/create")
