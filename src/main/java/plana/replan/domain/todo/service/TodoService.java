@@ -117,6 +117,16 @@ public class TodoService {
 
   @Transactional(readOnly = true)
   public List<TodoListResponseDto> getTodos(Long userId, String filter, String sort) {
+    if (userId == null) {
+      throw new CustomException(UserErrorCode.USER_NOT_FOUND);
+    }
+    if (filter == null) {
+      throw new CustomException(TodoErrorCode.INVALID_FILTER);
+    }
+    if (sort == null) {
+      throw new CustomException(TodoErrorCode.INVALID_SORT);
+    }
+
     User user =
         userRepository
             .findById(userId)
@@ -165,9 +175,9 @@ public class TodoService {
 
   private Comparator<Todo> buildSortComparator(String sort) {
     Comparator<Todo> pinnedFirst = Comparator.comparing(Todo::isPinned).reversed();
-    return switch (sort.toLowerCase()) {
+    return switch (sort) {
       case "priority" -> pinnedFirst.thenComparingDouble(Todo::getSortOrder);
-      case "duedate" -> pinnedFirst.thenComparing(
+      case "dueDate" -> pinnedFirst.thenComparing(
           Todo::getDueDate, Comparator.nullsLast(Comparator.naturalOrder()));
       default -> throw new CustomException(TodoErrorCode.INVALID_SORT);
     };

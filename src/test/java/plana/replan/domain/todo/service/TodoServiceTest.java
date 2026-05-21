@@ -487,6 +487,39 @@ class TodoServiceTest {
   }
 
   @Test
+  @DisplayName("getTodos - userId null: USER_NOT_FOUND 예외")
+  void getTodos_nullUserId_throws() {
+    assertThatThrownBy(() -> todoService.getTodos(null, "all", "priority"))
+        .isInstanceOf(CustomException.class)
+        .satisfies(
+            e ->
+                assertThat(((CustomException) e).getErrorCode())
+                    .isEqualTo(UserErrorCode.USER_NOT_FOUND));
+  }
+
+  @Test
+  @DisplayName("getTodos - filter null: INVALID_FILTER 예외")
+  void getTodos_nullFilter_throws() {
+    assertThatThrownBy(() -> todoService.getTodos(1L, null, "priority"))
+        .isInstanceOf(CustomException.class)
+        .satisfies(
+            e ->
+                assertThat(((CustomException) e).getErrorCode())
+                    .isEqualTo(TodoErrorCode.INVALID_FILTER));
+  }
+
+  @Test
+  @DisplayName("getTodos - sort null: INVALID_SORT 예외")
+  void getTodos_nullSort_throws() {
+    assertThatThrownBy(() -> todoService.getTodos(1L, "all", null))
+        .isInstanceOf(CustomException.class)
+        .satisfies(
+            e ->
+                assertThat(((CustomException) e).getErrorCode())
+                    .isEqualTo(TodoErrorCode.INVALID_SORT));
+  }
+
+  @Test
   @DisplayName("getTodos - userId가 DB에 없음: USER_NOT_FOUND 예외")
   void getTodos_userNotFound_throws() {
     given(userRepository.findById(99L)).willReturn(Optional.empty());
@@ -633,13 +666,26 @@ class TodoServiceTest {
   }
 
   @Test
-  @DisplayName("getTodos - filter·sort 대소문자 무관 처리")
-  void getTodos_filterAndSort_caseInsensitive() {
+  @DisplayName("getTodos - filter 대소문자 무관 처리 (sort는 정확한 값 필요)")
+  void getTodos_filterCaseInsensitive() {
     User user = testUser();
     given(userRepository.findById(1L)).willReturn(Optional.of(user));
     given(todoRepository.findActiveTodosForUser(any())).willReturn(List.of());
 
-    assertThatCode(() -> todoService.getTodos(1L, "ALL", "PRIORITY")).doesNotThrowAnyException();
+    assertThatCode(() -> todoService.getTodos(1L, "ALL", "priority")).doesNotThrowAnyException();
+  }
+
+  @Test
+  @DisplayName("getTodos - sort 대소문자 불일치: INVALID_SORT 예외")
+  void getTodos_sortCaseMismatch_throws() {
+    given(userRepository.findById(1L)).willReturn(Optional.of(testUser()));
+
+    assertThatThrownBy(() -> todoService.getTodos(1L, "all", "PRIORITY"))
+        .isInstanceOf(CustomException.class)
+        .satisfies(
+            e ->
+                assertThat(((CustomException) e).getErrorCode())
+                    .isEqualTo(TodoErrorCode.INVALID_SORT));
   }
 
   @Test
