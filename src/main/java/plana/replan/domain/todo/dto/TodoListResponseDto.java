@@ -1,5 +1,6 @@
 package plana.replan.domain.todo.dto;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.LocalDateTime;
 import lombok.AllArgsConstructor;
@@ -22,12 +23,14 @@ public class TodoListResponseDto {
   @Schema(description = "마감 일시 (ISO 8601 형식)", example = "2025-12-31T23:59:59")
   private LocalDateTime dueDate;
 
+  @JsonProperty("isPinned")
   @Schema(description = "핀 여부", example = "false")
   private boolean isPinned;
 
   @Schema(description = "정렬 순서", example = "10000.0")
   private double sortOrder;
 
+  @JsonProperty("isCompleted")
   @Schema(description = "완료 여부", example = "false")
   private boolean isCompleted;
 
@@ -43,6 +46,7 @@ public class TodoListResponseDto {
   @Schema(description = "반복 유형 (DAILY/WEEKLY/MONTHLY, 반복 아니면 null)", example = "DAILY")
   private String routineType;
 
+  @JsonProperty("isOverdue")
   @Schema(description = "기한 초과 여부 (미완료이고 dueDate가 현재 시각 이전인 경우 true)", example = "false")
   private boolean isOverdue;
 

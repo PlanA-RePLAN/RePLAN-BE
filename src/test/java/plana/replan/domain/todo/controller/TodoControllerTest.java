@@ -7,6 +7,7 @@ import static org.mockito.BDDMockito.willDoNothing;
 import static org.mockito.BDDMockito.willThrow;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -24,6 +25,7 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import plana.replan.domain.tag.exception.TagErrorCode;
+import plana.replan.domain.todo.dto.TodoListResponseDto;
 import plana.replan.domain.todo.dto.TodoResponseDto;
 import plana.replan.domain.todo.exception.TodoErrorCode;
 import plana.replan.domain.todo.service.TodoService;
@@ -394,5 +396,126 @@ class TodoControllerTest {
         .perform(delete("/api/todos/10/sub-todos/999").with(authentication(authToken(1L))))
         .andExpect(status().isNotFound())
         .andExpect(jsonPath("$.error.code").value("TODO_NOT_FOUND"));
+  }
+
+  // ── getTodos ──────────────────────────────────────────────────────────────
+
+  // todoId, title, dueDate, isPinned, sortOrder, isCompleted, tagId, tagTitle, tagColor,
+  // routineType, isOverdue
+  private TodoListResponseDto sampleDto(Long id, boolean isCompleted, boolean isOverdue) {
+    return new TodoListResponseDto(
+        id, "투두 " + id, null, false, 1000.0, isCompleted, null, null, null, null, isOverdue);
+  }
+
+  @Test
+  @DisplayName("인증 없이 투두 목록 조회: Security가 차단, 401 반환")
+  void getTodos_unauthenticated() throws Exception {
+    mockMvc
+        .perform(get("/api/todos"))
+        .andExpect(status().isUnauthorized())
+        .andExpect(jsonPath("$.error.code").value("EMPTY_TOKEN"));
+  }
+
+  @Test
+  @DisplayName("투두 목록 조회 성공 (기본 filter=all, sort=priority): status=200, 배열 반환")
+  void getTodos_success_defaultParams() throws Exception {
+    given(todoService.getTodos(any(), any(), any()))
+        .willReturn(List.of(sampleDto(1L, false, false), sampleDto(2L, false, false)));
+
+    mockMvc
+        .perform(get("/api/todos").with(authentication(authToken(1L))))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.success").value(true))
+        .andExpect(jsonPath("$.data").isArray())
+        .andExpect(jsonPath("$.data[0].todoId").value(1))
+        .andExpect(jsonPath("$.data[1].todoId").value(2))
+        .andExpect(jsonPath("$.error").value(nullValue()));
+  }
+
+  @Test
+  @DisplayName("투두 목록 조회 - isOverdue/태그/루틴 필드 포함 응답 검증")
+  void getTodos_success_responseFieldsVerified() throws Exception {
+    TodoListResponseDto dto =
+        new TodoListResponseDto(
+            1L, "투두", null, true, 500.0, false, 3L, "영어", "BLUE", "DAILY", true);
+    given(todoService.getTodos(any(), any(), any())).willReturn(List.of(dto));
+
+    mockMvc
+        .perform(get("/api/todos").with(authentication(authToken(1L))))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data[0].isPinned").value(true))
+        .andExpect(jsonPath("$.data[0].sortOrder").value(500.0))
+        .andExpect(jsonPath("$.data[0].tagId").value(3))
+        .andExpect(jsonPath("$.data[0].tagTitle").value("영어"))
+        .andExpect(jsonPath("$.data[0].tagColor").value("BLUE"))
+        .andExpect(jsonPath("$.data[0].routineType").value("DAILY"))
+        .andExpect(jsonPath("$.data[0].isOverdue").value(true));
+  }
+
+  @Test
+  @DisplayName("filter=day: status=200, 완료 투두 포함")
+  void getTodos_success_dayFilter() throws Exception {
+    given(todoService.getTodos(any(), any(), any()))
+        .willReturn(List.of(sampleDto(1L, false, false), sampleDto(2L, true, false)));
+
+    mockMvc
+        .perform(get("/api/todos?filter=day").with(authentication(authToken(1L))))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data[0].isCompleted").value(false))
+        .andExpect(jsonPath("$.data[1].isCompleted").value(true));
+  }
+
+  @Test
+  @DisplayName("filter=week, sort=duedate: status=200")
+  void getTodos_success_weekFilter_duedateSort() throws Exception {
+    given(todoService.getTodos(any(), any(), any()))
+        .willReturn(List.of(sampleDto(1L, false, false)));
+
+    mockMvc
+        .perform(get("/api/todos?filter=week&sort=duedate").with(authentication(authToken(1L))))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data").isArray());
+  }
+
+  @Test
+  @DisplayName("유효하지 않은 filter: status=400, error.code=INVALID_FILTER")
+  void getTodos_invalidFilter() throws Exception {
+    willThrow(new CustomException(TodoErrorCode.INVALID_FILTER))
+        .given(todoService)
+        .getTodos(any(), any(), any());
+
+    mockMvc
+        .perform(get("/api/todos?filter=invalid").with(authentication(authToken(1L))))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.error.code").value("INVALID_FILTER"))
+        .andExpect(jsonPath("$.data").value(nullValue()));
+  }
+
+  @Test
+  @DisplayName("유효하지 않은 sort: status=400, error.code=INVALID_SORT")
+  void getTodos_invalidSort() throws Exception {
+    willThrow(new CustomException(TodoErrorCode.INVALID_SORT))
+        .given(todoService)
+        .getTodos(any(), any(), any());
+
+    mockMvc
+        .perform(get("/api/todos?sort=invalid").with(authentication(authToken(1L))))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.error.code").value("INVALID_SORT"))
+        .andExpect(jsonPath("$.data").value(nullValue()));
+  }
+
+  @Test
+  @DisplayName("userId가 DB에 없는 경우: status=404, error.code=USER_NOT_FOUND")
+  void getTodos_userNotFound() throws Exception {
+    willThrow(new CustomException(UserErrorCode.USER_NOT_FOUND))
+        .given(todoService)
+        .getTodos(any(), any(), any());
+
+    mockMvc
+        .perform(get("/api/todos").with(authentication(authToken(999L))))
+        .andExpect(status().isNotFound())
+        .andExpect(jsonPath("$.error.code").value("USER_NOT_FOUND"))
+        .andExpect(jsonPath("$.data").value(nullValue()));
   }
 }
