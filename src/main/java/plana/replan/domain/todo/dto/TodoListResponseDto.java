@@ -43,9 +43,16 @@ public class TodoListResponseDto {
   @Schema(description = "반복 유형 (DAILY/WEEKLY/MONTHLY, 반복 아니면 null)", example = "DAILY")
   private String routineType;
 
+  @Schema(description = "기한 초과 여부 (미완료이고 dueDate가 현재 시각 이전인 경우 true)", example = "false")
+  private boolean isOverdue;
+
   public static TodoListResponseDto from(Todo todo) {
     Tag tag = todo.getTag();
     Routine routine = todo.getRoutine();
+    boolean overdue =
+        !todo.isCompleted()
+            && todo.getDueDate() != null
+            && todo.getDueDate().isBefore(LocalDateTime.now());
     return new TodoListResponseDto(
         todo.getId(),
         todo.getTitle(),
@@ -58,6 +65,7 @@ public class TodoListResponseDto {
         tag != null && tag.getColor() != null ? tag.getColor().name() : null,
         routine != null && routine.getRoutineType() != null
             ? routine.getRoutineType().name()
-            : null);
+            : null,
+        overdue);
   }
 }
