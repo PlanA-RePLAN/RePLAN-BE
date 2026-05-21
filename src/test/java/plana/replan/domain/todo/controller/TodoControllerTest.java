@@ -468,13 +468,13 @@ class TodoControllerTest {
   }
 
   @Test
-  @DisplayName("filter=week, sort=duedate: status=200")
-  void getTodos_success_weekFilter_duedateSort() throws Exception {
+  @DisplayName("filter=week, sort=dueDate: status=200")
+  void getTodos_success_weekFilter_dueDateSort() throws Exception {
     given(todoService.getTodos(any(), any(), any()))
         .willReturn(List.of(sampleDto(1L, false, false)));
 
     mockMvc
-        .perform(get("/api/todos?filter=week&sort=duedate").with(authentication(authToken(1L))))
+        .perform(get("/api/todos?filter=week&sort=dueDate").with(authentication(authToken(1L))))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data").isArray());
   }

@@ -171,7 +171,7 @@ public interface TodoControllerDocs {
           | 파라미터명 | 필수 여부 | 타입 | 기본값 | 설명 | 예시 |
           |-----------|-----------|------|--------|------|------|
           | filter | ❌ 선택 | string | `all` | 조회 범위 필터 (`all`, `day`, `week`, `month`) | `day` |
-          | sort | ❌ 선택 | string | `priority` | 정렬 기준 (`priority`, `duedate`) | `duedate` |
+          | sort | ❌ 선택 | string | `priority` | 정렬 기준 (`priority`, `dueDate`) | `dueDate` |
 
           **filter 값별 조회 조건**
 
@@ -187,7 +187,7 @@ public interface TodoControllerDocs {
           | sort | 정렬 |
           |------|------|
           | `priority` | isPinned DESC → sortOrder ASC |
-          | `duedate` | isPinned DESC → dueDate ASC (null 마지막) |
+          | `dueDate` | isPinned DESC → dueDate ASC (null 마지막) |
 
           **day 필터의 추가 정렬 규칙**
           - 미완료 투두 먼저, 완료 투두 나중 → 각 그룹 내에서 선택한 sort 기준 적용
@@ -270,7 +270,7 @@ public interface TodoControllerDocs {
                             "data": null,
                             "error": {
                               "code": "INVALID_SORT",
-                              "message": "유효하지 않은 정렬 값입니다. (priority, duedate 중 하나)",
+                              "message": "유효하지 않은 정렬 값입니다. (priority, dueDate 중 하나)",
                               "detail": null
                             }
                           }
@@ -319,7 +319,7 @@ public interface TodoControllerDocs {
       @Parameter(description = "조회 범위 필터 (all/day/week/month)", example = "all")
           @RequestParam(defaultValue = "all")
           String filter,
-      @Parameter(description = "정렬 기준 (priority/duedate)", example = "priority")
+      @Parameter(description = "정렬 기준 (priority/dueDate)", example = "priority")
           @RequestParam(defaultValue = "priority")
           String sort);
 

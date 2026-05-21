@@ -598,8 +598,8 @@ class TodoServiceTest {
   }
 
   @Test
-  @DisplayName("getTodos - duedate 정렬: 핀된 투두 먼저, 마감일 오름차순, null은 마지막")
-  void getTodos_duedateSort_pinnedFirst_thenDueDate_nullsLast() {
+  @DisplayName("getTodos - dueDate 정렬: 핀된 투두 먼저, 마감일 오름차순, null은 마지막")
+  void getTodos_dueDateSort_pinnedFirst_thenDueDate_nullsLast() {
     User user = testUser();
     given(userRepository.findById(1L)).willReturn(Optional.of(user));
 
@@ -614,7 +614,7 @@ class TodoServiceTest {
     given(todoRepository.findActiveTodosForUser(user))
         .willReturn(List.of(noDate, lateDate, earlyDate, pinnedLate));
 
-    List<TodoListResponseDto> result = todoService.getTodos(1L, "all", "duedate");
+    List<TodoListResponseDto> result = todoService.getTodos(1L, "all", "dueDate");
 
     assertThat(result).extracting("todoId").containsExactly(4L, 3L, 2L, 1L);
   }
