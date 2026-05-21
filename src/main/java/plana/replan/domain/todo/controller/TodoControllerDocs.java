@@ -195,6 +195,7 @@ public interface TodoControllerDocs {
           **반환 필드**
           - `routineType`: 루틴에 연결된 투두인 경우 `DAILY` / `WEEKLY` / `MONTHLY`, 일반 투두는 `null`
           - `tagId`, `tagTitle`, `tagColor`: 태그가 없으면 모두 `null`
+          - `isOverdue`: 미완료이고 `dueDate`가 현재 시각 이전인 경우 `true`, 그 외 `false`
           """,
       security = @SecurityRequirement(name = "Bearer Authentication"))
   @ApiResponses({
@@ -221,7 +222,8 @@ public interface TodoControllerDocs {
                                   "tagId": 3,
                                   "tagTitle": "영어",
                                   "tagColor": "BLUE",
-                                  "routineType": "DAILY"
+                                  "routineType": "DAILY",
+                                  "isOverdue": true
                                 },
                                 {
                                   "todoId": 2,
@@ -233,7 +235,8 @@ public interface TodoControllerDocs {
                                   "tagId": null,
                                   "tagTitle": null,
                                   "tagColor": null,
-                                  "routineType": null
+                                  "routineType": null,
+                                  "isOverdue": false
                                 }
                               ],
                               "error": null
