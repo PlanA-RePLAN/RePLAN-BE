@@ -44,6 +44,7 @@ public interface TodoControllerDocs {
           | 파라미터명 | 필수 여부 | 타입 | 기본값 | 설명 | 예시 |
           |-----------|-----------|------|--------|------|------|
           | filter | ❌ 선택 | string | `all` | 조회 범위 필터 (`all`, `day`, `week`, `month`) | `day` |
+          | sort | ❌ 선택 | string | `priority` | 정렬 기준 (`priority`, `duedate`) | `duedate` |
 
           **filter 값별 조회 조건**
 
@@ -54,9 +55,15 @@ public interface TodoControllerDocs {
           | `week` | 오늘부터 7일 이내 마감인 미완료 투두 |
           | `month` | 오늘부터 한 달 이내 마감인 미완료 투두 |
 
-          **정렬 기준**
-          - `day` 필터: 미완료 투두 먼저 → 핀된 투두 먼저 → sortOrder 오름차순
-          - 나머지 필터: 핀된 투두 먼저 → sortOrder 오름차순
+          **sort 값별 정렬 기준** (pinned는 항상 최우선)
+
+          | sort | 정렬 |
+          |------|------|
+          | `priority` | isPinned DESC → sortOrder ASC |
+          | `duedate` | isPinned DESC → dueDate ASC (null 마지막) |
+
+          **day 필터의 추가 정렬 규칙**
+          - 미완료 투두 먼저, 완료 투두 나중 → 각 그룹 내에서 선택한 sort 기준 적용
 
           **반환 필드**
           - `routineType`: 루틴에 연결된 투두인 경우 `DAILY` / `WEEKLY` / `MONTHLY`, 일반 투두는 `null`
@@ -107,24 +114,41 @@ public interface TodoControllerDocs {
                             """))),
     @ApiResponse(
         responseCode = "400",
-        description = "유효하지 않은 filter 값",
+        description = "유효하지 않은 filter 또는 sort 값",
         content =
             @Content(
-                examples =
-                    @ExampleObject(
-                        value =
-                            """
-                            {
-                              "status": 400,
-                              "success": false,
-                              "data": null,
-                              "error": {
-                                "code": "INVALID_FILTER",
-                                "message": "유효하지 않은 필터 값입니다. (all, day, week, month 중 하나)",
-                                "detail": null
-                              }
+                examples = {
+                  @ExampleObject(
+                      name = "잘못된 filter",
+                      value =
+                          """
+                          {
+                            "status": 400,
+                            "success": false,
+                            "data": null,
+                            "error": {
+                              "code": "INVALID_FILTER",
+                              "message": "유효하지 않은 필터 값입니다. (all, day, week, month 중 하나)",
+                              "detail": null
                             }
-                            """))),
+                          }
+                          """),
+                  @ExampleObject(
+                      name = "잘못된 sort",
+                      value =
+                          """
+                          {
+                            "status": 400,
+                            "success": false,
+                            "data": null,
+                            "error": {
+                              "code": "INVALID_SORT",
+                              "message": "유효하지 않은 정렬 값입니다. (priority, duedate 중 하나)",
+                              "detail": null
+                            }
+                          }
+                          """)
+                })),
     @ApiResponse(
         responseCode = "401",
         description = "AccessToken 없음 또는 만료",
@@ -167,7 +191,10 @@ public interface TodoControllerDocs {
       @AuthenticationPrincipal Long userId,
       @Parameter(description = "조회 범위 필터 (all/day/week/month)", example = "all")
           @RequestParam(defaultValue = "all")
-          String filter);
+          String filter,
+      @Parameter(description = "정렬 기준 (priority/duedate)", example = "priority")
+          @RequestParam(defaultValue = "priority")
+          String sort);
 
   @Operation(
       summary = "투두 생성",

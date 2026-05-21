@@ -33,8 +33,10 @@ public class TodoController implements TodoControllerDocs {
   @Override
   @GetMapping
   public ResponseEntity<ApiResult<List<TodoListResponseDto>>> getTodos(
-      @AuthenticationPrincipal Long userId, @RequestParam(defaultValue = "all") String filter) {
-    return ResponseEntity.ok(ApiResult.ok(todoService.getTodos(userId, filter)));
+      @AuthenticationPrincipal Long userId,
+      @RequestParam(defaultValue = "all") String filter,
+      @RequestParam(defaultValue = "priority") String sort) {
+    return ResponseEntity.ok(ApiResult.ok(todoService.getTodos(userId, filter, sort)));
   }
 
   @Override
