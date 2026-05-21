@@ -1,5 +1,11 @@
 package plana.replan.domain.todo.service;
 
+import java.time.LocalDate;
+import java.time.LocalTime;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -9,6 +15,7 @@ import plana.replan.domain.tag.repository.TagRepository;
 import plana.replan.domain.todo.dto.SubTodoCreateRequestDto;
 import plana.replan.domain.todo.dto.SubTodoUpdateRequestDto;
 import plana.replan.domain.todo.dto.TodoCreateRequestDto;
+import plana.replan.domain.todo.dto.TodoListResponseDto;
 import plana.replan.domain.todo.dto.TodoResponseDto;
 import plana.replan.domain.todo.entity.Todo;
 import plana.replan.domain.todo.exception.TodoErrorCode;
@@ -105,6 +112,42 @@ public class TodoService {
 
     subTodo.updateTitle(request.getTitle());
     return TodoResponseDto.from(subTodo);
+  }
+
+  @Transactional(readOnly = true)
+  public List<TodoListResponseDto> getTodos(Long userId, String filter) {
+    User user =
+        userRepository
+            .findById(userId)
+            .orElseThrow(() -> new CustomException(UserErrorCode.USER_NOT_FOUND));
+
+    LocalDate today = LocalDate.now();
+    var startOfDay = today.atStartOfDay();
+    var endOfDay = today.atTime(LocalTime.MAX);
+
+    List<Todo> todos;
+    switch (filter.toLowerCase()) {
+      case "all" -> todos = todoRepository.findActiveTodosForUser(user);
+      case "day" -> {
+        List<Todo> active =
+            todoRepository.findActiveTodosByDueDateRange(user, startOfDay, endOfDay);
+        List<Todo> completed =
+            todoRepository.findCompletedTodosByCompletedTimeRange(user, startOfDay, endOfDay);
+        todos = new ArrayList<>(active);
+        todos.addAll(completed);
+        todos.sort(
+            Comparator.comparing(Todo::isCompleted)
+                .thenComparing(Comparator.comparing(Todo::isPinned).reversed())
+                .thenComparingDouble(Todo::getSortOrder));
+      }
+      case "week" -> todos =
+          todoRepository.findActiveTodosByDueDateRange(user, startOfDay, startOfDay.plusDays(7));
+      case "month" -> todos =
+          todoRepository.findActiveTodosByDueDateRange(user, startOfDay, startOfDay.plusMonths(1));
+      default -> throw new CustomException(TodoErrorCode.INVALID_FILTER);
+    }
+
+    return todos.stream().map(TodoListResponseDto::from).collect(Collectors.toList());
   }
 
   @Transactional
