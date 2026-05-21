@@ -18,12 +18,139 @@ import org.springframework.web.bind.annotation.RequestParam;
 import plana.replan.domain.todo.dto.SubTodoCreateRequestDto;
 import plana.replan.domain.todo.dto.SubTodoUpdateRequestDto;
 import plana.replan.domain.todo.dto.TodoCreateRequestDto;
+import plana.replan.domain.todo.dto.TodoDetailResponseDto;
 import plana.replan.domain.todo.dto.TodoListResponseDto;
 import plana.replan.domain.todo.dto.TodoResponseDto;
 import plana.replan.global.common.ApiResult;
 
 @Tag(name = "Todo", description = "투두 관련 API")
 public interface TodoControllerDocs {
+
+  @Operation(
+      summary = "투두 상세 조회",
+      description =
+          """
+          **호출 주체**: AccessToken을 보유한 인증 사용자
+
+          **요청 방법**: `Authorization: Bearer {accessToken}` 헤더 필수
+
+          **Request Headers**
+
+          | 헤더명 | 필수 여부 | 타입 | 설명 |
+          |--------|-----------|------|------|
+          | Authorization | ✅ 필수 | string | `Bearer {accessToken}` 형식의 JWT 액세스 토큰 |
+
+          **Path Variable**
+
+          | 파라미터명 | 필수 여부 | 타입 | 설명 | 예시 |
+          |-----------|-----------|------|------|------|
+          | todoId | ✅ 필수 | integer | 조회할 투두 ID | `1` |
+
+          **반환 필드**
+          - `routineType`: 루틴에 연결된 투두인 경우 `DAILY` / `WEEKLY` / `MONTHLY`, 일반 투두는 `null`
+          - `tagId`, `tagTitle`, `tagColor`: 태그가 없으면 모두 `null`
+          - `subTodos`: 하위 투두 목록 (없으면 빈 배열)
+          """,
+      security = @SecurityRequirement(name = "Bearer Authentication"))
+  @ApiResponses({
+    @ApiResponse(
+        responseCode = "200",
+        description = "투두 상세 조회 성공",
+        content =
+            @Content(
+                examples =
+                    @ExampleObject(
+                        value =
+                            """
+                            {
+                              "status": 200,
+                              "success": true,
+                              "data": {
+                                "todoId": 1,
+                                "title": "토익 단어 50개 외우기",
+                                "dueDate": "2025-12-31T23:59:59",
+                                "isCompleted": false,
+                                "tagId": 3,
+                                "tagTitle": "영어",
+                                "tagColor": "BLUE",
+                                "routineType": "DAILY",
+                                "subTodos": [
+                                  {
+                                    "todoId": 10,
+                                    "title": "단어장 챕터 1 읽기",
+                                    "isCompleted": false
+                                  },
+                                  {
+                                    "todoId": 11,
+                                    "title": "단어장 챕터 2 읽기",
+                                    "isCompleted": true
+                                  }
+                                ]
+                              },
+                              "error": null
+                            }
+                            """))),
+    @ApiResponse(
+        responseCode = "401",
+        description = "AccessToken 없음 또는 만료",
+        content =
+            @Content(
+                examples = {
+                  @ExampleObject(
+                      name = "토큰 없음",
+                      value =
+                          """
+                          {
+                            "status": 401,
+                            "success": false,
+                            "data": null,
+                            "error": {
+                              "code": "EMPTY_TOKEN",
+                              "message": "토큰이 없습니다.",
+                              "detail": null
+                            }
+                          }
+                          """),
+                  @ExampleObject(
+                      name = "만료된 토큰",
+                      value =
+                          """
+                          {
+                            "status": 401,
+                            "success": false,
+                            "data": null,
+                            "error": {
+                              "code": "EXPIRED_TOKEN",
+                              "message": "만료된 토큰입니다.",
+                              "detail": null
+                            }
+                          }
+                          """)
+                })),
+    @ApiResponse(
+        responseCode = "404",
+        description = "투두를 찾을 수 없음 (존재하지 않거나 본인 소유가 아닌 경우)",
+        content =
+            @Content(
+                examples =
+                    @ExampleObject(
+                        value =
+                            """
+                            {
+                              "status": 404,
+                              "success": false,
+                              "data": null,
+                              "error": {
+                                "code": "TODO_NOT_FOUND",
+                                "message": "투두를 찾을 수 없습니다.",
+                                "detail": null
+                              }
+                            }
+                            """)))
+  })
+  ResponseEntity<ApiResult<TodoDetailResponseDto>> getTodoDetail(
+      @AuthenticationPrincipal Long userId,
+      @Parameter(description = "조회할 투두 ID", example = "1") @PathVariable Long todoId);
 
   @Operation(
       summary = "투두 목록 조회",

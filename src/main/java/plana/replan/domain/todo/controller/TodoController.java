@@ -18,6 +18,7 @@ import org.springframework.web.bind.annotation.RestController;
 import plana.replan.domain.todo.dto.SubTodoCreateRequestDto;
 import plana.replan.domain.todo.dto.SubTodoUpdateRequestDto;
 import plana.replan.domain.todo.dto.TodoCreateRequestDto;
+import plana.replan.domain.todo.dto.TodoDetailResponseDto;
 import plana.replan.domain.todo.dto.TodoListResponseDto;
 import plana.replan.domain.todo.dto.TodoResponseDto;
 import plana.replan.domain.todo.service.TodoService;
@@ -29,6 +30,13 @@ import plana.replan.global.common.ApiResult;
 public class TodoController implements TodoControllerDocs {
 
   private final TodoService todoService;
+
+  @Override
+  @GetMapping("/{todoId}")
+  public ResponseEntity<ApiResult<TodoDetailResponseDto>> getTodoDetail(
+      @AuthenticationPrincipal Long userId, @PathVariable Long todoId) {
+    return ResponseEntity.ok(ApiResult.ok(todoService.getTodoDetail(userId, todoId)));
+  }
 
   @Override
   @GetMapping
