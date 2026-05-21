@@ -13,14 +13,12 @@ public interface TodoRepository extends JpaRepository<Todo, Long> {
 
   boolean existsByRoutineAndDueDateBetween(Routine routine, LocalDateTime start, LocalDateTime end);
 
-  @Query(
-      "SELECT t FROM Todo t WHERE t.user = :user AND t.parent IS NULL AND t.isCompleted = false"
-          + " ORDER BY t.isPinned DESC, t.sortOrder ASC")
+  @Query("SELECT t FROM Todo t WHERE t.user = :user AND t.parent IS NULL AND t.isCompleted = false")
   List<Todo> findActiveTodosForUser(@Param("user") User user);
 
   @Query(
       "SELECT t FROM Todo t WHERE t.user = :user AND t.parent IS NULL AND t.isCompleted = false"
-          + " AND t.dueDate BETWEEN :start AND :end ORDER BY t.isPinned DESC, t.sortOrder ASC")
+          + " AND t.dueDate BETWEEN :start AND :end")
   List<Todo> findActiveTodosByDueDateRange(
       @Param("user") User user,
       @Param("start") LocalDateTime start,
@@ -28,7 +26,7 @@ public interface TodoRepository extends JpaRepository<Todo, Long> {
 
   @Query(
       "SELECT t FROM Todo t WHERE t.user = :user AND t.parent IS NULL AND t.isCompleted = true"
-          + " AND t.completedTime BETWEEN :start AND :end ORDER BY t.isPinned DESC, t.sortOrder ASC")
+          + " AND t.completedTime BETWEEN :start AND :end")
   List<Todo> findCompletedTodosByCompletedTimeRange(
       @Param("user") User user,
       @Param("start") LocalDateTime start,

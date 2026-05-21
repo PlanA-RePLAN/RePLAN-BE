@@ -115,11 +115,13 @@ public class TodoService {
   }
 
   @Transactional(readOnly = true)
-  public List<TodoListResponseDto> getTodos(Long userId, String filter) {
+  public List<TodoListResponseDto> getTodos(Long userId, String filter, String sort) {
     User user =
         userRepository
             .findById(userId)
             .orElseThrow(() -> new CustomException(UserErrorCode.USER_NOT_FOUND));
+
+    Comparator<Todo> sortComparator = buildSortComparator(sort);
 
     LocalDate today = LocalDate.now();
     var startOfDay = today.atStartOfDay();
@@ -127,7 +129,10 @@ public class TodoService {
 
     List<Todo> todos;
     switch (filter.toLowerCase()) {
-      case "all" -> todos = todoRepository.findActiveTodosForUser(user);
+      case "all" -> {
+        todos = new ArrayList<>(todoRepository.findActiveTodosForUser(user));
+        todos.sort(sortComparator);
+      }
       case "day" -> {
         List<Todo> active =
             todoRepository.findActiveTodosByDueDateRange(user, startOfDay, endOfDay);
@@ -135,19 +140,36 @@ public class TodoService {
             todoRepository.findCompletedTodosByCompletedTimeRange(user, startOfDay, endOfDay);
         todos = new ArrayList<>(active);
         todos.addAll(completed);
-        todos.sort(
-            Comparator.comparing(Todo::isCompleted)
-                .thenComparing(Comparator.comparing(Todo::isPinned).reversed())
-                .thenComparingDouble(Todo::getSortOrder));
+        todos.sort(Comparator.comparing(Todo::isCompleted).thenComparing(sortComparator));
       }
-      case "week" -> todos =
-          todoRepository.findActiveTodosByDueDateRange(user, startOfDay, startOfDay.plusDays(7));
-      case "month" -> todos =
-          todoRepository.findActiveTodosByDueDateRange(user, startOfDay, startOfDay.plusMonths(1));
+      case "week" -> {
+        todos =
+            new ArrayList<>(
+                todoRepository.findActiveTodosByDueDateRange(
+                    user, startOfDay, startOfDay.plusDays(7)));
+        todos.sort(sortComparator);
+      }
+      case "month" -> {
+        todos =
+            new ArrayList<>(
+                todoRepository.findActiveTodosByDueDateRange(
+                    user, startOfDay, startOfDay.plusMonths(1)));
+        todos.sort(sortComparator);
+      }
       default -> throw new CustomException(TodoErrorCode.INVALID_FILTER);
     }
 
     return todos.stream().map(TodoListResponseDto::from).collect(Collectors.toList());
+  }
+
+  private Comparator<Todo> buildSortComparator(String sort) {
+    Comparator<Todo> pinnedFirst = Comparator.comparing(Todo::isPinned).reversed();
+    return switch (sort.toLowerCase()) {
+      case "priority" -> pinnedFirst.thenComparingDouble(Todo::getSortOrder);
+      case "duedate" -> pinnedFirst.thenComparing(
+          Todo::getDueDate, Comparator.nullsLast(Comparator.naturalOrder()));
+      default -> throw new CustomException(TodoErrorCode.INVALID_SORT);
+    };
   }
 
   @Transactional
