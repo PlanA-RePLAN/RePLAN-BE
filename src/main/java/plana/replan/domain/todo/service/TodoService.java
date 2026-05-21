@@ -15,6 +15,7 @@ import plana.replan.domain.tag.repository.TagRepository;
 import plana.replan.domain.todo.dto.SubTodoCreateRequestDto;
 import plana.replan.domain.todo.dto.SubTodoUpdateRequestDto;
 import plana.replan.domain.todo.dto.TodoCreateRequestDto;
+import plana.replan.domain.todo.dto.TodoDetailResponseDto;
 import plana.replan.domain.todo.dto.TodoListResponseDto;
 import plana.replan.domain.todo.dto.TodoResponseDto;
 import plana.replan.domain.todo.entity.Todo;
@@ -170,6 +171,20 @@ public class TodoService {
           Todo::getDueDate, Comparator.nullsLast(Comparator.naturalOrder()));
       default -> throw new CustomException(TodoErrorCode.INVALID_SORT);
     };
+  }
+
+  @Transactional(readOnly = true)
+  public TodoDetailResponseDto getTodoDetail(Long userId, Long todoId) {
+    Todo todo =
+        todoRepository
+            .findById(todoId)
+            .orElseThrow(() -> new CustomException(TodoErrorCode.TODO_NOT_FOUND));
+
+    if (!todo.getUser().getId().equals(userId)) {
+      throw new CustomException(TodoErrorCode.TODO_NOT_FOUND);
+    }
+
+    return TodoDetailResponseDto.from(todo);
   }
 
   @Transactional
