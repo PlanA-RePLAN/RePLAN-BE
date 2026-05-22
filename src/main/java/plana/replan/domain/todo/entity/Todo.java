@@ -75,6 +75,18 @@ public class Todo extends BaseTimeEntity {
     this.title = Objects.requireNonNull(title, "제목은 필수입니다.");
   }
 
+  public void updateDueDate(LocalDateTime dueDate) {
+    this.dueDate = dueDate;
+  }
+
+  public void updateTag(Tag tag) {
+    this.tag = tag;
+  }
+
+  public void updateRoutine(Routine routine) {
+    this.routine = routine;
+  }
+
   @Builder
   public Todo(
       String title,

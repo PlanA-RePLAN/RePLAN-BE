@@ -49,6 +49,13 @@ public class Routine extends BaseTimeEntity {
   @JoinColumn(name = "goal_id")
   private Goal goal;
 
+  public void update(String title, RoutineType routineType, Integer routineDate, Tag tag) {
+    this.title = Objects.requireNonNull(title, "제목은 필수입니다.");
+    this.routineType = routineType;
+    this.routineDate = routineDate;
+    this.tag = tag;
+  }
+
   @Builder
   public Routine(
       String title,
