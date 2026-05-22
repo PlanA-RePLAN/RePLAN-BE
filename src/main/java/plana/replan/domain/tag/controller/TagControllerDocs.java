@@ -49,7 +49,8 @@ public interface TagControllerDocs {
   @ApiResponses({
     @ApiResponse(
         responseCode = "201",
-        description = "태그 생성 성공",
+        description =
+            "태그 생성 성공 — HTTP 상태는 201이며, 응답 본문의 status 필드는 ApiResult 공통 성공 규약에 따라 200으로 고정됩니다.",
         content =
             @Content(
                 examples = {
