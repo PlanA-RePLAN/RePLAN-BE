@@ -582,6 +582,40 @@ class TodoControllerTest {
         .andExpect(jsonPath("$.data").value(nullValue()));
   }
 
+  // ── deleteTodo ──────────────────────────────────────────────────────────────
+
+  @Test
+  @DisplayName("인증 없이 투두 삭제 호출: 401 반환")
+  void deleteTodo_unauthenticated() throws Exception {
+    mockMvc
+        .perform(delete("/api/todos/1"))
+        .andExpect(status().isUnauthorized())
+        .andExpect(jsonPath("$.error.code").value("EMPTY_TOKEN"));
+  }
+
+  @Test
+  @DisplayName("투두 삭제 성공: status=204, 응답 바디 없음")
+  void deleteTodo_success() throws Exception {
+    willDoNothing().given(todoService).deleteTodo(any(), any());
+
+    mockMvc
+        .perform(delete("/api/todos/1").with(authentication(authToken(1L))))
+        .andExpect(status().isNoContent());
+  }
+
+  @Test
+  @DisplayName("존재하지 않거나 본인 소유가 아닌 투두: status=404, error.code=TODO_NOT_FOUND")
+  void deleteTodo_notFound() throws Exception {
+    willThrow(new CustomException(TodoErrorCode.TODO_NOT_FOUND))
+        .given(todoService)
+        .deleteTodo(any(), any());
+
+    mockMvc
+        .perform(delete("/api/todos/99").with(authentication(authToken(1L))))
+        .andExpect(status().isNotFound())
+        .andExpect(jsonPath("$.error.code").value("TODO_NOT_FOUND"));
+  }
+
   // ── updateTodo ──────────────────────────────────────────────────────────────
 
   @Test
