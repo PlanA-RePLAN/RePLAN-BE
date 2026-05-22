@@ -338,7 +338,7 @@ public class TodoService {
           todoRepository
               .findById(request.getPrevTodoId())
               .orElseThrow(() -> new CustomException(TodoErrorCode.TODO_NOT_FOUND));
-      if (!prev.getUser().getId().equals(userId)) {
+      if (!prev.getUser().getId().equals(userId) || prev.getParent() != null) {
         throw new CustomException(TodoErrorCode.TODO_NOT_FOUND);
       }
       prevSortOrder = prev.getSortOrder();
@@ -350,7 +350,7 @@ public class TodoService {
           todoRepository
               .findById(request.getNextTodoId())
               .orElseThrow(() -> new CustomException(TodoErrorCode.TODO_NOT_FOUND));
-      if (!next.getUser().getId().equals(userId)) {
+      if (!next.getUser().getId().equals(userId) || next.getParent() != null) {
         throw new CustomException(TodoErrorCode.TODO_NOT_FOUND);
       }
       nextSortOrder = next.getSortOrder();
