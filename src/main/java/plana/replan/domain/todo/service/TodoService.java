@@ -1,5 +1,11 @@
 package plana.replan.domain.todo.service;
 
+import java.time.LocalDate;
+import java.time.LocalTime;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -9,6 +15,8 @@ import plana.replan.domain.tag.repository.TagRepository;
 import plana.replan.domain.todo.dto.SubTodoCreateRequestDto;
 import plana.replan.domain.todo.dto.SubTodoUpdateRequestDto;
 import plana.replan.domain.todo.dto.TodoCreateRequestDto;
+import plana.replan.domain.todo.dto.TodoDetailResponseDto;
+import plana.replan.domain.todo.dto.TodoListResponseDto;
 import plana.replan.domain.todo.dto.TodoResponseDto;
 import plana.replan.domain.todo.entity.Todo;
 import plana.replan.domain.todo.exception.TodoErrorCode;
@@ -105,6 +113,88 @@ public class TodoService {
 
     subTodo.updateTitle(request.getTitle());
     return TodoResponseDto.from(subTodo);
+  }
+
+  @Transactional(readOnly = true)
+  public List<TodoListResponseDto> getTodos(Long userId, String filter, String sort) {
+    if (userId == null) {
+      throw new CustomException(UserErrorCode.USER_NOT_FOUND);
+    }
+    if (filter == null) {
+      throw new CustomException(TodoErrorCode.INVALID_FILTER);
+    }
+    if (sort == null) {
+      throw new CustomException(TodoErrorCode.INVALID_SORT);
+    }
+
+    User user =
+        userRepository
+            .findById(userId)
+            .orElseThrow(() -> new CustomException(UserErrorCode.USER_NOT_FOUND));
+
+    Comparator<Todo> sortComparator = buildSortComparator(sort);
+
+    LocalDate today = LocalDate.now();
+    var startOfDay = today.atStartOfDay();
+    var endOfDay = today.atTime(LocalTime.MAX);
+
+    List<Todo> todos;
+    switch (filter.toLowerCase()) {
+      case "all" -> {
+        todos = new ArrayList<>(todoRepository.findActiveTodosForUser(user));
+        todos.sort(sortComparator);
+      }
+      case "day" -> {
+        List<Todo> active =
+            todoRepository.findActiveTodosByDueDateRange(user, startOfDay, endOfDay);
+        List<Todo> completed =
+            todoRepository.findCompletedTodosByCompletedTimeRange(user, startOfDay, endOfDay);
+        todos = new ArrayList<>(active);
+        todos.addAll(completed);
+        todos.sort(Comparator.comparing(Todo::isCompleted).thenComparing(sortComparator));
+      }
+      case "week" -> {
+        todos =
+            new ArrayList<>(
+                todoRepository.findActiveTodosByDueDateRange(
+                    user, startOfDay, startOfDay.plusDays(7)));
+        todos.sort(sortComparator);
+      }
+      case "month" -> {
+        todos =
+            new ArrayList<>(
+                todoRepository.findActiveTodosByDueDateRange(
+                    user, startOfDay, startOfDay.plusMonths(1)));
+        todos.sort(sortComparator);
+      }
+      default -> throw new CustomException(TodoErrorCode.INVALID_FILTER);
+    }
+
+    return todos.stream().map(TodoListResponseDto::from).collect(Collectors.toList());
+  }
+
+  private Comparator<Todo> buildSortComparator(String sort) {
+    Comparator<Todo> pinnedFirst = Comparator.comparing(Todo::isPinned).reversed();
+    return switch (sort) {
+      case "priority" -> pinnedFirst.thenComparingDouble(Todo::getSortOrder);
+      case "dueDate" -> pinnedFirst.thenComparing(
+          Todo::getDueDate, Comparator.nullsLast(Comparator.naturalOrder()));
+      default -> throw new CustomException(TodoErrorCode.INVALID_SORT);
+    };
+  }
+
+  @Transactional(readOnly = true)
+  public TodoDetailResponseDto getTodoDetail(Long userId, Long todoId) {
+    Todo todo =
+        todoRepository
+            .findById(todoId)
+            .orElseThrow(() -> new CustomException(TodoErrorCode.TODO_NOT_FOUND));
+
+    if (!todo.getUser().getId().equals(userId)) {
+      throw new CustomException(TodoErrorCode.TODO_NOT_FOUND);
+    }
+
+    return TodoDetailResponseDto.from(todo);
   }
 
   @Transactional
