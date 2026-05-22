@@ -30,6 +30,7 @@ import plana.replan.domain.user.entity.User;
 import plana.replan.domain.user.exception.UserErrorCode;
 import plana.replan.domain.user.repository.UserRepository;
 import plana.replan.global.exception.CustomException;
+import plana.replan.global.exception.GlobalErrorCode;
 
 @Service
 @RequiredArgsConstructor
@@ -211,11 +212,17 @@ public class TodoService {
               .orElseThrow(() -> new CustomException(TagErrorCode.TAG_NOT_FOUND));
     }
 
+    if (request.getTitle() != null && request.getTitle().isBlank()) {
+      throw new CustomException(GlobalErrorCode.INVALID_INPUT);
+    }
+
     if (request.getRoutineType() != null) {
       validateRoutineDate(request.getRoutineType(), request.getRoutineDate());
     }
 
-    todo.updateTitle(request.getTitle());
+    if (request.getTitle() != null) {
+      todo.updateTitle(request.getTitle());
+    }
     todo.updateDueDate(request.getDueDate());
     todo.updateTag(tag);
     handleRoutineUpdate(todo, request, tag);
@@ -238,12 +245,12 @@ public class TodoService {
         request.getRoutineType() == RoutineType.DAILY ? null : request.getRoutineDate();
 
     if (existingRoutine != null) {
-      existingRoutine.update(request.getTitle(), request.getRoutineType(), routineDate, tag);
+      existingRoutine.update(todo.getTitle(), request.getRoutineType(), routineDate, tag);
     } else {
       Routine newRoutine =
           routineRepository.save(
               Routine.builder()
-                  .title(request.getTitle())
+                  .title(todo.getTitle())
                   .routineType(request.getRoutineType())
                   .routineDate(routineDate)
                   .user(todo.getUser())

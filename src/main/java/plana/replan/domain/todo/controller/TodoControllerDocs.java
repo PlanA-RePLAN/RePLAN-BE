@@ -52,7 +52,7 @@ public interface TodoControllerDocs {
 
           | 필드명 | 필수 여부 | 타입 | 설명 | 예시 |
           |--------|-----------|------|------|------|
-          | title | ✅ 필수 | string | 투두 제목 | `"토익 단어 50개 외우기"` |
+          | title | ❌ 선택 | string | 투두 제목. null이면 변경하지 않음. 빈 문자열 불가 | `"토익 단어 50개 외우기"` |
           | dueDate | ❌ 선택 | string | 마감 일시 (ISO 8601 형식). null이면 마감일 제거 | `"2025-12-31T23:59:59"` |
           | tagId | ❌ 선택 | integer | 태그 ID. null이면 태그 제거 | `3` |
           | routineType | ❌ 선택 | string | 반복 유형 (`DAILY`/`WEEKLY`/`MONTHLY`). null이면 반복 없음 | `"WEEKLY"` |

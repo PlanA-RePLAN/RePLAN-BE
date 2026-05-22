@@ -43,6 +43,7 @@ import plana.replan.domain.user.entity.User;
 import plana.replan.domain.user.exception.UserErrorCode;
 import plana.replan.domain.user.repository.UserRepository;
 import plana.replan.global.exception.CustomException;
+import plana.replan.global.exception.GlobalErrorCode;
 
 @ExtendWith(MockitoExtension.class)
 class TodoServiceTest {
@@ -986,6 +987,21 @@ class TodoServiceTest {
   }
 
   @Test
+  @DisplayName("updateTodo - title 빈 문자열: INVALID_INPUT 예외")
+  void updateTodo_blankTitle_throws() {
+    User user = testUser();
+    given(todoRepository.findById(1L)).willReturn(Optional.of(testTodo(1L, user)));
+
+    assertThatThrownBy(
+            () -> todoService.updateTodo(1L, 1L, updateTodoRequest("", null, null, null, null)))
+        .isInstanceOf(CustomException.class)
+        .satisfies(
+            e ->
+                assertThat(((CustomException) e).getErrorCode())
+                    .isEqualTo(GlobalErrorCode.INVALID_INPUT));
+  }
+
+  @Test
   @DisplayName("updateTodo - 성공: title, dueDate, tag 수정 후 반환")
   void updateTodo_success_basic() {
     User user = testUser();
@@ -1004,6 +1020,20 @@ class TodoServiceTest {
     assertThat(result.getDueDate()).isEqualTo(newDueDate);
     assertThat(result.getTagId()).isEqualTo(5L);
     assertThat(result.getRoutineType()).isNull();
+  }
+
+  @Test
+  @DisplayName("updateTodo - title null: 기존 제목 유지")
+  void updateTodo_success_nullTitleKeepsExisting() {
+    User user = testUser();
+    Todo todo = testTodo(1L, user);
+
+    given(todoRepository.findById(1L)).willReturn(Optional.of(todo));
+
+    TodoDetailResponseDto result =
+        todoService.updateTodo(1L, 1L, updateTodoRequest(null, null, null, null, null));
+
+    assertThat(result.getTitle()).isEqualTo("부모 투두");
   }
 
   @Test

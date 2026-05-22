@@ -35,6 +35,7 @@ import plana.replan.domain.todo.service.TodoService;
 import plana.replan.domain.user.exception.UserErrorCode;
 import plana.replan.global.config.SecurityConfig;
 import plana.replan.global.exception.CustomException;
+import plana.replan.global.exception.GlobalErrorCode;
 import plana.replan.global.jwt.JwtUtil;
 
 @WebMvcTest(TodoController.class)
@@ -628,22 +629,29 @@ class TodoControllerTest {
   }
 
   @Test
-  @DisplayName("title 누락: status=400, error.code=INVALID_INPUT")
-  void updateTodo_missingTitle() throws Exception {
+  @DisplayName("title 생략: status=200 (title은 선택 필드)")
+  void updateTodo_omitTitle_ok() throws Exception {
+    TodoDetailResponseDto response =
+        new TodoDetailResponseDto(1L, "기존 제목", null, false, null, null, null, null, List.of());
+    given(todoService.updateTodo(any(), any(), any())).willReturn(response);
+
     mockMvc
         .perform(
             put("/api/todos/1")
                 .with(authentication(authToken(1L)))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{}"))
-        .andExpect(status().isBadRequest())
-        .andExpect(jsonPath("$.error.code").value("INVALID_INPUT"))
-        .andExpect(jsonPath("$.data").value(nullValue()));
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.title").value("기존 제목"));
   }
 
   @Test
-  @DisplayName("title 빈 문자열: status=400, error.code=INVALID_INPUT")
+  @DisplayName("title 빈 문자열: 서비스에서 INVALID_INPUT 반환 → status=400")
   void updateTodo_blankTitle() throws Exception {
+    willThrow(new CustomException(GlobalErrorCode.INVALID_INPUT))
+        .given(todoService)
+        .updateTodo(any(), any(), any());
+
     mockMvc
         .perform(
             put("/api/todos/1")

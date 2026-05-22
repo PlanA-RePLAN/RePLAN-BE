@@ -1,7 +1,6 @@
 package plana.replan.domain.todo.dto;
 
 import io.swagger.v3.oas.annotations.media.Schema;
-import jakarta.validation.constraints.NotBlank;
 import java.time.LocalDateTime;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -12,11 +11,7 @@ import plana.replan.domain.routine.entity.RoutineType;
 @NoArgsConstructor
 public class TodoUpdateRequestDto {
 
-  @NotBlank
-  @Schema(
-      description = "투두 제목",
-      example = "토익 단어 50개 외우기",
-      requiredMode = Schema.RequiredMode.REQUIRED)
+  @Schema(description = "투두 제목. null이면 변경하지 않음. 빈 문자열은 허용하지 않음", example = "토익 단어 50개 외우기")
   private String title;
 
   @Schema(description = "마감 일시 (ISO 8601 형식). null이면 마감일 제거", example = "2025-12-31T23:59:59")
