@@ -22,6 +22,7 @@ import plana.replan.domain.todo.dto.TodoCompleteRequestDto;
 import plana.replan.domain.todo.dto.TodoCreateRequestDto;
 import plana.replan.domain.todo.dto.TodoDetailResponseDto;
 import plana.replan.domain.todo.dto.TodoListResponseDto;
+import plana.replan.domain.todo.dto.TodoOrderRequestDto;
 import plana.replan.domain.todo.dto.TodoPinRequestDto;
 import plana.replan.domain.todo.dto.TodoResponseDto;
 import plana.replan.domain.todo.dto.TodoUpdateRequestDto;
@@ -56,6 +57,15 @@ public class TodoController implements TodoControllerDocs {
       @RequestParam(defaultValue = "all") String filter,
       @RequestParam(defaultValue = "priority") String sort) {
     return ResponseEntity.ok(ApiResult.ok(todoService.getTodos(userId, filter, sort)));
+  }
+
+  @Override
+  @PatchMapping("/{todoId}/order")
+  public ResponseEntity<ApiResult<TodoListResponseDto>> reorderTodo(
+      @AuthenticationPrincipal Long userId,
+      @PathVariable Long todoId,
+      @RequestBody TodoOrderRequestDto request) {
+    return ResponseEntity.ok(ApiResult.ok(todoService.reorderTodo(userId, todoId, request)));
   }
 
   @Override

@@ -22,6 +22,7 @@ import plana.replan.domain.todo.dto.TodoCompleteRequestDto;
 import plana.replan.domain.todo.dto.TodoCreateRequestDto;
 import plana.replan.domain.todo.dto.TodoDetailResponseDto;
 import plana.replan.domain.todo.dto.TodoListResponseDto;
+import plana.replan.domain.todo.dto.TodoOrderRequestDto;
 import plana.replan.domain.todo.dto.TodoPinRequestDto;
 import plana.replan.domain.todo.dto.TodoResponseDto;
 import plana.replan.domain.todo.dto.TodoUpdateRequestDto;
@@ -301,6 +302,56 @@ public class TodoService {
     }
 
     return TodoDetailResponseDto.from(todo);
+  }
+
+  @Transactional
+  public TodoListResponseDto reorderTodo(Long userId, Long todoId, TodoOrderRequestDto request) {
+    if (userId == null) {
+      throw new CustomException(UserErrorCode.USER_NOT_FOUND);
+    }
+    Todo todo =
+        todoRepository
+            .findById(todoId)
+            .orElseThrow(() -> new CustomException(TodoErrorCode.TODO_NOT_FOUND));
+
+    if (!todo.getUser().getId().equals(userId)) {
+      throw new CustomException(TodoErrorCode.TODO_NOT_FOUND);
+    }
+
+    if (todo.getParent() != null) {
+      throw new CustomException(TodoErrorCode.TODO_NOT_FOUND);
+    }
+
+    if (request.getPrevTodoId() == null && request.getNextTodoId() == null) {
+      throw new CustomException(GlobalErrorCode.INVALID_INPUT);
+    }
+
+    double prevSortOrder = 0;
+    if (request.getPrevTodoId() != null) {
+      Todo prev =
+          todoRepository
+              .findById(request.getPrevTodoId())
+              .orElseThrow(() -> new CustomException(TodoErrorCode.TODO_NOT_FOUND));
+      if (!prev.getUser().getId().equals(userId)) {
+        throw new CustomException(TodoErrorCode.TODO_NOT_FOUND);
+      }
+      prevSortOrder = prev.getSortOrder();
+    }
+
+    double nextSortOrder = prevSortOrder + 20000;
+    if (request.getNextTodoId() != null) {
+      Todo next =
+          todoRepository
+              .findById(request.getNextTodoId())
+              .orElseThrow(() -> new CustomException(TodoErrorCode.TODO_NOT_FOUND));
+      if (!next.getUser().getId().equals(userId)) {
+        throw new CustomException(TodoErrorCode.TODO_NOT_FOUND);
+      }
+      nextSortOrder = next.getSortOrder();
+    }
+
+    todo.updateSortOrder((prevSortOrder + nextSortOrder) / 2);
+    return TodoListResponseDto.from(todo);
   }
 
   @Transactional
