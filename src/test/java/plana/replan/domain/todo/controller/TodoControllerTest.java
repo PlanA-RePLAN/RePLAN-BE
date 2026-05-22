@@ -8,6 +8,7 @@ import static org.mockito.BDDMockito.willThrow;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -672,6 +673,100 @@ class TodoControllerTest {
         .perform(delete("/api/todos/99").with(authentication(authToken(1L))))
         .andExpect(status().isNotFound())
         .andExpect(jsonPath("$.error.code").value("TODO_NOT_FOUND"));
+  }
+
+  // ── pinTodo ──────────────────────────────────────────────────────────────────
+
+  @Test
+  @DisplayName("인증 없이 핀/언핀 호출: 401 반환")
+  void pinTodo_unauthenticated() throws Exception {
+    mockMvc
+        .perform(
+            patch("/api/todos/1/pin")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    { "isPinned": true }
+                    """))
+        .andExpect(status().isUnauthorized())
+        .andExpect(jsonPath("$.error.code").value("EMPTY_TOKEN"));
+  }
+
+  @Test
+  @DisplayName("핀 설정 성공: status=200, isPinned=true 반환")
+  void pinTodo_success_pin() throws Exception {
+    TodoListResponseDto response =
+        new TodoListResponseDto(
+            1L, "중요 투두", null, true, 1000.0, false, null, null, null, null, false);
+    given(todoService.pinTodo(any(), any(), any())).willReturn(response);
+
+    mockMvc
+        .perform(
+            patch("/api/todos/1/pin")
+                .with(authentication(authToken(1L)))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    { "isPinned": true }
+                    """))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.success").value(true))
+        .andExpect(jsonPath("$.data.todoId").value(1))
+        .andExpect(jsonPath("$.data.isPinned").value(true))
+        .andExpect(jsonPath("$.error").value(nullValue()));
+  }
+
+  @Test
+  @DisplayName("핀 해제 성공: status=200, isPinned=false 반환")
+  void pinTodo_success_unpin() throws Exception {
+    TodoListResponseDto response =
+        new TodoListResponseDto(
+            1L, "중요 투두", null, false, 1000.0, false, null, null, null, null, false);
+    given(todoService.pinTodo(any(), any(), any())).willReturn(response);
+
+    mockMvc
+        .perform(
+            patch("/api/todos/1/pin")
+                .with(authentication(authToken(1L)))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    { "isPinned": false }
+                    """))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.isPinned").value(false))
+        .andExpect(jsonPath("$.error").value(nullValue()));
+  }
+
+  @Test
+  @DisplayName("isPinned 누락: status=400, error.code=INVALID_INPUT")
+  void pinTodo_missingIsPinned() throws Exception {
+    mockMvc
+        .perform(
+            patch("/api/todos/1/pin")
+                .with(authentication(authToken(1L)))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{}"))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.error.code").value("INVALID_INPUT"))
+        .andExpect(jsonPath("$.data").value(nullValue()));
+  }
+
+  @Test
+  @DisplayName("존재하지 않거나 본인 소유가 아닌 투두: status=404, error.code=TODO_NOT_FOUND")
+  void pinTodo_notFound() throws Exception {
+    willThrow(new CustomException(TodoErrorCode.TODO_NOT_FOUND))
+        .given(todoService)
+        .pinTodo(any(), any(), any());
+
+    mockMvc
+        .perform(
+            patch("/api/todos/999/pin")
+                .with(authentication(authToken(1L)))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    { "isPinned": true }
+                    """))
+        .andExpect(status().isNotFound())
+        .andExpect(jsonPath("$.error.code").value("TODO_NOT_FOUND"))
+        .andExpect(jsonPath("$.data").value(nullValue()));
   }
 
   // ── updateTodo ──────────────────────────────────────────────────────────────
