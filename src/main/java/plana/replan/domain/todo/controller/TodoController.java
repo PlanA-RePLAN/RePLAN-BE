@@ -33,6 +33,13 @@ public class TodoController implements TodoControllerDocs {
   private final TodoService todoService;
 
   @Override
+  @GetMapping("/pinned")
+  public ResponseEntity<ApiResult<List<TodoListResponseDto>>> getPinnedTodos(
+      @AuthenticationPrincipal Long userId) {
+    return ResponseEntity.ok(ApiResult.ok(todoService.getPinnedTodos(userId)));
+  }
+
+  @Override
   @GetMapping("/{todoId}")
   public ResponseEntity<ApiResult<TodoDetailResponseDto>> getTodoDetail(
       @AuthenticationPrincipal Long userId, @PathVariable Long todoId) {

@@ -123,6 +123,22 @@ public class TodoService {
   }
 
   @Transactional(readOnly = true)
+  public List<TodoListResponseDto> getPinnedTodos(Long userId) {
+    if (userId == null) {
+      throw new CustomException(UserErrorCode.USER_NOT_FOUND);
+    }
+    User user =
+        userRepository
+            .findById(userId)
+            .orElseThrow(() -> new CustomException(UserErrorCode.USER_NOT_FOUND));
+
+    return todoRepository.findPinnedActiveTodosForUser(user).stream()
+        .sorted(Comparator.comparingDouble(Todo::getSortOrder))
+        .map(TodoListResponseDto::from)
+        .collect(Collectors.toList());
+  }
+
+  @Transactional(readOnly = true)
   public List<TodoListResponseDto> getTodos(Long userId, String filter, String sort) {
     if (userId == null) {
       throw new CustomException(UserErrorCode.USER_NOT_FOUND);

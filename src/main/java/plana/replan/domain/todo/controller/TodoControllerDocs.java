@@ -28,6 +28,97 @@ import plana.replan.global.common.ApiResult;
 public interface TodoControllerDocs {
 
   @Operation(
+      summary = "핀된 투두 목록 조회",
+      description =
+          """
+          **호출 주체**: AccessToken을 보유한 인증 사용자
+
+          **요청 방법**: `Authorization: Bearer {accessToken}` 헤더 필수
+
+          **Request Headers**
+
+          | 헤더명 | 필수 여부 | 타입 | 설명 |
+          |--------|-----------|------|------|
+          | Authorization | ✅ 필수 | string | `Bearer {accessToken}` 형식의 JWT 액세스 토큰 |
+
+          **조회 조건**: 미완료 + 핀된(`isPinned = true`) 부모 투두만 반환
+
+          **정렬**: sortOrder ASC
+          """,
+      security = @SecurityRequirement(name = "Bearer Authentication"))
+  @ApiResponses({
+    @ApiResponse(
+        responseCode = "200",
+        description = "핀된 투두 목록 조회 성공",
+        content =
+            @Content(
+                examples =
+                    @ExampleObject(
+                        value =
+                            """
+                            {
+                              "status": 200,
+                              "success": true,
+                              "data": [
+                                {
+                                  "todoId": 3,
+                                  "title": "토익 시험 접수",
+                                  "dueDate": "2025-12-31T23:59:59",
+                                  "isPinned": true,
+                                  "sortOrder": 500.0,
+                                  "isCompleted": false,
+                                  "tagId": 3,
+                                  "tagTitle": "영어",
+                                  "tagColor": "BLUE",
+                                  "routineType": null,
+                                  "isOverdue": false
+                                }
+                              ],
+                              "error": null
+                            }
+                            """))),
+    @ApiResponse(
+        responseCode = "401",
+        description = "AccessToken 없음 또는 만료",
+        content =
+            @Content(
+                examples = {
+                  @ExampleObject(
+                      name = "토큰 없음",
+                      value =
+                          """
+                          {
+                            "status": 401,
+                            "success": false,
+                            "data": null,
+                            "error": {
+                              "code": "EMPTY_TOKEN",
+                              "message": "토큰이 없습니다.",
+                              "detail": null
+                            }
+                          }
+                          """),
+                  @ExampleObject(
+                      name = "만료된 토큰",
+                      value =
+                          """
+                          {
+                            "status": 401,
+                            "success": false,
+                            "data": null,
+                            "error": {
+                              "code": "EXPIRED_TOKEN",
+                              "message": "만료된 토큰입니다.",
+                              "detail": null
+                            }
+                          }
+                          """)
+                }))
+  })
+  ResponseEntity<ApiResult<List<TodoListResponseDto>>> getPinnedTodos(
+      @AuthenticationPrincipal Long userId);
+
+  @Operation(
       summary = "투두 삭제",
       description =
           """

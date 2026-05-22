@@ -18,6 +18,11 @@ public interface TodoRepository extends JpaRepository<Todo, Long> {
 
   @Query(
       "SELECT t FROM Todo t WHERE t.user = :user AND t.parent IS NULL AND t.isCompleted = false"
+          + " AND t.isPinned = true")
+  List<Todo> findPinnedActiveTodosForUser(@Param("user") User user);
+
+  @Query(
+      "SELECT t FROM Todo t WHERE t.user = :user AND t.parent IS NULL AND t.isCompleted = false"
           + " AND t.dueDate BETWEEN :start AND :end")
   List<Todo> findActiveTodosByDueDateRange(
       @Param("user") User user,
