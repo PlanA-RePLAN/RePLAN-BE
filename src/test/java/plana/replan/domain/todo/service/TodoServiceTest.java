@@ -21,6 +21,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 import plana.replan.domain.routine.entity.Routine;
 import plana.replan.domain.routine.entity.RoutineType;
+import plana.replan.domain.routine.exception.RoutineErrorCode;
+import plana.replan.domain.routine.repository.RoutineRepository;
 import plana.replan.domain.tag.entity.Tag;
 import plana.replan.domain.tag.entity.TagColor;
 import plana.replan.domain.tag.exception.TagErrorCode;
@@ -28,8 +30,10 @@ import plana.replan.domain.tag.repository.TagRepository;
 import plana.replan.domain.todo.dto.SubTodoCreateRequestDto;
 import plana.replan.domain.todo.dto.SubTodoUpdateRequestDto;
 import plana.replan.domain.todo.dto.TodoCreateRequestDto;
+import plana.replan.domain.todo.dto.TodoDetailResponseDto;
 import plana.replan.domain.todo.dto.TodoListResponseDto;
 import plana.replan.domain.todo.dto.TodoResponseDto;
+import plana.replan.domain.todo.dto.TodoUpdateRequestDto;
 import plana.replan.domain.todo.entity.Todo;
 import plana.replan.domain.todo.exception.TodoErrorCode;
 import plana.replan.domain.todo.repository.TodoRepository;
@@ -46,6 +50,7 @@ class TodoServiceTest {
   @Mock private TodoRepository todoRepository;
   @Mock private UserRepository userRepository;
   @Mock private TagRepository tagRepository;
+  @Mock private RoutineRepository routineRepository;
 
   @InjectMocks private TodoService todoService;
 
@@ -838,5 +843,254 @@ class TodoServiceTest {
     assertThat(result.getSubTodos()).hasSize(1);
     assertThat(result.getSubTodos().get(0).getTodoId()).isEqualTo(10L);
     assertThat(result.getSubTodos().get(0).getTitle()).isEqualTo("부모 투두");
+  }
+
+  // ── updateTodo ──────────────────────────────────────────────────────────────
+
+  private TodoUpdateRequestDto updateTodoRequest(
+      String title,
+      LocalDateTime dueDate,
+      Long tagId,
+      RoutineType routineType,
+      Integer routineDate) {
+    TodoUpdateRequestDto dto = new TodoUpdateRequestDto();
+    ReflectionTestUtils.setField(dto, "title", title);
+    ReflectionTestUtils.setField(dto, "dueDate", dueDate);
+    ReflectionTestUtils.setField(dto, "tagId", tagId);
+    ReflectionTestUtils.setField(dto, "routineType", routineType);
+    ReflectionTestUtils.setField(dto, "routineDate", routineDate);
+    return dto;
+  }
+
+  private Routine testRoutine(User user, RoutineType type) {
+    Routine routine = Routine.builder().title("루틴").routineType(type).user(user).build();
+    ReflectionTestUtils.setField(routine, "id", 1L);
+    return routine;
+  }
+
+  @Test
+  @DisplayName("updateTodo - userId null: USER_NOT_FOUND 예외")
+  void updateTodo_nullUserId_throws() {
+    assertThatThrownBy(
+            () -> todoService.updateTodo(null, 1L, updateTodoRequest("제목", null, null, null, null)))
+        .isInstanceOf(CustomException.class)
+        .satisfies(
+            e ->
+                assertThat(((CustomException) e).getErrorCode())
+                    .isEqualTo(UserErrorCode.USER_NOT_FOUND));
+  }
+
+  @Test
+  @DisplayName("updateTodo - todoId DB에 없음: TODO_NOT_FOUND 예외")
+  void updateTodo_todoNotFound_throws() {
+    given(todoRepository.findById(99L)).willReturn(Optional.empty());
+
+    assertThatThrownBy(
+            () -> todoService.updateTodo(1L, 99L, updateTodoRequest("제목", null, null, null, null)))
+        .isInstanceOf(CustomException.class)
+        .satisfies(
+            e ->
+                assertThat(((CustomException) e).getErrorCode())
+                    .isEqualTo(TodoErrorCode.TODO_NOT_FOUND));
+  }
+
+  @Test
+  @DisplayName("updateTodo - 다른 유저 소유 투두: TODO_NOT_FOUND 예외")
+  void updateTodo_otherUserTodo_throws() {
+    User otherUser =
+        User.builder()
+            .email("other@test.com")
+            .nickname("타인")
+            .role(Role.ROLE_USER)
+            .provider(Provider.LOCAL)
+            .build();
+    ReflectionTestUtils.setField(otherUser, "id", 2L);
+
+    Todo todo = testTodo(1L, otherUser);
+    given(todoRepository.findById(1L)).willReturn(Optional.of(todo));
+
+    assertThatThrownBy(
+            () -> todoService.updateTodo(1L, 1L, updateTodoRequest("제목", null, null, null, null)))
+        .isInstanceOf(CustomException.class)
+        .satisfies(
+            e ->
+                assertThat(((CustomException) e).getErrorCode())
+                    .isEqualTo(TodoErrorCode.TODO_NOT_FOUND));
+  }
+
+  @Test
+  @DisplayName("updateTodo - 존재하지 않는 tagId: TAG_NOT_FOUND 예외")
+  void updateTodo_tagNotFound_throws() {
+    User user = testUser();
+    given(todoRepository.findById(1L)).willReturn(Optional.of(testTodo(1L, user)));
+    given(tagRepository.findById(99L)).willReturn(Optional.empty());
+
+    assertThatThrownBy(
+            () -> todoService.updateTodo(1L, 1L, updateTodoRequest("제목", null, 99L, null, null)))
+        .isInstanceOf(CustomException.class)
+        .satisfies(
+            e ->
+                assertThat(((CustomException) e).getErrorCode())
+                    .isEqualTo(TagErrorCode.TAG_NOT_FOUND));
+  }
+
+  @Test
+  @DisplayName("updateTodo - WEEKLY + routineDate > 127: ROUTINE_INVALID_DATE 예외")
+  void updateTodo_weeklyInvalidDate_throws() {
+    User user = testUser();
+    given(todoRepository.findById(1L)).willReturn(Optional.of(testTodo(1L, user)));
+
+    assertThatThrownBy(
+            () ->
+                todoService.updateTodo(
+                    1L, 1L, updateTodoRequest("제목", null, null, RoutineType.WEEKLY, 128)))
+        .isInstanceOf(CustomException.class)
+        .satisfies(
+            e ->
+                assertThat(((CustomException) e).getErrorCode())
+                    .isEqualTo(RoutineErrorCode.ROUTINE_INVALID_DATE));
+  }
+
+  @Test
+  @DisplayName("updateTodo - MONTHLY + routineDate = 0: ROUTINE_INVALID_DATE 예외")
+  void updateTodo_monthlyInvalidDate_throws() {
+    User user = testUser();
+    given(todoRepository.findById(1L)).willReturn(Optional.of(testTodo(1L, user)));
+
+    assertThatThrownBy(
+            () ->
+                todoService.updateTodo(
+                    1L, 1L, updateTodoRequest("제목", null, null, RoutineType.MONTHLY, 0)))
+        .isInstanceOf(CustomException.class)
+        .satisfies(
+            e ->
+                assertThat(((CustomException) e).getErrorCode())
+                    .isEqualTo(RoutineErrorCode.ROUTINE_INVALID_DATE));
+  }
+
+  @Test
+  @DisplayName("updateTodo - WEEKLY + routineDate null: ROUTINE_INVALID_DATE 예외")
+  void updateTodo_weeklyNullDate_throws() {
+    User user = testUser();
+    given(todoRepository.findById(1L)).willReturn(Optional.of(testTodo(1L, user)));
+
+    assertThatThrownBy(
+            () ->
+                todoService.updateTodo(
+                    1L, 1L, updateTodoRequest("제목", null, null, RoutineType.WEEKLY, null)))
+        .isInstanceOf(CustomException.class)
+        .satisfies(
+            e ->
+                assertThat(((CustomException) e).getErrorCode())
+                    .isEqualTo(RoutineErrorCode.ROUTINE_INVALID_DATE));
+  }
+
+  @Test
+  @DisplayName("updateTodo - 성공: title, dueDate, tag 수정 후 반환")
+  void updateTodo_success_basic() {
+    User user = testUser();
+    Todo todo = testTodo(1L, user);
+    LocalDateTime newDueDate = LocalDateTime.of(2026, 12, 31, 23, 59);
+    Tag tag = testTag(5L);
+
+    given(todoRepository.findById(1L)).willReturn(Optional.of(todo));
+    given(tagRepository.findById(5L)).willReturn(Optional.of(tag));
+
+    TodoDetailResponseDto result =
+        todoService.updateTodo(1L, 1L, updateTodoRequest("수정된 제목", newDueDate, 5L, null, null));
+
+    assertThat(result.getTodoId()).isEqualTo(1L);
+    assertThat(result.getTitle()).isEqualTo("수정된 제목");
+    assertThat(result.getDueDate()).isEqualTo(newDueDate);
+    assertThat(result.getTagId()).isEqualTo(5L);
+    assertThat(result.getRoutineType()).isNull();
+  }
+
+  @Test
+  @DisplayName("updateTodo - 성공: dueDate=null, tagId=null → 마감일·태그 제거")
+  void updateTodo_success_clearDueDateAndTag() {
+    User user = testUser();
+    Todo todo = testTodo(1L, user);
+    ReflectionTestUtils.setField(todo, "dueDate", LocalDateTime.of(2026, 1, 1, 0, 0));
+    ReflectionTestUtils.setField(todo, "tag", testTag(3L));
+
+    given(todoRepository.findById(1L)).willReturn(Optional.of(todo));
+
+    TodoDetailResponseDto result =
+        todoService.updateTodo(1L, 1L, updateTodoRequest("제목", null, null, null, null));
+
+    assertThat(result.getDueDate()).isNull();
+    assertThat(result.getTagId()).isNull();
+  }
+
+  @Test
+  @DisplayName("updateTodo - 루틴 있음 + routineType=null: 루틴 soft delete, todo.routine=null")
+  void updateTodo_success_removeRoutine() {
+    User user = testUser();
+    Todo todo = testTodo(1L, user);
+    Routine routine = testRoutine(user, RoutineType.DAILY);
+    ReflectionTestUtils.setField(todo, "routine", routine);
+
+    given(todoRepository.findById(1L)).willReturn(Optional.of(todo));
+
+    TodoDetailResponseDto result =
+        todoService.updateTodo(1L, 1L, updateTodoRequest("제목", null, null, null, null));
+
+    assertThat(ReflectionTestUtils.getField(routine, "deletedAt")).isNotNull();
+    assertThat(result.getRoutineType()).isNull();
+  }
+
+  @Test
+  @DisplayName("updateTodo - 루틴 있음 + 유형 변경 (DAILY→WEEKLY): 기존 루틴 업데이트")
+  void updateTodo_success_changeRoutineType() {
+    User user = testUser();
+    Todo todo = testTodo(1L, user);
+    Routine routine = testRoutine(user, RoutineType.DAILY);
+    ReflectionTestUtils.setField(todo, "routine", routine);
+
+    given(todoRepository.findById(1L)).willReturn(Optional.of(todo));
+
+    TodoDetailResponseDto result =
+        todoService.updateTodo(
+            1L, 1L, updateTodoRequest("수정된 제목", null, null, RoutineType.WEEKLY, 5));
+
+    assertThat(routine.getRoutineType()).isEqualTo(RoutineType.WEEKLY);
+    assertThat(routine.getRoutineDate()).isEqualTo(5);
+    assertThat(routine.getTitle()).isEqualTo("수정된 제목");
+    assertThat(result.getRoutineType()).isEqualTo("WEEKLY");
+    verify(routineRepository, never()).save(any());
+  }
+
+  @Test
+  @DisplayName("updateTodo - 루틴 없음 + routineType=DAILY: 새 루틴 생성 및 투두에 연결")
+  void updateTodo_success_addRoutine() {
+    User user = testUser();
+    Todo todo = testTodo(1L, user);
+
+    given(todoRepository.findById(1L)).willReturn(Optional.of(todo));
+    given(routineRepository.save(any(Routine.class))).willAnswer(inv -> inv.getArgument(0));
+
+    TodoDetailResponseDto result =
+        todoService.updateTodo(
+            1L, 1L, updateTodoRequest("제목", null, null, RoutineType.DAILY, null));
+
+    ArgumentCaptor<Routine> captor = ArgumentCaptor.forClass(Routine.class);
+    verify(routineRepository).save(captor.capture());
+    assertThat(captor.getValue().getRoutineType()).isEqualTo(RoutineType.DAILY);
+    assertThat(captor.getValue().getTitle()).isEqualTo("제목");
+    assertThat(result.getRoutineType()).isEqualTo("DAILY");
+  }
+
+  @Test
+  @DisplayName("updateTodo - 루틴 없음 + routineType=null: 루틴 관련 동작 없음")
+  void updateTodo_success_noRoutineNoChange() {
+    User user = testUser();
+    Todo todo = testTodo(1L, user);
+
+    given(todoRepository.findById(1L)).willReturn(Optional.of(todo));
+
+    todoService.updateTodo(1L, 1L, updateTodoRequest("제목", null, null, null, null));
+
+    verify(routineRepository, never()).save(any());
   }
 }

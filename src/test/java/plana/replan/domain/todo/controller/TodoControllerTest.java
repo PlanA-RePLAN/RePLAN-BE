@@ -24,6 +24,7 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import plana.replan.domain.routine.exception.RoutineErrorCode;
 import plana.replan.domain.tag.exception.TagErrorCode;
 import plana.replan.domain.todo.dto.TodoDetailResponseDto;
 import plana.replan.domain.todo.dto.TodoDetailResponseDto.SubTodoDto;
@@ -577,6 +578,144 @@ class TodoControllerTest {
         .perform(get("/api/todos/99").with(authentication(authToken(1L))))
         .andExpect(status().isNotFound())
         .andExpect(jsonPath("$.error.code").value("TODO_NOT_FOUND"))
+        .andExpect(jsonPath("$.data").value(nullValue()));
+  }
+
+  // ── updateTodo ──────────────────────────────────────────────────────────────
+
+  @Test
+  @DisplayName("인증 없이 투두 수정 호출: 401 반환")
+  void updateTodo_unauthenticated() throws Exception {
+    mockMvc
+        .perform(
+            put("/api/todos/1")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    { "title": "수정된 제목" }
+                    """))
+        .andExpect(status().isUnauthorized())
+        .andExpect(jsonPath("$.error.code").value("EMPTY_TOKEN"));
+  }
+
+  @Test
+  @DisplayName("투두 수정 성공: status=200, TodoDetailResponseDto 반환")
+  void updateTodo_success() throws Exception {
+    TodoDetailResponseDto response =
+        new TodoDetailResponseDto(1L, "수정된 제목", null, false, 3L, "영어", "BLUE", "WEEKLY", List.of());
+
+    given(todoService.updateTodo(any(), any(), any())).willReturn(response);
+
+    mockMvc
+        .perform(
+            put("/api/todos/1")
+                .with(authentication(authToken(1L)))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """
+                    { "title": "수정된 제목", "tagId": 3, "routineType": "WEEKLY", "routineDate": 5 }
+                    """))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.status").value(200))
+        .andExpect(jsonPath("$.success").value(true))
+        .andExpect(jsonPath("$.data.todoId").value(1))
+        .andExpect(jsonPath("$.data.title").value("수정된 제목"))
+        .andExpect(jsonPath("$.data.tagId").value(3))
+        .andExpect(jsonPath("$.data.tagTitle").value("영어"))
+        .andExpect(jsonPath("$.data.tagColor").value("BLUE"))
+        .andExpect(jsonPath("$.data.routineType").value("WEEKLY"))
+        .andExpect(jsonPath("$.data.subTodos").isArray())
+        .andExpect(jsonPath("$.error").value(nullValue()));
+  }
+
+  @Test
+  @DisplayName("title 누락: status=400, error.code=INVALID_INPUT")
+  void updateTodo_missingTitle() throws Exception {
+    mockMvc
+        .perform(
+            put("/api/todos/1")
+                .with(authentication(authToken(1L)))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{}"))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.error.code").value("INVALID_INPUT"))
+        .andExpect(jsonPath("$.data").value(nullValue()));
+  }
+
+  @Test
+  @DisplayName("title 빈 문자열: status=400, error.code=INVALID_INPUT")
+  void updateTodo_blankTitle() throws Exception {
+    mockMvc
+        .perform(
+            put("/api/todos/1")
+                .with(authentication(authToken(1L)))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    { "title": "" }
+                    """))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.error.code").value("INVALID_INPUT"))
+        .andExpect(jsonPath("$.data").value(nullValue()));
+  }
+
+  @Test
+  @DisplayName("존재하지 않는 todoId: status=404, error.code=TODO_NOT_FOUND")
+  void updateTodo_todoNotFound() throws Exception {
+    willThrow(new CustomException(TodoErrorCode.TODO_NOT_FOUND))
+        .given(todoService)
+        .updateTodo(any(), any(), any());
+
+    mockMvc
+        .perform(
+            put("/api/todos/999")
+                .with(authentication(authToken(1L)))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    { "title": "수정된 제목" }
+                    """))
+        .andExpect(status().isNotFound())
+        .andExpect(jsonPath("$.error.code").value("TODO_NOT_FOUND"))
+        .andExpect(jsonPath("$.data").value(nullValue()));
+  }
+
+  @Test
+  @DisplayName("존재하지 않는 tagId: status=404, error.code=TAG_NOT_FOUND")
+  void updateTodo_tagNotFound() throws Exception {
+    willThrow(new CustomException(TagErrorCode.TAG_NOT_FOUND))
+        .given(todoService)
+        .updateTodo(any(), any(), any());
+
+    mockMvc
+        .perform(
+            put("/api/todos/1")
+                .with(authentication(authToken(1L)))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """
+                    { "title": "수정된 제목", "tagId": 999 }
+                    """))
+        .andExpect(status().isNotFound())
+        .andExpect(jsonPath("$.error.code").value("TAG_NOT_FOUND"))
+        .andExpect(jsonPath("$.data").value(nullValue()));
+  }
+
+  @Test
+  @DisplayName("잘못된 반복 날짜: status=400, error.code=ROUTINE_INVALID_DATE")
+  void updateTodo_routineInvalidDate() throws Exception {
+    willThrow(new CustomException(RoutineErrorCode.ROUTINE_INVALID_DATE))
+        .given(todoService)
+        .updateTodo(any(), any(), any());
+
+    mockMvc
+        .perform(
+            put("/api/todos/1")
+                .with(authentication(authToken(1L)))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """
+                    { "title": "수정된 제목", "routineType": "WEEKLY", "routineDate": 200 }
+                    """))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.error.code").value("ROUTINE_INVALID_DATE"))
         .andExpect(jsonPath("$.data").value(nullValue()));
   }
 }
