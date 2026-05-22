@@ -60,6 +60,9 @@ public class TodoService {
           tagRepository
               .findById(request.getTagId())
               .orElseThrow(() -> new CustomException(TagErrorCode.TAG_NOT_FOUND));
+      if (!tag.getUser().getId().equals(userId)) {
+        throw new CustomException(TagErrorCode.TAG_NOT_FOUND);
+      }
     }
 
     Todo todo =
@@ -228,6 +231,9 @@ public class TodoService {
           tagRepository
               .findById(request.getTagId())
               .orElseThrow(() -> new CustomException(TagErrorCode.TAG_NOT_FOUND));
+      if (!tag.getUser().getId().equals(userId)) {
+        throw new CustomException(TagErrorCode.TAG_NOT_FOUND);
+      }
     }
 
     if (request.getTitle() != null && request.getTitle().isBlank()) {
