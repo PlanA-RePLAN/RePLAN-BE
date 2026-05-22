@@ -675,6 +675,99 @@ class TodoControllerTest {
         .andExpect(jsonPath("$.error.code").value("TODO_NOT_FOUND"));
   }
 
+  // ── completeTodo ──────────────────────────────────────────────────────────────
+
+  @Test
+  @DisplayName("인증 없이 완료/미완료 처리 호출: 401 반환")
+  void completeTodo_unauthenticated() throws Exception {
+    mockMvc
+        .perform(
+            patch("/api/todos/1/complete")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    { "isCompleted": true }
+                    """))
+        .andExpect(status().isUnauthorized())
+        .andExpect(jsonPath("$.error.code").value("EMPTY_TOKEN"));
+  }
+
+  @Test
+  @DisplayName("완료 처리 성공: status=200, isCompleted=true 반환")
+  void completeTodo_success_complete() throws Exception {
+    TodoListResponseDto response =
+        new TodoListResponseDto(1L, "투두", null, false, 1000.0, true, null, null, null, null, false);
+    given(todoService.completeTodo(any(), any(), any())).willReturn(response);
+
+    mockMvc
+        .perform(
+            patch("/api/todos/1/complete")
+                .with(authentication(authToken(1L)))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    { "isCompleted": true }
+                    """))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.success").value(true))
+        .andExpect(jsonPath("$.data.todoId").value(1))
+        .andExpect(jsonPath("$.data.isCompleted").value(true))
+        .andExpect(jsonPath("$.error").value(nullValue()));
+  }
+
+  @Test
+  @DisplayName("미완료 처리 성공: status=200, isCompleted=false 반환")
+  void completeTodo_success_uncomplete() throws Exception {
+    TodoListResponseDto response =
+        new TodoListResponseDto(
+            1L, "투두", null, false, 1000.0, false, null, null, null, null, false);
+    given(todoService.completeTodo(any(), any(), any())).willReturn(response);
+
+    mockMvc
+        .perform(
+            patch("/api/todos/1/complete")
+                .with(authentication(authToken(1L)))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    { "isCompleted": false }
+                    """))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.isCompleted").value(false))
+        .andExpect(jsonPath("$.error").value(nullValue()));
+  }
+
+  @Test
+  @DisplayName("isCompleted 누락: status=400, error.code=INVALID_INPUT")
+  void completeTodo_missingIsCompleted() throws Exception {
+    mockMvc
+        .perform(
+            patch("/api/todos/1/complete")
+                .with(authentication(authToken(1L)))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{}"))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.error.code").value("INVALID_INPUT"))
+        .andExpect(jsonPath("$.data").value(nullValue()));
+  }
+
+  @Test
+  @DisplayName("존재하지 않거나 본인 소유가 아닌 투두: status=404, error.code=TODO_NOT_FOUND")
+  void completeTodo_notFound() throws Exception {
+    willThrow(new CustomException(TodoErrorCode.TODO_NOT_FOUND))
+        .given(todoService)
+        .completeTodo(any(), any(), any());
+
+    mockMvc
+        .perform(
+            patch("/api/todos/999/complete")
+                .with(authentication(authToken(1L)))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    { "isCompleted": true }
+                    """))
+        .andExpect(status().isNotFound())
+        .andExpect(jsonPath("$.error.code").value("TODO_NOT_FOUND"))
+        .andExpect(jsonPath("$.data").value(nullValue()));
+  }
+
   // ── pinTodo ──────────────────────────────────────────────────────────────────
 
   @Test

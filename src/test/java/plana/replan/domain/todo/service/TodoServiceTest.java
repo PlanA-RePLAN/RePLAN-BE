@@ -29,6 +29,7 @@ import plana.replan.domain.tag.exception.TagErrorCode;
 import plana.replan.domain.tag.repository.TagRepository;
 import plana.replan.domain.todo.dto.SubTodoCreateRequestDto;
 import plana.replan.domain.todo.dto.SubTodoUpdateRequestDto;
+import plana.replan.domain.todo.dto.TodoCompleteRequestDto;
 import plana.replan.domain.todo.dto.TodoCreateRequestDto;
 import plana.replan.domain.todo.dto.TodoDetailResponseDto;
 import plana.replan.domain.todo.dto.TodoListResponseDto;
@@ -1026,6 +1027,108 @@ class TodoServiceTest {
 
     assertThat(ReflectionTestUtils.getField(todo, "deletedAt")).isNotNull();
     assertThat(ReflectionTestUtils.getField(routine, "deletedAt")).isNull();
+  }
+
+  // ── completeTodo ──────────────────────────────────────────────────────────────
+
+  private TodoCompleteRequestDto completeRequest(boolean isCompleted) {
+    TodoCompleteRequestDto dto = new TodoCompleteRequestDto();
+    ReflectionTestUtils.setField(dto, "isCompleted", isCompleted);
+    return dto;
+  }
+
+  @Test
+  @DisplayName("completeTodo - userId null: USER_NOT_FOUND 예외")
+  void completeTodo_nullUserId_throws() {
+    assertThatThrownBy(() -> todoService.completeTodo(null, 1L, completeRequest(true)))
+        .isInstanceOf(CustomException.class)
+        .satisfies(
+            e ->
+                assertThat(((CustomException) e).getErrorCode())
+                    .isEqualTo(UserErrorCode.USER_NOT_FOUND));
+  }
+
+  @Test
+  @DisplayName("completeTodo - todoId DB에 없음: TODO_NOT_FOUND 예외")
+  void completeTodo_todoNotFound_throws() {
+    given(todoRepository.findById(99L)).willReturn(Optional.empty());
+
+    assertThatThrownBy(() -> todoService.completeTodo(1L, 99L, completeRequest(true)))
+        .isInstanceOf(CustomException.class)
+        .satisfies(
+            e ->
+                assertThat(((CustomException) e).getErrorCode())
+                    .isEqualTo(TodoErrorCode.TODO_NOT_FOUND));
+  }
+
+  @Test
+  @DisplayName("completeTodo - 다른 유저 소유 투두: TODO_NOT_FOUND 예외")
+  void completeTodo_otherUserTodo_throws() {
+    User otherUser =
+        User.builder()
+            .email("other@test.com")
+            .nickname("타인")
+            .role(Role.ROLE_USER)
+            .provider(Provider.LOCAL)
+            .build();
+    ReflectionTestUtils.setField(otherUser, "id", 2L);
+
+    given(todoRepository.findById(1L)).willReturn(Optional.of(testTodo(1L, otherUser)));
+
+    assertThatThrownBy(() -> todoService.completeTodo(1L, 1L, completeRequest(true)))
+        .isInstanceOf(CustomException.class)
+        .satisfies(
+            e ->
+                assertThat(((CustomException) e).getErrorCode())
+                    .isEqualTo(TodoErrorCode.TODO_NOT_FOUND));
+  }
+
+  @Test
+  @DisplayName("completeTodo - 하위 투두 ID 전달: TODO_NOT_FOUND 예외")
+  void completeTodo_subTodoId_throws() {
+    User user = testUser();
+    Todo parent = testTodo(10L, user);
+    Todo subTodo = Todo.builder().title("하위 투두").user(user).parent(parent).isPinned(false).build();
+    ReflectionTestUtils.setField(subTodo, "id", 43L);
+
+    given(todoRepository.findById(43L)).willReturn(Optional.of(subTodo));
+
+    assertThatThrownBy(() -> todoService.completeTodo(1L, 43L, completeRequest(true)))
+        .isInstanceOf(CustomException.class)
+        .satisfies(
+            e ->
+                assertThat(((CustomException) e).getErrorCode())
+                    .isEqualTo(TodoErrorCode.TODO_NOT_FOUND));
+  }
+
+  @Test
+  @DisplayName("completeTodo - 성공 (완료 처리): isCompleted=true, completedTime 설정됨")
+  void completeTodo_success_complete() {
+    User user = testUser();
+    Todo todo = testTodo(1L, user);
+
+    given(todoRepository.findById(1L)).willReturn(Optional.of(todo));
+
+    TodoListResponseDto result = todoService.completeTodo(1L, 1L, completeRequest(true));
+
+    assertThat(result.isCompleted()).isTrue();
+    assertThat(ReflectionTestUtils.getField(todo, "completedTime")).isNotNull();
+  }
+
+  @Test
+  @DisplayName("completeTodo - 성공 (미완료 처리): isCompleted=false, completedTime=null")
+  void completeTodo_success_uncomplete() {
+    User user = testUser();
+    Todo todo = testTodo(1L, user);
+    ReflectionTestUtils.setField(todo, "isCompleted", true);
+    ReflectionTestUtils.setField(todo, "completedTime", LocalDateTime.now());
+
+    given(todoRepository.findById(1L)).willReturn(Optional.of(todo));
+
+    TodoListResponseDto result = todoService.completeTodo(1L, 1L, completeRequest(false));
+
+    assertThat(result.isCompleted()).isFalse();
+    assertThat(ReflectionTestUtils.getField(todo, "completedTime")).isNull();
   }
 
   // ── pinTodo ──────────────────────────────────────────────────────────────────
