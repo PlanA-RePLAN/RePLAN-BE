@@ -582,6 +582,64 @@ class TodoControllerTest {
         .andExpect(jsonPath("$.data").value(nullValue()));
   }
 
+  // ── getPinnedTodos ──────────────────────────────────────────────────────────
+
+  @Test
+  @DisplayName("인증 없이 핀된 투두 조회 호출: 401 반환")
+  void getPinnedTodos_unauthenticated() throws Exception {
+    mockMvc
+        .perform(get("/api/todos/pinned"))
+        .andExpect(status().isUnauthorized())
+        .andExpect(jsonPath("$.error.code").value("EMPTY_TOKEN"));
+  }
+
+  @Test
+  @DisplayName("핀된 투두 목록 조회 성공: status=200, isPinned=true인 목록 반환")
+  void getPinnedTodos_success() throws Exception {
+    List<TodoListResponseDto> pinnedList =
+        List.of(
+            new TodoListResponseDto(
+                3L, "중요 투두", null, true, 500.0, false, null, null, null, null, false),
+            new TodoListResponseDto(
+                1L, "긴급 투두", null, true, 1000.0, false, null, null, null, null, false));
+    given(todoService.getPinnedTodos(any())).willReturn(pinnedList);
+
+    mockMvc
+        .perform(get("/api/todos/pinned").with(authentication(authToken(1L))))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.success").value(true))
+        .andExpect(jsonPath("$.data").isArray())
+        .andExpect(jsonPath("$.data[0].todoId").value(3))
+        .andExpect(jsonPath("$.data[0].isPinned").value(true))
+        .andExpect(jsonPath("$.data[1].todoId").value(1))
+        .andExpect(jsonPath("$.error").value(nullValue()));
+  }
+
+  @Test
+  @DisplayName("핀된 투두 없음: status=200, 빈 배열 반환")
+  void getPinnedTodos_empty() throws Exception {
+    given(todoService.getPinnedTodos(any())).willReturn(List.of());
+
+    mockMvc
+        .perform(get("/api/todos/pinned").with(authentication(authToken(1L))))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data").isArray())
+        .andExpect(jsonPath("$.data").isEmpty());
+  }
+
+  @Test
+  @DisplayName("userId DB에 없음: status=404, error.code=USER_NOT_FOUND")
+  void getPinnedTodos_userNotFound() throws Exception {
+    willThrow(new CustomException(UserErrorCode.USER_NOT_FOUND))
+        .given(todoService)
+        .getPinnedTodos(any());
+
+    mockMvc
+        .perform(get("/api/todos/pinned").with(authentication(authToken(999L))))
+        .andExpect(status().isNotFound())
+        .andExpect(jsonPath("$.error.code").value("USER_NOT_FOUND"));
+  }
+
   // ── deleteTodo ──────────────────────────────────────────────────────────────
 
   @Test

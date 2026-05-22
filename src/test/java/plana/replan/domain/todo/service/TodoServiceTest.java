@@ -846,6 +846,74 @@ class TodoServiceTest {
     assertThat(result.getSubTodos().get(0).getTitle()).isEqualTo("부모 투두");
   }
 
+  // ── getPinnedTodos ──────────────────────────────────────────────────────────
+
+  @Test
+  @DisplayName("getPinnedTodos - userId null: USER_NOT_FOUND 예외")
+  void getPinnedTodos_nullUserId_throws() {
+    assertThatThrownBy(() -> todoService.getPinnedTodos(null))
+        .isInstanceOf(CustomException.class)
+        .satisfies(
+            e ->
+                assertThat(((CustomException) e).getErrorCode())
+                    .isEqualTo(UserErrorCode.USER_NOT_FOUND));
+  }
+
+  @Test
+  @DisplayName("getPinnedTodos - userId DB에 없음: USER_NOT_FOUND 예외")
+  void getPinnedTodos_userNotFound_throws() {
+    given(userRepository.findById(99L)).willReturn(Optional.empty());
+
+    assertThatThrownBy(() -> todoService.getPinnedTodos(99L))
+        .isInstanceOf(CustomException.class)
+        .satisfies(
+            e ->
+                assertThat(((CustomException) e).getErrorCode())
+                    .isEqualTo(UserErrorCode.USER_NOT_FOUND));
+  }
+
+  @Test
+  @DisplayName("getPinnedTodos - 성공: 핀된 투두만 반환")
+  void getPinnedTodos_success_returnsOnlyPinned() {
+    User user = testUser();
+    given(userRepository.findById(1L)).willReturn(Optional.of(user));
+
+    Todo pinned1 = activeTodoWithSort(1L, user, true, 1000.0);
+    Todo pinned2 = activeTodoWithSort(2L, user, true, 500.0);
+    given(todoRepository.findPinnedActiveTodosForUser(user)).willReturn(List.of(pinned1, pinned2));
+
+    List<TodoListResponseDto> result = todoService.getPinnedTodos(1L);
+
+    assertThat(result).hasSize(2);
+    assertThat(result).extracting("isPinned").containsOnly(true);
+  }
+
+  @Test
+  @DisplayName("getPinnedTodos - 성공: sortOrder 오름차순 정렬")
+  void getPinnedTodos_success_sortBySortOrder() {
+    User user = testUser();
+    given(userRepository.findById(1L)).willReturn(Optional.of(user));
+
+    Todo t1 = activeTodoWithSort(1L, user, true, 2000.0);
+    Todo t2 = activeTodoWithSort(2L, user, true, 500.0);
+    Todo t3 = activeTodoWithSort(3L, user, true, 1000.0);
+    given(todoRepository.findPinnedActiveTodosForUser(user)).willReturn(List.of(t1, t2, t3));
+
+    List<TodoListResponseDto> result = todoService.getPinnedTodos(1L);
+
+    assertThat(result).extracting("todoId").containsExactly(2L, 3L, 1L);
+  }
+
+  @Test
+  @DisplayName("getPinnedTodos - 핀된 투두 없음: 빈 리스트 반환")
+  void getPinnedTodos_empty() {
+    User user = testUser();
+    given(userRepository.findById(1L)).willReturn(Optional.of(user));
+    given(todoRepository.findPinnedActiveTodosForUser(user)).willReturn(List.of());
+
+    assertThat(todoService.getPinnedTodos(1L)).isEmpty();
+  }
+
   // ── deleteTodo ──────────────────────────────────────────────────────────────
 
   @Test
