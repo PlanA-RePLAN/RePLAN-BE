@@ -21,10 +21,219 @@ import plana.replan.domain.todo.dto.TodoCreateRequestDto;
 import plana.replan.domain.todo.dto.TodoDetailResponseDto;
 import plana.replan.domain.todo.dto.TodoListResponseDto;
 import plana.replan.domain.todo.dto.TodoResponseDto;
+import plana.replan.domain.todo.dto.TodoUpdateRequestDto;
 import plana.replan.global.common.ApiResult;
 
 @Tag(name = "Todo", description = "투두 관련 API")
 public interface TodoControllerDocs {
+
+  @Operation(
+      summary = "투두 수정",
+      description =
+          """
+          **호출 주체**: AccessToken을 보유한 인증 사용자
+
+          **요청 방법**: `Authorization: Bearer {accessToken}` 헤더 필수
+
+          **Request Headers**
+
+          | 헤더명 | 필수 여부 | 타입 | 설명 |
+          |--------|-----------|------|------|
+          | Authorization | ✅ 필수 | string | `Bearer {accessToken}` 형식의 JWT 액세스 토큰 |
+          | Content-Type | ✅ 필수 | string | `application/json` |
+
+          **Path Variable**
+
+          | 파라미터명 | 필수 여부 | 타입 | 설명 | 예시 |
+          |-----------|-----------|------|------|------|
+          | todoId | ✅ 필수 | integer | 수정할 투두 ID | `1` |
+
+          **Request Body**
+
+          | 필드명 | 필수 여부 | 타입 | 설명 | 예시 |
+          |--------|-----------|------|------|------|
+          | title | ✅ 필수 | string | 투두 제목 | `"토익 단어 50개 외우기"` |
+          | dueDate | ❌ 선택 | string | 마감 일시 (ISO 8601 형식). null이면 마감일 제거 | `"2025-12-31T23:59:59"` |
+          | tagId | ❌ 선택 | integer | 태그 ID. null이면 태그 제거 | `3` |
+          | routineType | ❌ 선택 | string | 반복 유형 (`DAILY`/`WEEKLY`/`MONTHLY`). null이면 반복 없음 | `"WEEKLY"` |
+          | routineDate | ❌ 선택 | integer | 반복 날짜 (WEEKLY: 1-127 비트마스크, MONTHLY: 1-31). DAILY는 null | `5` |
+
+          ❌ 선택 필드는 생략하거나 null로 전달해도 동일하게 처리됩니다.
+
+          **반복(routine) 처리 규칙**
+
+          | 기존 상태 | routineType 값 | 동작 |
+          |----------|---------------|------|
+          | 반복 있음 | `null` | 기존 루틴 삭제, 투두를 일반 투두로 변경 |
+          | 반복 있음 | 유형 값 | 기존 루틴의 유형·날짜·제목·태그 업데이트 |
+          | 반복 없음 | `null` | 변경 없음 |
+          | 반복 없음 | 유형 값 | 새 루틴 생성 후 투두에 연결 |
+          """,
+      security = @SecurityRequirement(name = "Bearer Authentication"))
+  @ApiResponses({
+    @ApiResponse(
+        responseCode = "200",
+        description = "투두 수정 성공",
+        content =
+            @Content(
+                examples =
+                    @ExampleObject(
+                        value =
+                            """
+                            {
+                              "status": 200,
+                              "success": true,
+                              "data": {
+                                "todoId": 1,
+                                "title": "토익 단어 50개 외우기 (수정)",
+                                "dueDate": "2025-12-31T23:59:59",
+                                "isCompleted": false,
+                                "tagId": 3,
+                                "tagTitle": "영어",
+                                "tagColor": "BLUE",
+                                "routineType": "WEEKLY",
+                                "subTodos": []
+                              },
+                              "error": null
+                            }
+                            """))),
+    @ApiResponse(
+        responseCode = "400",
+        description = "입력값 오류",
+        content =
+            @Content(
+                examples = {
+                  @ExampleObject(
+                      name = "title 누락",
+                      value =
+                          """
+                          {
+                            "status": 400,
+                            "success": false,
+                            "data": null,
+                            "error": {
+                              "code": "INVALID_INPUT",
+                              "message": "제목은 필수입니다.",
+                              "detail": null
+                            }
+                          }
+                          """),
+                  @ExampleObject(
+                      name = "잘못된 반복 날짜",
+                      value =
+                          """
+                          {
+                            "status": 400,
+                            "success": false,
+                            "data": null,
+                            "error": {
+                              "code": "ROUTINE_INVALID_DATE",
+                              "message": "유효하지 않은 반복 날짜입니다.",
+                              "detail": null
+                            }
+                          }
+                          """)
+                })),
+    @ApiResponse(
+        responseCode = "401",
+        description = "AccessToken 없음 또는 만료",
+        content =
+            @Content(
+                examples = {
+                  @ExampleObject(
+                      name = "토큰 없음",
+                      value =
+                          """
+                          {
+                            "status": 401,
+                            "success": false,
+                            "data": null,
+                            "error": {
+                              "code": "EMPTY_TOKEN",
+                              "message": "토큰이 없습니다.",
+                              "detail": null
+                            }
+                          }
+                          """),
+                  @ExampleObject(
+                      name = "만료된 토큰",
+                      value =
+                          """
+                          {
+                            "status": 401,
+                            "success": false,
+                            "data": null,
+                            "error": {
+                              "code": "EXPIRED_TOKEN",
+                              "message": "만료된 토큰입니다.",
+                              "detail": null
+                            }
+                          }
+                          """)
+                })),
+    @ApiResponse(
+        responseCode = "404",
+        description = "투두 또는 태그를 찾을 수 없음",
+        content =
+            @Content(
+                examples = {
+                  @ExampleObject(
+                      name = "투두 없음",
+                      value =
+                          """
+                          {
+                            "status": 404,
+                            "success": false,
+                            "data": null,
+                            "error": {
+                              "code": "TODO_NOT_FOUND",
+                              "message": "투두를 찾을 수 없습니다.",
+                              "detail": null
+                            }
+                          }
+                          """),
+                  @ExampleObject(
+                      name = "태그 없음",
+                      value =
+                          """
+                          {
+                            "status": 404,
+                            "success": false,
+                            "data": null,
+                            "error": {
+                              "code": "TAG_NOT_FOUND",
+                              "message": "태그를 찾을 수 없습니다.",
+                              "detail": null
+                            }
+                          }
+                          """)
+                }))
+  })
+  ResponseEntity<ApiResult<TodoDetailResponseDto>> updateTodo(
+      @AuthenticationPrincipal Long userId,
+      @Parameter(description = "수정할 투두 ID", example = "1") @PathVariable Long todoId,
+      @io.swagger.v3.oas.annotations.parameters.RequestBody(
+              content =
+                  @Content(
+                      mediaType = "application/json",
+                      examples = {
+                        @ExampleObject(
+                            name = "전체 필드 포함",
+                            value =
+                                """
+                                {"title": "토익 단어 50개 외우기", "dueDate": "2025-12-31T23:59:59", "tagId": 3, "routineType": "WEEKLY", "routineDate": 5}
+                                """),
+                        @ExampleObject(
+                            name = "필수 필드만 (optional 생략)",
+                            summary = "optional 필드를 생략하면 null로 처리됨",
+                            value =
+                                """
+                                {"title": "토익 단어 50개 외우기"}
+                                """)
+                      }))
+          @Valid
+          @RequestBody
+          TodoUpdateRequestDto request);
 
   @Operation(
       summary = "투두 상세 조회",

@@ -21,6 +21,7 @@ import plana.replan.domain.todo.dto.TodoCreateRequestDto;
 import plana.replan.domain.todo.dto.TodoDetailResponseDto;
 import plana.replan.domain.todo.dto.TodoListResponseDto;
 import plana.replan.domain.todo.dto.TodoResponseDto;
+import plana.replan.domain.todo.dto.TodoUpdateRequestDto;
 import plana.replan.domain.todo.service.TodoService;
 import plana.replan.global.common.ApiResult;
 
@@ -45,6 +46,15 @@ public class TodoController implements TodoControllerDocs {
       @RequestParam(defaultValue = "all") String filter,
       @RequestParam(defaultValue = "priority") String sort) {
     return ResponseEntity.ok(ApiResult.ok(todoService.getTodos(userId, filter, sort)));
+  }
+
+  @Override
+  @PutMapping("/{todoId}")
+  public ResponseEntity<ApiResult<TodoDetailResponseDto>> updateTodo(
+      @AuthenticationPrincipal Long userId,
+      @PathVariable Long todoId,
+      @Valid @RequestBody TodoUpdateRequestDto request) {
+    return ResponseEntity.ok(ApiResult.ok(todoService.updateTodo(userId, todoId, request)));
   }
 
   @Override
