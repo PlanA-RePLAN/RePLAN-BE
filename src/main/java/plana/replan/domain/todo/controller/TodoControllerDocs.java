@@ -28,6 +28,99 @@ import plana.replan.global.common.ApiResult;
 public interface TodoControllerDocs {
 
   @Operation(
+      summary = "투두 삭제",
+      description =
+          """
+          **호출 주체**: AccessToken을 보유한 인증 사용자
+
+          **요청 방법**: `Authorization: Bearer {accessToken}` 헤더 필수
+
+          **Request Headers**
+
+          | 헤더명 | 필수 여부 | 타입 | 설명 |
+          |--------|-----------|------|------|
+          | Authorization | ✅ 필수 | string | `Bearer {accessToken}` 형식의 JWT 액세스 토큰 |
+
+          **Path Variable**
+
+          | 파라미터명 | 필수 여부 | 타입 | 설명 | 예시 |
+          |-----------|-----------|------|------|------|
+          | todoId | ✅ 필수 | integer | 삭제할 투두 ID | `1` |
+
+          **비즈니스 로직**
+          1. todoId로 투두 조회
+          2. 요청 유저 소유인지 검증
+          3. 하위 투두(sub-todo)의 ID를 직접 전달한 경우 404 반환
+          4. 하위 투두가 있으면 모두 함께 soft delete
+          5. 투두 soft delete (deleted_at 설정)
+          6. 연결된 루틴은 삭제하지 않음 (루틴은 계속 미래 투두를 생성함)
+          """,
+      security = @SecurityRequirement(name = "Bearer Authentication"))
+  @ApiResponses({
+    @ApiResponse(responseCode = "204", description = "투두 삭제 성공"),
+    @ApiResponse(
+        responseCode = "401",
+        description = "AccessToken 없음 또는 만료",
+        content =
+            @Content(
+                examples = {
+                  @ExampleObject(
+                      name = "토큰 없음",
+                      value =
+                          """
+                          {
+                            "status": 401,
+                            "success": false,
+                            "data": null,
+                            "error": {
+                              "code": "EMPTY_TOKEN",
+                              "message": "토큰이 없습니다.",
+                              "detail": null
+                            }
+                          }
+                          """),
+                  @ExampleObject(
+                      name = "만료된 토큰",
+                      value =
+                          """
+                          {
+                            "status": 401,
+                            "success": false,
+                            "data": null,
+                            "error": {
+                              "code": "EXPIRED_TOKEN",
+                              "message": "만료된 토큰입니다.",
+                              "detail": null
+                            }
+                          }
+                          """)
+                })),
+    @ApiResponse(
+        responseCode = "404",
+        description = "투두를 찾을 수 없음 (존재하지 않거나 본인 소유가 아니거나 하위 투두 ID인 경우)",
+        content =
+            @Content(
+                examples =
+                    @ExampleObject(
+                        value =
+                            """
+                            {
+                              "status": 404,
+                              "success": false,
+                              "data": null,
+                              "error": {
+                                "code": "TODO_NOT_FOUND",
+                                "message": "투두를 찾을 수 없습니다.",
+                                "detail": null
+                              }
+                            }
+                            """)))
+  })
+  ResponseEntity<Void> deleteTodo(
+      @AuthenticationPrincipal Long userId,
+      @Parameter(description = "삭제할 투두 ID", example = "1") @PathVariable Long todoId);
+
+  @Operation(
       summary = "투두 수정",
       description =
           """

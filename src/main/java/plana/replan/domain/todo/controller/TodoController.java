@@ -49,6 +49,14 @@ public class TodoController implements TodoControllerDocs {
   }
 
   @Override
+  @DeleteMapping("/{todoId}")
+  public ResponseEntity<Void> deleteTodo(
+      @AuthenticationPrincipal Long userId, @PathVariable Long todoId) {
+    todoService.deleteTodo(userId, todoId);
+    return ResponseEntity.noContent().build();
+  }
+
+  @Override
   @PutMapping("/{todoId}")
   public ResponseEntity<ApiResult<TodoDetailResponseDto>> updateTodo(
       @AuthenticationPrincipal Long userId,

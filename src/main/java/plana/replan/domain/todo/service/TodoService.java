@@ -287,6 +287,28 @@ public class TodoService {
   }
 
   @Transactional
+  public void deleteTodo(Long userId, Long todoId) {
+    if (userId == null) {
+      throw new CustomException(UserErrorCode.USER_NOT_FOUND);
+    }
+    Todo todo =
+        todoRepository
+            .findById(todoId)
+            .orElseThrow(() -> new CustomException(TodoErrorCode.TODO_NOT_FOUND));
+
+    if (!todo.getUser().getId().equals(userId)) {
+      throw new CustomException(TodoErrorCode.TODO_NOT_FOUND);
+    }
+
+    if (todo.getParent() != null) {
+      throw new CustomException(TodoErrorCode.TODO_NOT_FOUND);
+    }
+
+    todo.getChildren().forEach(child -> child.softDelete());
+    todo.softDelete();
+  }
+
+  @Transactional
   public void deleteSubTodo(Long userId, Long parentId, Long subTodoId) {
     if (userId == null) {
       throw new CustomException(UserErrorCode.USER_NOT_FOUND);
