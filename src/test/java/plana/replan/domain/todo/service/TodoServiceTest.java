@@ -619,43 +619,43 @@ class TodoServiceTest {
   }
 
   @Test
-  @DisplayName("getTodos - priority 정렬: 핀된 투두 먼저, 같은 그룹 내 sortOrder 오름차순")
-  void getTodos_prioritySort_pinnedFirst_thenSortOrder() {
+  @DisplayName("getTodos - priority 정렬: sortOrder 오름차순 (pin 여부 무관)")
+  void getTodos_prioritySort_bySortOrder() {
     User user = testUser();
     given(userRepository.findById(1L)).willReturn(Optional.of(user));
 
-    Todo normal1 = activeTodoWithSort(1L, user, false, 1000.0);
-    Todo normal2 = activeTodoWithSort(2L, user, false, 500.0);
-    Todo pinned = activeTodoWithSort(3L, user, true, 9999.0);
+    Todo t1 = activeTodoWithSort(1L, user, false, 1000.0);
+    Todo t2 = activeTodoWithSort(2L, user, false, 500.0);
+    Todo t3 = activeTodoWithSort(3L, user, true, 9999.0);
 
-    given(todoRepository.findActiveTodosForUser(user))
-        .willReturn(List.of(normal1, pinned, normal2));
+    given(todoRepository.findActiveTodosForUser(user)).willReturn(List.of(t1, t3, t2));
 
     List<TodoListResponseDto> result = todoService.getTodos(1L, "all", "priority");
 
-    assertThat(result).extracting("todoId").containsExactly(3L, 2L, 1L);
+    assertThat(result).extracting("todoId").containsExactly(2L, 1L, 3L);
   }
 
   @Test
-  @DisplayName("getTodos - dueDate 정렬: 핀된 투두 먼저, 마감일 오름차순, null은 마지막")
-  void getTodos_dueDateSort_pinnedFirst_thenDueDate_nullsLast() {
+  @DisplayName("getTodos - dueDate 정렬: 마감일 오름차순, null은 마지막 (pin 여부 무관)")
+  void getTodos_dueDateSort_byDueDate_nullsLast() {
     User user = testUser();
     given(userRepository.findById(1L)).willReturn(Optional.of(user));
 
     LocalDateTime early = LocalDateTime.of(2026, 1, 1, 0, 0);
+    LocalDateTime mid = LocalDateTime.of(2026, 6, 1, 0, 0);
     LocalDateTime late = LocalDateTime.of(2026, 12, 31, 0, 0);
 
     Todo noDate = activeTodoWithDueDate(1L, user, false, null);
     Todo lateDate = activeTodoWithDueDate(2L, user, false, late);
-    Todo earlyDate = activeTodoWithDueDate(3L, user, false, early);
-    Todo pinnedLate = activeTodoWithDueDate(4L, user, true, late);
+    Todo earlyDate = activeTodoWithDueDate(3L, user, true, early);
+    Todo midDate = activeTodoWithDueDate(4L, user, false, mid);
 
     given(todoRepository.findActiveTodosForUser(user))
-        .willReturn(List.of(noDate, lateDate, earlyDate, pinnedLate));
+        .willReturn(List.of(noDate, lateDate, earlyDate, midDate));
 
     List<TodoListResponseDto> result = todoService.getTodos(1L, "all", "dueDate");
 
-    assertThat(result).extracting("todoId").containsExactly(4L, 3L, 2L, 1L);
+    assertThat(result).extracting("todoId").containsExactly(3L, 4L, 2L, 1L);
   }
 
   @Test

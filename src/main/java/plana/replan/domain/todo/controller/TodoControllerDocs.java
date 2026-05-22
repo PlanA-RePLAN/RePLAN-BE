@@ -484,12 +484,12 @@ public interface TodoControllerDocs {
           | `week` | 오늘부터 7일 이내 마감인 미완료 투두 |
           | `month` | 오늘부터 한 달 이내 마감인 미완료 투두 |
 
-          **sort 값별 정렬 기준** (pinned는 항상 최우선)
+          **sort 값별 정렬 기준**
 
           | sort | 정렬 |
           |------|------|
-          | `priority` | isPinned DESC → sortOrder ASC |
-          | `dueDate` | isPinned DESC → dueDate ASC (null 마지막) |
+          | `priority` | sortOrder ASC |
+          | `dueDate` | dueDate ASC (null 마지막) |
 
           **day 필터의 추가 정렬 규칙**
           - 미완료 투두 먼저, 완료 투두 나중 → 각 그룹 내에서 선택한 sort 기준 적용

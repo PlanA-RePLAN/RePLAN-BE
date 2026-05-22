@@ -181,10 +181,9 @@ public class TodoService {
   }
 
   private Comparator<Todo> buildSortComparator(String sort) {
-    Comparator<Todo> pinnedFirst = Comparator.comparing(Todo::isPinned).reversed();
     return switch (sort) {
-      case "priority" -> pinnedFirst.thenComparingDouble(Todo::getSortOrder);
-      case "dueDate" -> pinnedFirst.thenComparing(
+      case "priority" -> Comparator.comparingDouble(Todo::getSortOrder);
+      case "dueDate" -> Comparator.comparing(
           Todo::getDueDate, Comparator.nullsLast(Comparator.naturalOrder()));
       default -> throw new CustomException(TodoErrorCode.INVALID_SORT);
     };
