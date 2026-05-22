@@ -32,6 +32,10 @@ public class TagService {
             .findById(userId)
             .orElseThrow(() -> new CustomException(UserErrorCode.USER_NOT_FOUND));
 
+    if (request.getTitle() == null || request.getTitle().isBlank()) {
+      throw new CustomException(GlobalErrorCode.INVALID_INPUT);
+    }
+
     Tag tag = Tag.builder().title(request.getTitle()).color(request.getColor()).user(user).build();
     tagRepository.save(tag);
     return TagResponseDto.from(tag);
