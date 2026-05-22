@@ -49,6 +49,13 @@ public class Routine extends BaseTimeEntity {
   @JoinColumn(name = "goal_id")
   private Goal goal;
 
+  public void update(String title, RoutineType routineType, Integer routineDate, Tag tag) {
+    this.title = requireNonBlank(title);
+    this.routineType = routineType;
+    this.routineDate = routineDate;
+    this.tag = tag;
+  }
+
   @Builder
   public Routine(
       String title,
@@ -58,12 +65,19 @@ public class Routine extends BaseTimeEntity {
       User user,
       Tag tag,
       Goal goal) {
-    this.title = Objects.requireNonNull(title, "제목은 필수입니다.");
+    this.title = requireNonBlank(title);
     this.user = Objects.requireNonNull(user, "유저는 필수입니다.");
     this.dueDate = dueDate;
     this.routineType = routineType;
     this.routineDate = routineDate;
     this.tag = tag;
     this.goal = goal;
+  }
+
+  private static String requireNonBlank(String title) {
+    if (title == null || title.isBlank()) {
+      throw new IllegalArgumentException("제목은 필수입니다.");
+    }
+    return title;
   }
 }

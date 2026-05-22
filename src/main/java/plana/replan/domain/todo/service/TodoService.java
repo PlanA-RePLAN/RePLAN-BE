@@ -9,15 +9,23 @@ import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import plana.replan.domain.routine.entity.Routine;
+import plana.replan.domain.routine.entity.RoutineType;
+import plana.replan.domain.routine.exception.RoutineErrorCode;
+import plana.replan.domain.routine.repository.RoutineRepository;
 import plana.replan.domain.tag.entity.Tag;
 import plana.replan.domain.tag.exception.TagErrorCode;
 import plana.replan.domain.tag.repository.TagRepository;
 import plana.replan.domain.todo.dto.SubTodoCreateRequestDto;
 import plana.replan.domain.todo.dto.SubTodoUpdateRequestDto;
+import plana.replan.domain.todo.dto.TodoCompleteRequestDto;
 import plana.replan.domain.todo.dto.TodoCreateRequestDto;
 import plana.replan.domain.todo.dto.TodoDetailResponseDto;
 import plana.replan.domain.todo.dto.TodoListResponseDto;
+import plana.replan.domain.todo.dto.TodoOrderRequestDto;
+import plana.replan.domain.todo.dto.TodoPinRequestDto;
 import plana.replan.domain.todo.dto.TodoResponseDto;
+import plana.replan.domain.todo.dto.TodoUpdateRequestDto;
 import plana.replan.domain.todo.entity.Todo;
 import plana.replan.domain.todo.exception.TodoErrorCode;
 import plana.replan.domain.todo.repository.TodoRepository;
@@ -25,6 +33,7 @@ import plana.replan.domain.user.entity.User;
 import plana.replan.domain.user.exception.UserErrorCode;
 import plana.replan.domain.user.repository.UserRepository;
 import plana.replan.global.exception.CustomException;
+import plana.replan.global.exception.GlobalErrorCode;
 
 @Service
 @RequiredArgsConstructor
@@ -33,6 +42,7 @@ public class TodoService {
   private final TodoRepository todoRepository;
   private final UserRepository userRepository;
   private final TagRepository tagRepository;
+  private final RoutineRepository routineRepository;
 
   @Transactional
   public TodoResponseDto createTodo(Long userId, TodoCreateRequestDto request) {
@@ -50,6 +60,9 @@ public class TodoService {
           tagRepository
               .findById(request.getTagId())
               .orElseThrow(() -> new CustomException(TagErrorCode.TAG_NOT_FOUND));
+      if (!tag.getUser().getId().equals(userId)) {
+        throw new CustomException(TagErrorCode.TAG_NOT_FOUND);
+      }
     }
 
     Todo todo =
@@ -116,6 +129,22 @@ public class TodoService {
   }
 
   @Transactional(readOnly = true)
+  public List<TodoListResponseDto> getPinnedTodos(Long userId) {
+    if (userId == null) {
+      throw new CustomException(UserErrorCode.USER_NOT_FOUND);
+    }
+    User user =
+        userRepository
+            .findById(userId)
+            .orElseThrow(() -> new CustomException(UserErrorCode.USER_NOT_FOUND));
+
+    return todoRepository.findPinnedActiveTodosForUser(user).stream()
+        .sorted(Comparator.comparingDouble(Todo::getSortOrder))
+        .map(TodoListResponseDto::from)
+        .collect(Collectors.toList());
+  }
+
+  @Transactional(readOnly = true)
   public List<TodoListResponseDto> getTodos(Long userId, String filter, String sort) {
     if (userId == null) {
       throw new CustomException(UserErrorCode.USER_NOT_FOUND);
@@ -174,13 +203,97 @@ public class TodoService {
   }
 
   private Comparator<Todo> buildSortComparator(String sort) {
-    Comparator<Todo> pinnedFirst = Comparator.comparing(Todo::isPinned).reversed();
     return switch (sort) {
-      case "priority" -> pinnedFirst.thenComparingDouble(Todo::getSortOrder);
-      case "dueDate" -> pinnedFirst.thenComparing(
+      case "priority" -> Comparator.comparingDouble(Todo::getSortOrder);
+      case "dueDate" -> Comparator.comparing(
           Todo::getDueDate, Comparator.nullsLast(Comparator.naturalOrder()));
       default -> throw new CustomException(TodoErrorCode.INVALID_SORT);
     };
+  }
+
+  @Transactional
+  public TodoDetailResponseDto updateTodo(Long userId, Long todoId, TodoUpdateRequestDto request) {
+    if (userId == null) {
+      throw new CustomException(UserErrorCode.USER_NOT_FOUND);
+    }
+    Todo todo =
+        todoRepository
+            .findById(todoId)
+            .orElseThrow(() -> new CustomException(TodoErrorCode.TODO_NOT_FOUND));
+
+    if (!todo.getUser().getId().equals(userId)) {
+      throw new CustomException(TodoErrorCode.TODO_NOT_FOUND);
+    }
+
+    Tag tag = null;
+    if (request.getTagId() != null) {
+      tag =
+          tagRepository
+              .findById(request.getTagId())
+              .orElseThrow(() -> new CustomException(TagErrorCode.TAG_NOT_FOUND));
+      if (!tag.getUser().getId().equals(userId)) {
+        throw new CustomException(TagErrorCode.TAG_NOT_FOUND);
+      }
+    }
+
+    if (request.getTitle() != null && request.getTitle().isBlank()) {
+      throw new CustomException(GlobalErrorCode.INVALID_INPUT);
+    }
+
+    if (request.getRoutineType() != null) {
+      validateRoutineDate(request.getRoutineType(), request.getRoutineDate());
+    }
+
+    if (request.getTitle() != null) {
+      todo.updateTitle(request.getTitle());
+    }
+    todo.updateDueDate(request.getDueDate());
+    todo.updateTag(tag);
+    handleRoutineUpdate(todo, request, tag);
+
+    return TodoDetailResponseDto.from(todo);
+  }
+
+  private void handleRoutineUpdate(Todo todo, TodoUpdateRequestDto request, Tag tag) {
+    Routine existingRoutine = todo.getRoutine();
+
+    if (request.getRoutineType() == null) {
+      if (existingRoutine != null) {
+        existingRoutine.softDelete();
+        todo.updateRoutine(null);
+      }
+      return;
+    }
+
+    Integer routineDate =
+        request.getRoutineType() == RoutineType.DAILY ? null : request.getRoutineDate();
+
+    if (existingRoutine != null) {
+      existingRoutine.update(todo.getTitle(), request.getRoutineType(), routineDate, tag);
+    } else {
+      Routine newRoutine =
+          routineRepository.save(
+              Routine.builder()
+                  .title(todo.getTitle())
+                  .routineType(request.getRoutineType())
+                  .routineDate(routineDate)
+                  .user(todo.getUser())
+                  .tag(tag)
+                  .build());
+      todo.updateRoutine(newRoutine);
+    }
+  }
+
+  private void validateRoutineDate(RoutineType routineType, Integer routineDate) {
+    if (routineType == RoutineType.WEEKLY) {
+      if (routineDate == null || routineDate < 1 || routineDate > 127) {
+        throw new CustomException(RoutineErrorCode.ROUTINE_INVALID_DATE);
+      }
+    } else if (routineType == RoutineType.MONTHLY) {
+      if (routineDate == null || routineDate < 1 || routineDate > 31) {
+        throw new CustomException(RoutineErrorCode.ROUTINE_INVALID_DATE);
+      }
+    }
   }
 
   @Transactional(readOnly = true)
@@ -195,6 +308,123 @@ public class TodoService {
     }
 
     return TodoDetailResponseDto.from(todo);
+  }
+
+  @Transactional
+  public TodoListResponseDto reorderTodo(Long userId, Long todoId, TodoOrderRequestDto request) {
+    if (userId == null) {
+      throw new CustomException(UserErrorCode.USER_NOT_FOUND);
+    }
+    Todo todo =
+        todoRepository
+            .findById(todoId)
+            .orElseThrow(() -> new CustomException(TodoErrorCode.TODO_NOT_FOUND));
+
+    if (!todo.getUser().getId().equals(userId)) {
+      throw new CustomException(TodoErrorCode.TODO_NOT_FOUND);
+    }
+
+    if (todo.getParent() != null) {
+      throw new CustomException(TodoErrorCode.TODO_NOT_FOUND);
+    }
+
+    if (request.getPrevTodoId() == null && request.getNextTodoId() == null) {
+      throw new CustomException(GlobalErrorCode.INVALID_INPUT);
+    }
+
+    double prevSortOrder = 0;
+    if (request.getPrevTodoId() != null) {
+      Todo prev =
+          todoRepository
+              .findById(request.getPrevTodoId())
+              .orElseThrow(() -> new CustomException(TodoErrorCode.TODO_NOT_FOUND));
+      if (!prev.getUser().getId().equals(userId) || prev.getParent() != null) {
+        throw new CustomException(TodoErrorCode.TODO_NOT_FOUND);
+      }
+      prevSortOrder = prev.getSortOrder();
+    }
+
+    double nextSortOrder = prevSortOrder + 20000;
+    if (request.getNextTodoId() != null) {
+      Todo next =
+          todoRepository
+              .findById(request.getNextTodoId())
+              .orElseThrow(() -> new CustomException(TodoErrorCode.TODO_NOT_FOUND));
+      if (!next.getUser().getId().equals(userId) || next.getParent() != null) {
+        throw new CustomException(TodoErrorCode.TODO_NOT_FOUND);
+      }
+      nextSortOrder = next.getSortOrder();
+    }
+
+    todo.updateSortOrder((prevSortOrder + nextSortOrder) / 2);
+    return TodoListResponseDto.from(todo);
+  }
+
+  @Transactional
+  public TodoListResponseDto completeTodo(
+      Long userId, Long todoId, TodoCompleteRequestDto request) {
+    if (userId == null) {
+      throw new CustomException(UserErrorCode.USER_NOT_FOUND);
+    }
+    Todo todo =
+        todoRepository
+            .findById(todoId)
+            .orElseThrow(() -> new CustomException(TodoErrorCode.TODO_NOT_FOUND));
+
+    if (!todo.getUser().getId().equals(userId)) {
+      throw new CustomException(TodoErrorCode.TODO_NOT_FOUND);
+    }
+
+    if (todo.getParent() != null) {
+      throw new CustomException(TodoErrorCode.TODO_NOT_FOUND);
+    }
+
+    todo.updateCompleted(request.getIsCompleted());
+    return TodoListResponseDto.from(todo);
+  }
+
+  @Transactional
+  public TodoListResponseDto pinTodo(Long userId, Long todoId, TodoPinRequestDto request) {
+    if (userId == null) {
+      throw new CustomException(UserErrorCode.USER_NOT_FOUND);
+    }
+    Todo todo =
+        todoRepository
+            .findById(todoId)
+            .orElseThrow(() -> new CustomException(TodoErrorCode.TODO_NOT_FOUND));
+
+    if (!todo.getUser().getId().equals(userId)) {
+      throw new CustomException(TodoErrorCode.TODO_NOT_FOUND);
+    }
+
+    if (todo.getParent() != null) {
+      throw new CustomException(TodoErrorCode.TODO_NOT_FOUND);
+    }
+
+    todo.updatePinned(request.getIsPinned());
+    return TodoListResponseDto.from(todo);
+  }
+
+  @Transactional
+  public void deleteTodo(Long userId, Long todoId) {
+    if (userId == null) {
+      throw new CustomException(UserErrorCode.USER_NOT_FOUND);
+    }
+    Todo todo =
+        todoRepository
+            .findById(todoId)
+            .orElseThrow(() -> new CustomException(TodoErrorCode.TODO_NOT_FOUND));
+
+    if (!todo.getUser().getId().equals(userId)) {
+      throw new CustomException(TodoErrorCode.TODO_NOT_FOUND);
+    }
+
+    if (todo.getParent() != null) {
+      throw new CustomException(TodoErrorCode.TODO_NOT_FOUND);
+    }
+
+    todo.getChildren().forEach(child -> child.softDelete());
+    todo.softDelete();
   }
 
   @Transactional

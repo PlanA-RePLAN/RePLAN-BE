@@ -17,14 +17,895 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 import plana.replan.domain.todo.dto.SubTodoCreateRequestDto;
 import plana.replan.domain.todo.dto.SubTodoUpdateRequestDto;
+import plana.replan.domain.todo.dto.TodoCompleteRequestDto;
 import plana.replan.domain.todo.dto.TodoCreateRequestDto;
 import plana.replan.domain.todo.dto.TodoDetailResponseDto;
 import plana.replan.domain.todo.dto.TodoListResponseDto;
+import plana.replan.domain.todo.dto.TodoOrderRequestDto;
+import plana.replan.domain.todo.dto.TodoPinRequestDto;
 import plana.replan.domain.todo.dto.TodoResponseDto;
+import plana.replan.domain.todo.dto.TodoUpdateRequestDto;
 import plana.replan.global.common.ApiResult;
 
 @Tag(name = "Todo", description = "투두 관련 API")
 public interface TodoControllerDocs {
+
+  @Operation(
+      summary = "핀된 투두 목록 조회",
+      description =
+          """
+          **호출 주체**: AccessToken을 보유한 인증 사용자
+
+          **요청 방법**: `Authorization: Bearer {accessToken}` 헤더 필수
+
+          **Request Headers**
+
+          | 헤더명 | 필수 여부 | 타입 | 설명 |
+          |--------|-----------|------|------|
+          | Authorization | ✅ 필수 | string | `Bearer {accessToken}` 형식의 JWT 액세스 토큰 |
+
+          **조회 조건**: 미완료 + 핀된(`isPinned = true`) 부모 투두만 반환
+
+          **정렬**: sortOrder ASC
+          """,
+      security = @SecurityRequirement(name = "Bearer Authentication"))
+  @ApiResponses({
+    @ApiResponse(
+        responseCode = "200",
+        description = "핀된 투두 목록 조회 성공",
+        content =
+            @Content(
+                examples =
+                    @ExampleObject(
+                        value =
+                            """
+                            {
+                              "status": 200,
+                              "success": true,
+                              "data": [
+                                {
+                                  "todoId": 3,
+                                  "title": "토익 시험 접수",
+                                  "dueDate": "2025-12-31T23:59:59",
+                                  "isPinned": true,
+                                  "sortOrder": 500.0,
+                                  "isCompleted": false,
+                                  "tagId": 3,
+                                  "tagTitle": "영어",
+                                  "tagColor": "BLUE",
+                                  "routineType": null,
+                                  "isOverdue": false
+                                }
+                              ],
+                              "error": null
+                            }
+                            """))),
+    @ApiResponse(
+        responseCode = "401",
+        description = "AccessToken 없음 또는 만료",
+        content =
+            @Content(
+                examples = {
+                  @ExampleObject(
+                      name = "토큰 없음",
+                      value =
+                          """
+                          {
+                            "status": 401,
+                            "success": false,
+                            "data": null,
+                            "error": {
+                              "code": "EMPTY_TOKEN",
+                              "message": "토큰이 없습니다.",
+                              "detail": null
+                            }
+                          }
+                          """),
+                  @ExampleObject(
+                      name = "만료된 토큰",
+                      value =
+                          """
+                          {
+                            "status": 401,
+                            "success": false,
+                            "data": null,
+                            "error": {
+                              "code": "EXPIRED_TOKEN",
+                              "message": "만료된 토큰입니다.",
+                              "detail": null
+                            }
+                          }
+                          """)
+                }))
+  })
+  ResponseEntity<ApiResult<List<TodoListResponseDto>>> getPinnedTodos(
+      @AuthenticationPrincipal Long userId);
+
+  @Operation(
+      summary = "투두 우선순위 변경",
+      description =
+          """
+          **호출 주체**: AccessToken을 보유한 인증 사용자
+
+          **요청 방법**: `Authorization: Bearer {accessToken}` 헤더 필수
+
+          **Request Headers**
+
+          | 헤더명 | 필수 여부 | 타입 | 설명 |
+          |--------|-----------|------|------|
+          | Authorization | ✅ 필수 | string | `Bearer {accessToken}` 형식의 JWT 액세스 토큰 |
+          | Content-Type | ✅ 필수 | string | `application/json` |
+
+          **Path Variable**
+
+          | 파라미터명 | 필수 여부 | 타입 | 설명 | 예시 |
+          |-----------|-----------|------|------|------|
+          | todoId | ✅ 필수 | integer | 순서를 변경할 투두 ID | `3` |
+
+          **Request Body**
+
+          | 필드명 | 필수 여부 | 타입 | 설명 | 예시 |
+          |--------|-----------|------|------|------|
+          | prevTodoId | ❌ 선택 | integer | 바로 앞에 위치할 투두의 ID. 맨 앞으로 이동 시 null | `1` |
+          | nextTodoId | ❌ 선택 | integer | 바로 뒤에 위치할 투두의 ID. 맨 뒤로 이동 시 null | `5` |
+
+          **제약 조건**: `prevTodoId`와 `nextTodoId`를 동시에 null로 보내면 400 반환
+
+          **정렬 방식**: `sortOrder = (prevTodoId의 sortOrder + nextTodoId의 sortOrder) / 2`
+          - 맨 앞으로 이동 시: `prevSortOrder = 0` 으로 계산
+          - 맨 뒤로 이동 시: `nextSortOrder = prevSortOrder + 20000` 으로 계산
+
+          **제약 조건**: 하위 투두(sub-todo)는 순서 변경 불가
+          """,
+      security = @SecurityRequirement(name = "Bearer Authentication"))
+  @ApiResponses({
+    @ApiResponse(
+        responseCode = "200",
+        description = "우선순위 변경 성공",
+        content =
+            @Content(
+                examples =
+                    @ExampleObject(
+                        value =
+                            """
+                            {
+                              "status": 200,
+                              "success": true,
+                              "data": {
+                                "todoId": 3,
+                                "title": "토익 단어 50개 외우기",
+                                "dueDate": null,
+                                "isPinned": false,
+                                "sortOrder": 15000.0,
+                                "isCompleted": false,
+                                "tagId": null,
+                                "tagTitle": null,
+                                "tagColor": null,
+                                "routineType": null,
+                                "isOverdue": false
+                              },
+                              "error": null
+                            }
+                            """))),
+    @ApiResponse(
+        responseCode = "400",
+        description = "prevTodoId와 nextTodoId 모두 null",
+        content =
+            @Content(
+                examples =
+                    @ExampleObject(
+                        value =
+                            """
+                            {
+                              "status": 400,
+                              "success": false,
+                              "data": null,
+                              "error": {
+                                "code": "INVALID_INPUT",
+                                "message": "잘못된 입력입니다.",
+                                "detail": null
+                              }
+                            }
+                            """))),
+    @ApiResponse(
+        responseCode = "401",
+        description = "AccessToken 없음 또는 만료",
+        content =
+            @Content(
+                examples = {
+                  @ExampleObject(
+                      name = "토큰 없음",
+                      value =
+                          """
+                          {
+                            "status": 401,
+                            "success": false,
+                            "data": null,
+                            "error": {
+                              "code": "EMPTY_TOKEN",
+                              "message": "토큰이 없습니다.",
+                              "detail": null
+                            }
+                          }
+                          """),
+                  @ExampleObject(
+                      name = "만료된 토큰",
+                      value =
+                          """
+                          {
+                            "status": 401,
+                            "success": false,
+                            "data": null,
+                            "error": {
+                              "code": "EXPIRED_TOKEN",
+                              "message": "만료된 토큰입니다.",
+                              "detail": null
+                            }
+                          }
+                          """)
+                })),
+    @ApiResponse(
+        responseCode = "404",
+        description = "투두를 찾을 수 없음 (존재하지 않거나 본인 소유가 아니거나 하위 투두인 경우)",
+        content =
+            @Content(
+                examples =
+                    @ExampleObject(
+                        value =
+                            """
+                            {
+                              "status": 404,
+                              "success": false,
+                              "data": null,
+                              "error": {
+                                "code": "TODO_NOT_FOUND",
+                                "message": "투두를 찾을 수 없습니다.",
+                                "detail": null
+                              }
+                            }
+                            """)))
+  })
+  ResponseEntity<ApiResult<TodoListResponseDto>> reorderTodo(
+      @AuthenticationPrincipal Long userId,
+      @Parameter(description = "순서를 변경할 투두 ID", example = "3") @PathVariable Long todoId,
+      @Valid @RequestBody TodoOrderRequestDto request);
+
+  @Operation(
+      summary = "투두 완료/미완료 처리",
+      description =
+          """
+          **호출 주체**: AccessToken을 보유한 인증 사용자
+
+          **요청 방법**: `Authorization: Bearer {accessToken}` 헤더 필수
+
+          **Request Headers**
+
+          | 헤더명 | 필수 여부 | 타입 | 설명 |
+          |--------|-----------|------|------|
+          | Authorization | ✅ 필수 | string | `Bearer {accessToken}` 형식의 JWT 액세스 토큰 |
+          | Content-Type | ✅ 필수 | string | `application/json` |
+
+          **Path Variable**
+
+          | 파라미터명 | 필수 여부 | 타입 | 설명 | 예시 |
+          |-----------|-----------|------|------|------|
+          | todoId | ✅ 필수 | integer | 완료/미완료 처리할 투두 ID | `1` |
+
+          **Request Body**
+
+          | 필드명 | 필수 여부 | 타입 | 설명 | 예시 |
+          |--------|-----------|------|------|------|
+          | isCompleted | ✅ 필수 | boolean | `true`면 완료, `false`면 미완료 처리 | `true` |
+
+          **동작**: 완료 처리 시 `completedTime`이 현재 시각으로 기록되고, 미완료 처리 시 `null`로 초기화됨
+
+          **제약 조건**: 하위 투두(sub-todo)는 이 API로 처리 불가 — todoId가 하위 투두인 경우 404 반환
+          """,
+      security = @SecurityRequirement(name = "Bearer Authentication"))
+  @ApiResponses({
+    @ApiResponse(
+        responseCode = "200",
+        description = "완료/미완료 처리 성공",
+        content =
+            @Content(
+                examples = {
+                  @ExampleObject(
+                      name = "완료 처리",
+                      value =
+                          """
+                          {
+                            "status": 200,
+                            "success": true,
+                            "data": {
+                              "todoId": 1,
+                              "title": "토익 단어 50개 외우기",
+                              "dueDate": null,
+                              "isPinned": false,
+                              "sortOrder": 1000.0,
+                              "isCompleted": true,
+                              "tagId": null,
+                              "tagTitle": null,
+                              "tagColor": null,
+                              "routineType": null,
+                              "isOverdue": false
+                            },
+                            "error": null
+                          }
+                          """),
+                  @ExampleObject(
+                      name = "미완료 처리",
+                      value =
+                          """
+                          {
+                            "status": 200,
+                            "success": true,
+                            "data": {
+                              "todoId": 1,
+                              "title": "토익 단어 50개 외우기",
+                              "dueDate": null,
+                              "isPinned": false,
+                              "sortOrder": 1000.0,
+                              "isCompleted": false,
+                              "tagId": null,
+                              "tagTitle": null,
+                              "tagColor": null,
+                              "routineType": null,
+                              "isOverdue": false
+                            },
+                            "error": null
+                          }
+                          """)
+                })),
+    @ApiResponse(
+        responseCode = "400",
+        description = "isCompleted 누락",
+        content =
+            @Content(
+                examples =
+                    @ExampleObject(
+                        value =
+                            """
+                            {
+                              "status": 400,
+                              "success": false,
+                              "data": null,
+                              "error": {
+                                "code": "INVALID_INPUT",
+                                "message": "잘못된 입력입니다.",
+                                "detail": null
+                              }
+                            }
+                            """))),
+    @ApiResponse(
+        responseCode = "401",
+        description = "AccessToken 없음 또는 만료",
+        content =
+            @Content(
+                examples = {
+                  @ExampleObject(
+                      name = "토큰 없음",
+                      value =
+                          """
+                          {
+                            "status": 401,
+                            "success": false,
+                            "data": null,
+                            "error": {
+                              "code": "EMPTY_TOKEN",
+                              "message": "토큰이 없습니다.",
+                              "detail": null
+                            }
+                          }
+                          """),
+                  @ExampleObject(
+                      name = "만료된 토큰",
+                      value =
+                          """
+                          {
+                            "status": 401,
+                            "success": false,
+                            "data": null,
+                            "error": {
+                              "code": "EXPIRED_TOKEN",
+                              "message": "만료된 토큰입니다.",
+                              "detail": null
+                            }
+                          }
+                          """)
+                })),
+    @ApiResponse(
+        responseCode = "404",
+        description = "투두를 찾을 수 없음 (존재하지 않거나 본인 소유가 아니거나 하위 투두인 경우)",
+        content =
+            @Content(
+                examples =
+                    @ExampleObject(
+                        value =
+                            """
+                            {
+                              "status": 404,
+                              "success": false,
+                              "data": null,
+                              "error": {
+                                "code": "TODO_NOT_FOUND",
+                                "message": "투두를 찾을 수 없습니다.",
+                                "detail": null
+                              }
+                            }
+                            """)))
+  })
+  ResponseEntity<ApiResult<TodoListResponseDto>> completeTodo(
+      @AuthenticationPrincipal Long userId,
+      @Parameter(description = "완료/미완료 처리할 투두 ID", example = "1") @PathVariable Long todoId,
+      @Valid @RequestBody TodoCompleteRequestDto request);
+
+  @Operation(
+      summary = "투두 핀/언핀",
+      description =
+          """
+          **호출 주체**: AccessToken을 보유한 인증 사용자
+
+          **요청 방법**: `Authorization: Bearer {accessToken}` 헤더 필수
+
+          **Request Headers**
+
+          | 헤더명 | 필수 여부 | 타입 | 설명 |
+          |--------|-----------|------|------|
+          | Authorization | ✅ 필수 | string | `Bearer {accessToken}` 형식의 JWT 액세스 토큰 |
+          | Content-Type | ✅ 필수 | string | `application/json` |
+
+          **Path Variable**
+
+          | 파라미터명 | 필수 여부 | 타입 | 설명 | 예시 |
+          |-----------|-----------|------|------|------|
+          | todoId | ✅ 필수 | integer | 핀/언핀할 투두 ID | `1` |
+
+          **Request Body**
+
+          | 필드명 | 필수 여부 | 타입 | 설명 | 예시 |
+          |--------|-----------|------|------|------|
+          | isPinned | ✅ 필수 | boolean | `true`면 핀, `false`면 언핀 | `true` |
+
+          **제약 조건**: 하위 투두(sub-todo)는 핀 불가 — todoId가 하위 투두인 경우 404 반환
+          """,
+      security = @SecurityRequirement(name = "Bearer Authentication"))
+  @ApiResponses({
+    @ApiResponse(
+        responseCode = "200",
+        description = "핀/언핀 성공",
+        content =
+            @Content(
+                examples = {
+                  @ExampleObject(
+                      name = "핀",
+                      value =
+                          """
+                          {
+                            "status": 200,
+                            "success": true,
+                            "data": {
+                              "todoId": 1,
+                              "title": "토익 단어 50개 외우기",
+                              "dueDate": null,
+                              "isPinned": true,
+                              "sortOrder": 1000.0,
+                              "isCompleted": false,
+                              "tagId": null,
+                              "tagTitle": null,
+                              "tagColor": null,
+                              "routineType": null,
+                              "isOverdue": false
+                            },
+                            "error": null
+                          }
+                          """),
+                  @ExampleObject(
+                      name = "언핀",
+                      value =
+                          """
+                          {
+                            "status": 200,
+                            "success": true,
+                            "data": {
+                              "todoId": 1,
+                              "title": "토익 단어 50개 외우기",
+                              "dueDate": null,
+                              "isPinned": false,
+                              "sortOrder": 1000.0,
+                              "isCompleted": false,
+                              "tagId": null,
+                              "tagTitle": null,
+                              "tagColor": null,
+                              "routineType": null,
+                              "isOverdue": false
+                            },
+                            "error": null
+                          }
+                          """)
+                })),
+    @ApiResponse(
+        responseCode = "400",
+        description = "isPinned 누락",
+        content =
+            @Content(
+                examples =
+                    @ExampleObject(
+                        value =
+                            """
+                            {
+                              "status": 400,
+                              "success": false,
+                              "data": null,
+                              "error": {
+                                "code": "INVALID_INPUT",
+                                "message": "잘못된 입력입니다.",
+                                "detail": null
+                              }
+                            }
+                            """))),
+    @ApiResponse(
+        responseCode = "401",
+        description = "AccessToken 없음 또는 만료",
+        content =
+            @Content(
+                examples = {
+                  @ExampleObject(
+                      name = "토큰 없음",
+                      value =
+                          """
+                          {
+                            "status": 401,
+                            "success": false,
+                            "data": null,
+                            "error": {
+                              "code": "EMPTY_TOKEN",
+                              "message": "토큰이 없습니다.",
+                              "detail": null
+                            }
+                          }
+                          """),
+                  @ExampleObject(
+                      name = "만료된 토큰",
+                      value =
+                          """
+                          {
+                            "status": 401,
+                            "success": false,
+                            "data": null,
+                            "error": {
+                              "code": "EXPIRED_TOKEN",
+                              "message": "만료된 토큰입니다.",
+                              "detail": null
+                            }
+                          }
+                          """)
+                })),
+    @ApiResponse(
+        responseCode = "404",
+        description = "투두를 찾을 수 없음 (존재하지 않거나 본인 소유가 아니거나 하위 투두인 경우)",
+        content =
+            @Content(
+                examples =
+                    @ExampleObject(
+                        value =
+                            """
+                            {
+                              "status": 404,
+                              "success": false,
+                              "data": null,
+                              "error": {
+                                "code": "TODO_NOT_FOUND",
+                                "message": "투두를 찾을 수 없습니다.",
+                                "detail": null
+                              }
+                            }
+                            """)))
+  })
+  ResponseEntity<ApiResult<TodoListResponseDto>> pinTodo(
+      @AuthenticationPrincipal Long userId,
+      @Parameter(description = "핀/언핀할 투두 ID", example = "1") @PathVariable Long todoId,
+      @Valid @RequestBody TodoPinRequestDto request);
+
+  @Operation(
+      summary = "투두 삭제",
+      description =
+          """
+          **호출 주체**: AccessToken을 보유한 인증 사용자
+
+          **요청 방법**: `Authorization: Bearer {accessToken}` 헤더 필수
+
+          **Request Headers**
+
+          | 헤더명 | 필수 여부 | 타입 | 설명 |
+          |--------|-----------|------|------|
+          | Authorization | ✅ 필수 | string | `Bearer {accessToken}` 형식의 JWT 액세스 토큰 |
+
+          **Path Variable**
+
+          | 파라미터명 | 필수 여부 | 타입 | 설명 | 예시 |
+          |-----------|-----------|------|------|------|
+          | todoId | ✅ 필수 | integer | 삭제할 투두 ID | `1` |
+
+          **비즈니스 로직**
+          1. todoId로 투두 조회
+          2. 요청 유저 소유인지 검증
+          3. 하위 투두(sub-todo)의 ID를 직접 전달한 경우 404 반환
+          4. 하위 투두가 있으면 모두 함께 soft delete
+          5. 투두 soft delete (deleted_at 설정)
+          6. 연결된 루틴은 삭제하지 않음 (루틴은 계속 미래 투두를 생성함)
+          """,
+      security = @SecurityRequirement(name = "Bearer Authentication"))
+  @ApiResponses({
+    @ApiResponse(responseCode = "204", description = "투두 삭제 성공"),
+    @ApiResponse(
+        responseCode = "401",
+        description = "AccessToken 없음 또는 만료",
+        content =
+            @Content(
+                examples = {
+                  @ExampleObject(
+                      name = "토큰 없음",
+                      value =
+                          """
+                          {
+                            "status": 401,
+                            "success": false,
+                            "data": null,
+                            "error": {
+                              "code": "EMPTY_TOKEN",
+                              "message": "토큰이 없습니다.",
+                              "detail": null
+                            }
+                          }
+                          """),
+                  @ExampleObject(
+                      name = "만료된 토큰",
+                      value =
+                          """
+                          {
+                            "status": 401,
+                            "success": false,
+                            "data": null,
+                            "error": {
+                              "code": "EXPIRED_TOKEN",
+                              "message": "만료된 토큰입니다.",
+                              "detail": null
+                            }
+                          }
+                          """)
+                })),
+    @ApiResponse(
+        responseCode = "404",
+        description = "투두를 찾을 수 없음 (존재하지 않거나 본인 소유가 아니거나 하위 투두 ID인 경우)",
+        content =
+            @Content(
+                examples =
+                    @ExampleObject(
+                        value =
+                            """
+                            {
+                              "status": 404,
+                              "success": false,
+                              "data": null,
+                              "error": {
+                                "code": "TODO_NOT_FOUND",
+                                "message": "투두를 찾을 수 없습니다.",
+                                "detail": null
+                              }
+                            }
+                            """)))
+  })
+  ResponseEntity<Void> deleteTodo(
+      @AuthenticationPrincipal Long userId,
+      @Parameter(description = "삭제할 투두 ID", example = "1") @PathVariable Long todoId);
+
+  @Operation(
+      summary = "투두 수정",
+      description =
+          """
+          **호출 주체**: AccessToken을 보유한 인증 사용자
+
+          **요청 방법**: `Authorization: Bearer {accessToken}` 헤더 필수
+
+          **Request Headers**
+
+          | 헤더명 | 필수 여부 | 타입 | 설명 |
+          |--------|-----------|------|------|
+          | Authorization | ✅ 필수 | string | `Bearer {accessToken}` 형식의 JWT 액세스 토큰 |
+          | Content-Type | ✅ 필수 | string | `application/json` |
+
+          **Path Variable**
+
+          | 파라미터명 | 필수 여부 | 타입 | 설명 | 예시 |
+          |-----------|-----------|------|------|------|
+          | todoId | ✅ 필수 | integer | 수정할 투두 ID | `1` |
+
+          **Request Body**
+
+          | 필드명 | 필수 여부 | 타입 | 설명 | 예시 |
+          |--------|-----------|------|------|------|
+          | title | ❌ 선택 | string | 투두 제목. null이면 변경하지 않음. 빈 문자열 불가 | `"토익 단어 50개 외우기"` |
+          | dueDate | ❌ 선택 | string | 마감 일시 (ISO 8601 형식). null이면 마감일 제거 | `"2025-12-31T23:59:59"` |
+          | tagId | ❌ 선택 | integer | 태그 ID. null이면 태그 제거 | `3` |
+          | routineType | ❌ 선택 | string | 반복 유형 (`DAILY`/`WEEKLY`/`MONTHLY`). null이면 반복 없음 | `"WEEKLY"` |
+          | routineDate | ❌ 선택 | integer | 반복 날짜 (WEEKLY: 1-127 비트마스크, MONTHLY: 1-31). DAILY는 null | `5` |
+
+          ❌ 선택 필드는 생략하거나 null로 전달해도 동일하게 처리됩니다.
+
+          **반복(routine) 처리 규칙**
+
+          | 기존 상태 | routineType 값 | 동작 |
+          |----------|---------------|------|
+          | 반복 있음 | `null` | 기존 루틴 삭제, 투두를 일반 투두로 변경 |
+          | 반복 있음 | 유형 값 | 기존 루틴의 유형·날짜·제목·태그 업데이트 |
+          | 반복 없음 | `null` | 변경 없음 |
+          | 반복 없음 | 유형 값 | 새 루틴 생성 후 투두에 연결 |
+          """,
+      security = @SecurityRequirement(name = "Bearer Authentication"))
+  @ApiResponses({
+    @ApiResponse(
+        responseCode = "200",
+        description = "투두 수정 성공",
+        content =
+            @Content(
+                examples =
+                    @ExampleObject(
+                        value =
+                            """
+                            {
+                              "status": 200,
+                              "success": true,
+                              "data": {
+                                "todoId": 1,
+                                "title": "토익 단어 50개 외우기 (수정)",
+                                "dueDate": "2025-12-31T23:59:59",
+                                "isCompleted": false,
+                                "tagId": 3,
+                                "tagTitle": "영어",
+                                "tagColor": "BLUE",
+                                "routineType": "WEEKLY",
+                                "subTodos": []
+                              },
+                              "error": null
+                            }
+                            """))),
+    @ApiResponse(
+        responseCode = "400",
+        description = "입력값 오류",
+        content =
+            @Content(
+                examples = {
+                  @ExampleObject(
+                      name = "title 빈 문자열",
+                      value =
+                          """
+                          {
+                            "status": 400,
+                            "success": false,
+                            "data": null,
+                            "error": {
+                              "code": "INVALID_INPUT",
+                              "message": "잘못된 입력입니다.",
+                              "detail": null
+                            }
+                          }
+                          """),
+                  @ExampleObject(
+                      name = "잘못된 반복 날짜",
+                      value =
+                          """
+                          {
+                            "status": 400,
+                            "success": false,
+                            "data": null,
+                            "error": {
+                              "code": "ROUTINE_INVALID_DATE",
+                              "message": "유효하지 않은 반복 날짜입니다.",
+                              "detail": null
+                            }
+                          }
+                          """)
+                })),
+    @ApiResponse(
+        responseCode = "401",
+        description = "AccessToken 없음 또는 만료",
+        content =
+            @Content(
+                examples = {
+                  @ExampleObject(
+                      name = "토큰 없음",
+                      value =
+                          """
+                          {
+                            "status": 401,
+                            "success": false,
+                            "data": null,
+                            "error": {
+                              "code": "EMPTY_TOKEN",
+                              "message": "토큰이 없습니다.",
+                              "detail": null
+                            }
+                          }
+                          """),
+                  @ExampleObject(
+                      name = "만료된 토큰",
+                      value =
+                          """
+                          {
+                            "status": 401,
+                            "success": false,
+                            "data": null,
+                            "error": {
+                              "code": "EXPIRED_TOKEN",
+                              "message": "만료된 토큰입니다.",
+                              "detail": null
+                            }
+                          }
+                          """)
+                })),
+    @ApiResponse(
+        responseCode = "404",
+        description = "투두 또는 태그를 찾을 수 없음",
+        content =
+            @Content(
+                examples = {
+                  @ExampleObject(
+                      name = "투두 없음",
+                      value =
+                          """
+                          {
+                            "status": 404,
+                            "success": false,
+                            "data": null,
+                            "error": {
+                              "code": "TODO_NOT_FOUND",
+                              "message": "투두를 찾을 수 없습니다.",
+                              "detail": null
+                            }
+                          }
+                          """),
+                  @ExampleObject(
+                      name = "태그 없음",
+                      value =
+                          """
+                          {
+                            "status": 404,
+                            "success": false,
+                            "data": null,
+                            "error": {
+                              "code": "TAG_NOT_FOUND",
+                              "message": "태그를 찾을 수 없습니다.",
+                              "detail": null
+                            }
+                          }
+                          """)
+                }))
+  })
+  ResponseEntity<ApiResult<TodoDetailResponseDto>> updateTodo(
+      @AuthenticationPrincipal Long userId,
+      @Parameter(description = "수정할 투두 ID", example = "1") @PathVariable Long todoId,
+      @io.swagger.v3.oas.annotations.parameters.RequestBody(
+              content =
+                  @Content(
+                      mediaType = "application/json",
+                      examples = {
+                        @ExampleObject(
+                            name = "전체 필드 포함",
+                            value =
+                                """
+                                {"title": "토익 단어 50개 외우기", "dueDate": "2025-12-31T23:59:59", "tagId": 3, "routineType": "WEEKLY", "routineDate": 5}
+                                """),
+                        @ExampleObject(
+                            name = "필수 필드만 (optional 생략)",
+                            summary = "optional 필드를 생략하면 null로 처리됨",
+                            value =
+                                """
+                                {"title": "토익 단어 50개 외우기"}
+                                """)
+                      }))
+          @Valid
+          @RequestBody
+          TodoUpdateRequestDto request);
 
   @Operation(
       summary = "투두 상세 조회",
@@ -182,12 +1063,12 @@ public interface TodoControllerDocs {
           | `week` | 오늘부터 7일 이내 마감인 미완료 투두 |
           | `month` | 오늘부터 한 달 이내 마감인 미완료 투두 |
 
-          **sort 값별 정렬 기준** (pinned는 항상 최우선)
+          **sort 값별 정렬 기준**
 
           | sort | 정렬 |
           |------|------|
-          | `priority` | isPinned DESC → sortOrder ASC |
-          | `dueDate` | isPinned DESC → dueDate ASC (null 마지막) |
+          | `priority` | sortOrder ASC |
+          | `dueDate` | dueDate ASC (null 마지막) |
 
           **day 필터의 추가 정렬 규칙**
           - 미완료 투두 먼저, 완료 투두 나중 → 각 그룹 내에서 선택한 sort 기준 적용
