@@ -87,6 +87,15 @@ public class Todo extends BaseTimeEntity {
     this.routine = routine;
   }
 
+  public void updatePinned(boolean isPinned) {
+    this.isPinned = isPinned;
+  }
+
+  public void updateCompleted(boolean isCompleted) {
+    this.isCompleted = isCompleted;
+    this.completedTime = isCompleted ? LocalDateTime.now() : null;
+  }
+
   @Builder
   public Todo(
       String title,

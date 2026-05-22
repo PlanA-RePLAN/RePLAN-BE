@@ -18,9 +18,11 @@ import plana.replan.domain.tag.exception.TagErrorCode;
 import plana.replan.domain.tag.repository.TagRepository;
 import plana.replan.domain.todo.dto.SubTodoCreateRequestDto;
 import plana.replan.domain.todo.dto.SubTodoUpdateRequestDto;
+import plana.replan.domain.todo.dto.TodoCompleteRequestDto;
 import plana.replan.domain.todo.dto.TodoCreateRequestDto;
 import plana.replan.domain.todo.dto.TodoDetailResponseDto;
 import plana.replan.domain.todo.dto.TodoListResponseDto;
+import plana.replan.domain.todo.dto.TodoPinRequestDto;
 import plana.replan.domain.todo.dto.TodoResponseDto;
 import plana.replan.domain.todo.dto.TodoUpdateRequestDto;
 import plana.replan.domain.todo.entity.Todo;
@@ -299,6 +301,51 @@ public class TodoService {
     }
 
     return TodoDetailResponseDto.from(todo);
+  }
+
+  @Transactional
+  public TodoListResponseDto completeTodo(
+      Long userId, Long todoId, TodoCompleteRequestDto request) {
+    if (userId == null) {
+      throw new CustomException(UserErrorCode.USER_NOT_FOUND);
+    }
+    Todo todo =
+        todoRepository
+            .findById(todoId)
+            .orElseThrow(() -> new CustomException(TodoErrorCode.TODO_NOT_FOUND));
+
+    if (!todo.getUser().getId().equals(userId)) {
+      throw new CustomException(TodoErrorCode.TODO_NOT_FOUND);
+    }
+
+    if (todo.getParent() != null) {
+      throw new CustomException(TodoErrorCode.TODO_NOT_FOUND);
+    }
+
+    todo.updateCompleted(request.getIsCompleted());
+    return TodoListResponseDto.from(todo);
+  }
+
+  @Transactional
+  public TodoListResponseDto pinTodo(Long userId, Long todoId, TodoPinRequestDto request) {
+    if (userId == null) {
+      throw new CustomException(UserErrorCode.USER_NOT_FOUND);
+    }
+    Todo todo =
+        todoRepository
+            .findById(todoId)
+            .orElseThrow(() -> new CustomException(TodoErrorCode.TODO_NOT_FOUND));
+
+    if (!todo.getUser().getId().equals(userId)) {
+      throw new CustomException(TodoErrorCode.TODO_NOT_FOUND);
+    }
+
+    if (todo.getParent() != null) {
+      throw new CustomException(TodoErrorCode.TODO_NOT_FOUND);
+    }
+
+    todo.updatePinned(request.getIsPinned());
+    return TodoListResponseDto.from(todo);
   }
 
   @Transactional
