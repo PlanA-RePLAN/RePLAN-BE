@@ -33,6 +33,7 @@ import plana.replan.domain.todo.dto.TodoCompleteRequestDto;
 import plana.replan.domain.todo.dto.TodoCreateRequestDto;
 import plana.replan.domain.todo.dto.TodoDetailResponseDto;
 import plana.replan.domain.todo.dto.TodoListResponseDto;
+import plana.replan.domain.todo.dto.TodoOrderRequestDto;
 import plana.replan.domain.todo.dto.TodoPinRequestDto;
 import plana.replan.domain.todo.dto.TodoResponseDto;
 import plana.replan.domain.todo.dto.TodoUpdateRequestDto;
@@ -1027,6 +1028,140 @@ class TodoServiceTest {
 
     assertThat(ReflectionTestUtils.getField(todo, "deletedAt")).isNotNull();
     assertThat(ReflectionTestUtils.getField(routine, "deletedAt")).isNull();
+  }
+
+  // ── reorderTodo ──────────────────────────────────────────────────────────────
+
+  private TodoOrderRequestDto orderRequest(Long prevId, Long nextId) {
+    TodoOrderRequestDto dto = new TodoOrderRequestDto();
+    ReflectionTestUtils.setField(dto, "prevTodoId", prevId);
+    ReflectionTestUtils.setField(dto, "nextTodoId", nextId);
+    return dto;
+  }
+
+  @Test
+  @DisplayName("reorderTodo - userId null: USER_NOT_FOUND 예외")
+  void reorderTodo_nullUserId_throws() {
+    assertThatThrownBy(() -> todoService.reorderTodo(null, 1L, orderRequest(null, 2L)))
+        .isInstanceOf(CustomException.class)
+        .satisfies(
+            e ->
+                assertThat(((CustomException) e).getErrorCode())
+                    .isEqualTo(UserErrorCode.USER_NOT_FOUND));
+  }
+
+  @Test
+  @DisplayName("reorderTodo - todoId DB에 없음: TODO_NOT_FOUND 예외")
+  void reorderTodo_todoNotFound_throws() {
+    given(todoRepository.findById(99L)).willReturn(Optional.empty());
+
+    assertThatThrownBy(() -> todoService.reorderTodo(1L, 99L, orderRequest(null, 2L)))
+        .isInstanceOf(CustomException.class)
+        .satisfies(
+            e ->
+                assertThat(((CustomException) e).getErrorCode())
+                    .isEqualTo(TodoErrorCode.TODO_NOT_FOUND));
+  }
+
+  @Test
+  @DisplayName("reorderTodo - 다른 유저 소유 투두: TODO_NOT_FOUND 예외")
+  void reorderTodo_otherUserTodo_throws() {
+    User otherUser =
+        User.builder()
+            .email("other@test.com")
+            .nickname("타인")
+            .role(Role.ROLE_USER)
+            .provider(Provider.LOCAL)
+            .build();
+    ReflectionTestUtils.setField(otherUser, "id", 2L);
+
+    given(todoRepository.findById(1L)).willReturn(Optional.of(testTodo(1L, otherUser)));
+
+    assertThatThrownBy(() -> todoService.reorderTodo(1L, 1L, orderRequest(null, 2L)))
+        .isInstanceOf(CustomException.class)
+        .satisfies(
+            e ->
+                assertThat(((CustomException) e).getErrorCode())
+                    .isEqualTo(TodoErrorCode.TODO_NOT_FOUND));
+  }
+
+  @Test
+  @DisplayName("reorderTodo - 하위 투두 ID 전달: TODO_NOT_FOUND 예외")
+  void reorderTodo_subTodoId_throws() {
+    User user = testUser();
+    Todo parent = testTodo(10L, user);
+    Todo subTodo = Todo.builder().title("하위").user(user).parent(parent).isPinned(false).build();
+    ReflectionTestUtils.setField(subTodo, "id", 43L);
+
+    given(todoRepository.findById(43L)).willReturn(Optional.of(subTodo));
+
+    assertThatThrownBy(() -> todoService.reorderTodo(1L, 43L, orderRequest(null, 2L)))
+        .isInstanceOf(CustomException.class)
+        .satisfies(
+            e ->
+                assertThat(((CustomException) e).getErrorCode())
+                    .isEqualTo(TodoErrorCode.TODO_NOT_FOUND));
+  }
+
+  @Test
+  @DisplayName("reorderTodo - prevTodoId와 nextTodoId 모두 null: INVALID_INPUT 예외")
+  void reorderTodo_bothNull_throws() {
+    User user = testUser();
+    given(todoRepository.findById(1L)).willReturn(Optional.of(testTodo(1L, user)));
+
+    assertThatThrownBy(() -> todoService.reorderTodo(1L, 1L, orderRequest(null, null)))
+        .isInstanceOf(CustomException.class)
+        .satisfies(
+            e ->
+                assertThat(((CustomException) e).getErrorCode())
+                    .isEqualTo(GlobalErrorCode.INVALID_INPUT));
+  }
+
+  @Test
+  @DisplayName("reorderTodo - 성공 (두 항목 사이 삽입): sortOrder = (prev + next) / 2")
+  void reorderTodo_success_between() {
+    User user = testUser();
+    Todo todo = testTodo(1L, user);
+    Todo prev = activeTodoWithSort(2L, user, false, 10000.0);
+    Todo next = activeTodoWithSort(3L, user, false, 20000.0);
+
+    given(todoRepository.findById(1L)).willReturn(Optional.of(todo));
+    given(todoRepository.findById(2L)).willReturn(Optional.of(prev));
+    given(todoRepository.findById(3L)).willReturn(Optional.of(next));
+
+    TodoListResponseDto result = todoService.reorderTodo(1L, 1L, orderRequest(2L, 3L));
+
+    assertThat(result.getSortOrder()).isEqualTo(15000.0);
+  }
+
+  @Test
+  @DisplayName("reorderTodo - 성공 (맨 앞으로 이동): sortOrder = nextSortOrder / 2")
+  void reorderTodo_success_toFront() {
+    User user = testUser();
+    Todo todo = testTodo(1L, user);
+    Todo next = activeTodoWithSort(2L, user, false, 10000.0);
+
+    given(todoRepository.findById(1L)).willReturn(Optional.of(todo));
+    given(todoRepository.findById(2L)).willReturn(Optional.of(next));
+
+    TodoListResponseDto result = todoService.reorderTodo(1L, 1L, orderRequest(null, 2L));
+
+    assertThat(result.getSortOrder()).isEqualTo(5000.0);
+  }
+
+  @Test
+  @DisplayName("reorderTodo - 성공 (맨 뒤로 이동): sortOrder = prevSortOrder + 10000")
+  void reorderTodo_success_toEnd() {
+    User user = testUser();
+    Todo todo = testTodo(1L, user);
+    Todo prev = activeTodoWithSort(2L, user, false, 30000.0);
+
+    given(todoRepository.findById(1L)).willReturn(Optional.of(todo));
+    given(todoRepository.findById(2L)).willReturn(Optional.of(prev));
+
+    TodoListResponseDto result = todoService.reorderTodo(1L, 1L, orderRequest(2L, null));
+
+    assertThat(result.getSortOrder()).isEqualTo(40000.0);
   }
 
   // ── completeTodo ──────────────────────────────────────────────────────────────

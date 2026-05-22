@@ -675,6 +675,102 @@ class TodoControllerTest {
         .andExpect(jsonPath("$.error.code").value("TODO_NOT_FOUND"));
   }
 
+  // ── reorderTodo ──────────────────────────────────────────────────────────────
+
+  @Test
+  @DisplayName("인증 없이 우선순위 변경 호출: 401 반환")
+  void reorderTodo_unauthenticated() throws Exception {
+    mockMvc
+        .perform(
+            patch("/api/todos/1/order")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """
+                    { "prevTodoId": 1, "nextTodoId": 3 }
+                    """))
+        .andExpect(status().isUnauthorized())
+        .andExpect(jsonPath("$.error.code").value("EMPTY_TOKEN"));
+  }
+
+  @Test
+  @DisplayName("두 항목 사이 삽입 성공: status=200, 중간 sortOrder 반환")
+  void reorderTodo_success_between() throws Exception {
+    TodoListResponseDto response =
+        new TodoListResponseDto(
+            2L, "투두", null, false, 15000.0, false, null, null, null, null, false);
+    given(todoService.reorderTodo(any(), any(), any())).willReturn(response);
+
+    mockMvc
+        .perform(
+            patch("/api/todos/2/order")
+                .with(authentication(authToken(1L)))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """
+                    { "prevTodoId": 1, "nextTodoId": 3 }
+                    """))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.success").value(true))
+        .andExpect(jsonPath("$.data.sortOrder").value(15000.0))
+        .andExpect(jsonPath("$.error").value(nullValue()));
+  }
+
+  @Test
+  @DisplayName("맨 앞으로 이동 (prevTodoId=null): status=200")
+  void reorderTodo_success_toFront() throws Exception {
+    TodoListResponseDto response =
+        new TodoListResponseDto(
+            2L, "투두", null, false, 5000.0, false, null, null, null, null, false);
+    given(todoService.reorderTodo(any(), any(), any())).willReturn(response);
+
+    mockMvc
+        .perform(
+            patch("/api/todos/2/order")
+                .with(authentication(authToken(1L)))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    { "nextTodoId": 3 }
+                    """))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.sortOrder").value(5000.0));
+  }
+
+  @Test
+  @DisplayName("prevTodoId와 nextTodoId 모두 null: status=400, error.code=INVALID_INPUT")
+  void reorderTodo_bothNull() throws Exception {
+    willThrow(new CustomException(GlobalErrorCode.INVALID_INPUT))
+        .given(todoService)
+        .reorderTodo(any(), any(), any());
+
+    mockMvc
+        .perform(
+            patch("/api/todos/1/order")
+                .with(authentication(authToken(1L)))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{}"))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.error.code").value("INVALID_INPUT"));
+  }
+
+  @Test
+  @DisplayName("존재하지 않거나 본인 소유가 아닌 투두: status=404, error.code=TODO_NOT_FOUND")
+  void reorderTodo_notFound() throws Exception {
+    willThrow(new CustomException(TodoErrorCode.TODO_NOT_FOUND))
+        .given(todoService)
+        .reorderTodo(any(), any(), any());
+
+    mockMvc
+        .perform(
+            patch("/api/todos/999/order")
+                .with(authentication(authToken(1L)))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    { "nextTodoId": 3 }
+                    """))
+        .andExpect(status().isNotFound())
+        .andExpect(jsonPath("$.error.code").value("TODO_NOT_FOUND"));
+  }
+
   // ── completeTodo ──────────────────────────────────────────────────────────────
 
   @Test
