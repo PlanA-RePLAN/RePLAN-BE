@@ -96,6 +96,10 @@ public class Todo extends BaseTimeEntity {
     this.completedTime = isCompleted ? LocalDateTime.now() : null;
   }
 
+  public void updateSortOrder(double sortOrder) {
+    this.sortOrder = sortOrder;
+  }
+
   @Builder
   public Todo(
       String title,
