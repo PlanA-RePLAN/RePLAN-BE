@@ -9,6 +9,10 @@ import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import plana.replan.domain.routine.entity.Routine;
+import plana.replan.domain.routine.entity.RoutineType;
+import plana.replan.domain.routine.exception.RoutineErrorCode;
+import plana.replan.domain.routine.repository.RoutineRepository;
 import plana.replan.domain.tag.entity.Tag;
 import plana.replan.domain.tag.exception.TagErrorCode;
 import plana.replan.domain.tag.repository.TagRepository;
@@ -18,6 +22,7 @@ import plana.replan.domain.todo.dto.TodoCreateRequestDto;
 import plana.replan.domain.todo.dto.TodoDetailResponseDto;
 import plana.replan.domain.todo.dto.TodoListResponseDto;
 import plana.replan.domain.todo.dto.TodoResponseDto;
+import plana.replan.domain.todo.dto.TodoUpdateRequestDto;
 import plana.replan.domain.todo.entity.Todo;
 import plana.replan.domain.todo.exception.TodoErrorCode;
 import plana.replan.domain.todo.repository.TodoRepository;
@@ -33,6 +38,7 @@ public class TodoService {
   private final TodoRepository todoRepository;
   private final UserRepository userRepository;
   private final TagRepository tagRepository;
+  private final RoutineRepository routineRepository;
 
   @Transactional
   public TodoResponseDto createTodo(Long userId, TodoCreateRequestDto request) {
@@ -181,6 +187,82 @@ public class TodoService {
           Todo::getDueDate, Comparator.nullsLast(Comparator.naturalOrder()));
       default -> throw new CustomException(TodoErrorCode.INVALID_SORT);
     };
+  }
+
+  @Transactional
+  public TodoDetailResponseDto updateTodo(Long userId, Long todoId, TodoUpdateRequestDto request) {
+    if (userId == null) {
+      throw new CustomException(UserErrorCode.USER_NOT_FOUND);
+    }
+    Todo todo =
+        todoRepository
+            .findById(todoId)
+            .orElseThrow(() -> new CustomException(TodoErrorCode.TODO_NOT_FOUND));
+
+    if (!todo.getUser().getId().equals(userId)) {
+      throw new CustomException(TodoErrorCode.TODO_NOT_FOUND);
+    }
+
+    Tag tag = null;
+    if (request.getTagId() != null) {
+      tag =
+          tagRepository
+              .findById(request.getTagId())
+              .orElseThrow(() -> new CustomException(TagErrorCode.TAG_NOT_FOUND));
+    }
+
+    if (request.getRoutineType() != null) {
+      validateRoutineDate(request.getRoutineType(), request.getRoutineDate());
+    }
+
+    todo.updateTitle(request.getTitle());
+    todo.updateDueDate(request.getDueDate());
+    todo.updateTag(tag);
+    handleRoutineUpdate(todo, request, tag);
+
+    return TodoDetailResponseDto.from(todo);
+  }
+
+  private void handleRoutineUpdate(Todo todo, TodoUpdateRequestDto request, Tag tag) {
+    Routine existingRoutine = todo.getRoutine();
+
+    if (request.getRoutineType() == null) {
+      if (existingRoutine != null) {
+        existingRoutine.softDelete();
+        todo.updateRoutine(null);
+      }
+      return;
+    }
+
+    Integer routineDate =
+        request.getRoutineType() == RoutineType.DAILY ? null : request.getRoutineDate();
+
+    if (existingRoutine != null) {
+      existingRoutine.update(request.getTitle(), request.getRoutineType(), routineDate, tag);
+    } else {
+      Routine newRoutine =
+          routineRepository.save(
+              Routine.builder()
+                  .title(request.getTitle())
+                  .routineType(request.getRoutineType())
+                  .routineDate(routineDate)
+                  .user(todo.getUser())
+                  .tag(tag)
+                  .build());
+      todo.updateRoutine(newRoutine);
+    }
+  }
+
+  private void validateRoutineDate(RoutineType routineType, Integer routineDate) {
+    if (routineType == RoutineType.WEEKLY) {
+      if (routineDate == null || routineDate < 1 || routineDate > 127) {
+        throw new CustomException(RoutineErrorCode.ROUTINE_INVALID_DATE);
+      }
+    } else if (routineType == RoutineType.MONTHLY) {
+      if (routineDate == null || routineDate < 1 || routineDate > 31) {
+        throw new CustomException(RoutineErrorCode.ROUTINE_INVALID_DATE);
+      }
+    }
   }
 
   @Transactional(readOnly = true)
