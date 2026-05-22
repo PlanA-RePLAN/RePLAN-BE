@@ -268,7 +268,7 @@ public interface TodoControllerDocs {
   ResponseEntity<ApiResult<TodoListResponseDto>> reorderTodo(
       @AuthenticationPrincipal Long userId,
       @Parameter(description = "순서를 변경할 투두 ID", example = "3") @PathVariable Long todoId,
-      @RequestBody TodoOrderRequestDto request);
+      @Valid @RequestBody TodoOrderRequestDto request);
 
   @Operation(
       summary = "투두 완료/미완료 처리",
@@ -776,7 +776,7 @@ public interface TodoControllerDocs {
             @Content(
                 examples = {
                   @ExampleObject(
-                      name = "title 누락",
+                      name = "title 빈 문자열",
                       value =
                           """
                           {
@@ -785,7 +785,7 @@ public interface TodoControllerDocs {
                             "data": null,
                             "error": {
                               "code": "INVALID_INPUT",
-                              "message": "제목은 필수입니다.",
+                              "message": "잘못된 입력입니다.",
                               "detail": null
                             }
                           }

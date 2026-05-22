@@ -64,7 +64,7 @@ public class TodoController implements TodoControllerDocs {
   public ResponseEntity<ApiResult<TodoListResponseDto>> reorderTodo(
       @AuthenticationPrincipal Long userId,
       @PathVariable Long todoId,
-      @RequestBody TodoOrderRequestDto request) {
+      @Valid @RequestBody TodoOrderRequestDto request) {
     return ResponseEntity.ok(ApiResult.ok(todoService.reorderTodo(userId, todoId, request)));
   }
 
