@@ -71,6 +71,35 @@ public class Todo extends BaseTimeEntity {
   @OneToOne(mappedBy = "todo", fetch = FetchType.LAZY)
   private FailureReason failureReason;
 
+  public void updateTitle(String title) {
+    this.title = Objects.requireNonNull(title, "제목은 필수입니다.");
+  }
+
+  public void updateDueDate(LocalDateTime dueDate) {
+    this.dueDate = dueDate;
+  }
+
+  public void updateTag(Tag tag) {
+    this.tag = tag;
+  }
+
+  public void updateRoutine(Routine routine) {
+    this.routine = routine;
+  }
+
+  public void updatePinned(boolean isPinned) {
+    this.isPinned = isPinned;
+  }
+
+  public void updateCompleted(boolean isCompleted, LocalDateTime now) {
+    this.isCompleted = isCompleted;
+    this.completedTime = isCompleted ? now : null;
+  }
+
+  public void updateSortOrder(double sortOrder) {
+    this.sortOrder = sortOrder;
+  }
+
   @Builder
   public Todo(
       String title,
@@ -80,7 +109,8 @@ public class Todo extends BaseTimeEntity {
       User user,
       Tag tag,
       Goal goal,
-      Routine routine) {
+      Routine routine,
+      Todo parent) {
     this.title = Objects.requireNonNull(title, "제목은 필수입니다.");
     this.user = Objects.requireNonNull(user, "유저는 필수입니다.");
     this.dueDate = dueDate;
@@ -89,5 +119,6 @@ public class Todo extends BaseTimeEntity {
     this.tag = tag;
     this.goal = goal;
     this.routine = routine;
+    this.parent = parent;
   }
 }

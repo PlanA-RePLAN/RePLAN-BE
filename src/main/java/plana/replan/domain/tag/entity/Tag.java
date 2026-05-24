@@ -32,6 +32,13 @@ public class Tag extends BaseTimeEntity {
   @JoinColumn(name = "user_id", nullable = false)
   private User user;
 
+  public void update(String title, TagColor color) {
+    if (title != null) {
+      this.title = title;
+    }
+    this.color = color;
+  }
+
   @Builder
   public Tag(String title, TagColor color, User user) {
     this.title = Objects.requireNonNull(title, "제목은 필수입니다.");
