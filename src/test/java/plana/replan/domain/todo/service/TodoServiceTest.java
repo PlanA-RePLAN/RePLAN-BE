@@ -8,6 +8,7 @@ import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
+import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -17,6 +18,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 import plana.replan.domain.routine.entity.Routine;
@@ -51,6 +53,7 @@ import plana.replan.global.exception.GlobalErrorCode;
 @ExtendWith(MockitoExtension.class)
 class TodoServiceTest {
 
+  @Spy private Clock clock = Clock.systemDefaultZone();
   @Mock private TodoRepository todoRepository;
   @Mock private UserRepository userRepository;
   @Mock private TagRepository tagRepository;
@@ -288,6 +291,27 @@ class TodoServiceTest {
     assertThat(ReflectionTestUtils.getField(saved, "tag")).isNull();
     assertThat(ReflectionTestUtils.getField(saved, "goal")).isNull();
     assertThat(ReflectionTestUtils.getField(saved, "routine")).isNull();
+  }
+
+  @Test
+  @DisplayName("parent가 이미 서브투두인 경우: TODO_NOT_FOUND 예외, save 미호출")
+  void createSubTodo_parentIsSubTodo_throws() {
+    User user = testUser();
+    Todo grandParent = testTodo(5L, user);
+    Todo parentSubTodo = testTodo(10L, user);
+    ReflectionTestUtils.setField(parentSubTodo, "parent", grandParent);
+
+    given(userRepository.findById(1L)).willReturn(Optional.of(user));
+    given(todoRepository.findById(10L)).willReturn(Optional.of(parentSubTodo));
+
+    assertThatThrownBy(() -> todoService.createSubTodo(1L, 10L, subRequest("하위 투두")))
+        .isInstanceOf(CustomException.class)
+        .satisfies(
+            e ->
+                assertThat(((CustomException) e).getErrorCode())
+                    .isEqualTo(TodoErrorCode.TODO_NOT_FOUND));
+
+    verify(todoRepository, never()).save(any());
   }
 
   // ── updateSubTodo ──────────────────────────────────────────────────────────
@@ -833,7 +857,8 @@ class TodoServiceTest {
         Routine.builder().title("루틴").routineType(RoutineType.DAILY).user(user).build();
     ReflectionTestUtils.setField(parent, "routine", routine);
 
-    Todo child = testTodo(10L, user);
+    Todo child = Todo.builder().title("하위 투두").user(user).isPinned(false).build();
+    ReflectionTestUtils.setField(child, "id", 10L);
     ReflectionTestUtils.setField(parent, "children", List.of(child));
 
     given(todoRepository.findById(1L)).willReturn(Optional.of(parent));
@@ -846,7 +871,7 @@ class TodoServiceTest {
     assertThat(result.getRoutineType()).isEqualTo("DAILY");
     assertThat(result.getSubTodos()).hasSize(1);
     assertThat(result.getSubTodos().get(0).getTodoId()).isEqualTo(10L);
-    assertThat(result.getSubTodos().get(0).getTitle()).isEqualTo("부모 투두");
+    assertThat(result.getSubTodos().get(0).getTitle()).isEqualTo("하위 투두");
   }
 
   // ── getPinnedTodos ──────────────────────────────────────────────────────────

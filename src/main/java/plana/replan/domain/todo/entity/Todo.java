@@ -91,9 +91,9 @@ public class Todo extends BaseTimeEntity {
     this.isPinned = isPinned;
   }
 
-  public void updateCompleted(boolean isCompleted) {
+  public void updateCompleted(boolean isCompleted, LocalDateTime now) {
     this.isCompleted = isCompleted;
-    this.completedTime = isCompleted ? LocalDateTime.now() : null;
+    this.completedTime = isCompleted ? now : null;
   }
 
   public void updateSortOrder(double sortOrder) {

@@ -101,7 +101,7 @@ public interface TagControllerDocs {
                               "error": {
                                 "code": "INVALID_INPUT",
                                 "message": "잘못된 입력입니다.",
-                                "detail": null
+                                "detail": "title: 태그 이름은 필수입니다."
                               }
                             }
                             """))),

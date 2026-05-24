@@ -375,7 +375,7 @@ class RoutineServiceTest {
     routineService.createRoutine(
         1L, new RoutineCreateRequestDto("아침 스트레칭", null, RoutineType.DAILY, null, null, null));
 
-    verify(todoRepository).save(any(Todo.class));
+    verify(todoRepository).saveAndFlush(any(Todo.class));
   }
 
   @Test
@@ -387,7 +387,7 @@ class RoutineServiceTest {
     routineService.createRoutine(
         1L, new RoutineCreateRequestDto("루틴", null, RoutineType.WEEKLY, 1, null, null));
 
-    verify(todoRepository).save(any(Todo.class));
+    verify(todoRepository).saveAndFlush(any(Todo.class));
   }
 
   @Test
@@ -399,7 +399,7 @@ class RoutineServiceTest {
     routineService.createRoutine(
         1L, new RoutineCreateRequestDto("루틴", null, RoutineType.WEEKLY, 2, null, null));
 
-    verify(todoRepository, never()).save(any(Todo.class));
+    verify(todoRepository, never()).saveAndFlush(any(Todo.class));
   }
 
   @Test
@@ -411,7 +411,7 @@ class RoutineServiceTest {
     routineService.createRoutine(
         1L, new RoutineCreateRequestDto("루틴", null, RoutineType.MONTHLY, 15, null, null));
 
-    verify(todoRepository).save(any(Todo.class));
+    verify(todoRepository).saveAndFlush(any(Todo.class));
   }
 
   @Test
@@ -423,7 +423,7 @@ class RoutineServiceTest {
     routineService.createRoutine(
         1L, new RoutineCreateRequestDto("루틴", null, RoutineType.MONTHLY, 16, null, null));
 
-    verify(todoRepository, never()).save(any(Todo.class));
+    verify(todoRepository, never()).saveAndFlush(any(Todo.class));
   }
 
   @Test
@@ -435,7 +435,7 @@ class RoutineServiceTest {
     routineService.createRoutine(
         1L, new RoutineCreateRequestDto("아침 스트레칭", null, RoutineType.DAILY, null, null, null));
 
-    verify(todoRepository, never()).save(any(Todo.class));
+    verify(todoRepository, never()).saveAndFlush(any(Todo.class));
   }
 
   // ========== generateDailyTodos (배치) ==========
@@ -455,7 +455,7 @@ class RoutineServiceTest {
 
     routineService.generateDailyTodos();
 
-    verify(todoRepository).save(any(Todo.class));
+    verify(todoRepository).saveAndFlush(any(Todo.class));
   }
 
   @Test
@@ -465,7 +465,7 @@ class RoutineServiceTest {
 
     routineService.generateDailyTodos();
 
-    verify(todoRepository).save(any(Todo.class));
+    verify(todoRepository).saveAndFlush(any(Todo.class));
   }
 
   @Test
@@ -475,7 +475,7 @@ class RoutineServiceTest {
 
     routineService.generateDailyTodos();
 
-    verify(todoRepository, never()).save(any(Todo.class));
+    verify(todoRepository, never()).saveAndFlush(any(Todo.class));
   }
 
   @Test
@@ -485,7 +485,7 @@ class RoutineServiceTest {
 
     routineService.generateDailyTodos();
 
-    verify(todoRepository).save(any(Todo.class));
+    verify(todoRepository).saveAndFlush(any(Todo.class));
   }
 
   @Test
@@ -495,7 +495,7 @@ class RoutineServiceTest {
 
     routineService.generateDailyTodos();
 
-    verify(todoRepository, never()).save(any(Todo.class));
+    verify(todoRepository, never()).saveAndFlush(any(Todo.class));
   }
 
   @Test
@@ -505,6 +505,6 @@ class RoutineServiceTest {
 
     routineService.generateDailyTodos();
 
-    verify(todoRepository, never()).save(any(Todo.class));
+    verify(todoRepository, never()).saveAndFlush(any(Todo.class));
   }
 }

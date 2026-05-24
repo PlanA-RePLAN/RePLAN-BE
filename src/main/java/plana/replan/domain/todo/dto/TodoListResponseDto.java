@@ -2,6 +2,7 @@ package plana.replan.domain.todo.dto;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import io.swagger.v3.oas.annotations.media.Schema;
+import java.time.Clock;
 import java.time.LocalDateTime;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -50,13 +51,13 @@ public class TodoListResponseDto {
   @Schema(description = "기한 초과 여부 (미완료이고 dueDate가 현재 시각 이전인 경우 true)", example = "false")
   private boolean isOverdue;
 
-  public static TodoListResponseDto from(Todo todo) {
+  public static TodoListResponseDto from(Todo todo, Clock clock) {
     Tag tag = todo.getTag();
     Routine routine = todo.getRoutine();
     boolean overdue =
         !todo.isCompleted()
             && todo.getDueDate() != null
-            && todo.getDueDate().isBefore(LocalDateTime.now());
+            && todo.getDueDate().isBefore(LocalDateTime.now(clock));
     return new TodoListResponseDto(
         todo.getId(),
         todo.getTitle(),
