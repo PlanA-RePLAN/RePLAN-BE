@@ -5,6 +5,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import plana.replan.domain.goal.entity.Goal;
@@ -108,16 +109,20 @@ public class RoutineService {
         routine, todayStart, todayStart.plusDays(1))) {
       return;
     }
-    todoRepository.save(
-        Todo.builder()
-            .title(routine.getTitle())
-            .dueDate(todayStart)
-            .isPinned(false)
-            .user(routine.getUser())
-            .tag(routine.getTag())
-            .goal(routine.getGoal())
-            .routine(routine)
-            .build());
+    try {
+      todoRepository.saveAndFlush(
+          Todo.builder()
+              .title(routine.getTitle())
+              .dueDate(todayStart)
+              .isPinned(false)
+              .user(routine.getUser())
+              .tag(routine.getTag())
+              .goal(routine.getGoal())
+              .routine(routine)
+              .build());
+    } catch (DataIntegrityViolationException ignored) {
+      // 동시 실행 시 unique 제약 충돌은 정상 상황 — 이미 생성된 것으로 간주
+    }
   }
 
   private void validateRoutineDate(RoutineType routineType, Integer routineDate) {
