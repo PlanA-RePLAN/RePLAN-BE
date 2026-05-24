@@ -857,7 +857,8 @@ class TodoServiceTest {
         Routine.builder().title("루틴").routineType(RoutineType.DAILY).user(user).build();
     ReflectionTestUtils.setField(parent, "routine", routine);
 
-    Todo child = testTodo(10L, user);
+    Todo child = Todo.builder().title("하위 투두").user(user).isPinned(false).build();
+    ReflectionTestUtils.setField(child, "id", 10L);
     ReflectionTestUtils.setField(parent, "children", List.of(child));
 
     given(todoRepository.findById(1L)).willReturn(Optional.of(parent));
@@ -870,7 +871,7 @@ class TodoServiceTest {
     assertThat(result.getRoutineType()).isEqualTo("DAILY");
     assertThat(result.getSubTodos()).hasSize(1);
     assertThat(result.getSubTodos().get(0).getTodoId()).isEqualTo(10L);
-    assertThat(result.getSubTodos().get(0).getTitle()).isEqualTo("부모 투두");
+    assertThat(result.getSubTodos().get(0).getTitle()).isEqualTo("하위 투두");
   }
 
   // ── getPinnedTodos ──────────────────────────────────────────────────────────
