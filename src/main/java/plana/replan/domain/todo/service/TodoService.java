@@ -1,6 +1,8 @@
 package plana.replan.domain.todo.service;
 
+import java.time.Clock;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -39,6 +41,7 @@ import plana.replan.global.exception.GlobalErrorCode;
 @RequiredArgsConstructor
 public class TodoService {
 
+  private final Clock clock;
   private final TodoRepository todoRepository;
   private final UserRepository userRepository;
   private final TagRepository tagRepository;
@@ -140,7 +143,7 @@ public class TodoService {
 
     return todoRepository.findPinnedActiveTodosForUser(user).stream()
         .sorted(Comparator.comparingDouble(Todo::getSortOrder))
-        .map(TodoListResponseDto::from)
+        .map(todo -> TodoListResponseDto.from(todo, clock))
         .collect(Collectors.toList());
   }
 
@@ -163,7 +166,7 @@ public class TodoService {
 
     Comparator<Todo> sortComparator = buildSortComparator(sort);
 
-    LocalDate today = LocalDate.now();
+    LocalDate today = LocalDate.now(clock);
     var startOfDay = today.atStartOfDay();
     var endOfDay = today.atTime(LocalTime.MAX);
 
@@ -199,7 +202,9 @@ public class TodoService {
       default -> throw new CustomException(TodoErrorCode.INVALID_FILTER);
     }
 
-    return todos.stream().map(TodoListResponseDto::from).collect(Collectors.toList());
+    return todos.stream()
+        .map(todo -> TodoListResponseDto.from(todo, clock))
+        .collect(Collectors.toList());
   }
 
   private Comparator<Todo> buildSortComparator(String sort) {
@@ -357,7 +362,7 @@ public class TodoService {
     }
 
     todo.updateSortOrder((prevSortOrder + nextSortOrder) / 2);
-    return TodoListResponseDto.from(todo);
+    return TodoListResponseDto.from(todo, clock);
   }
 
   @Transactional
@@ -379,8 +384,8 @@ public class TodoService {
       throw new CustomException(TodoErrorCode.TODO_NOT_FOUND);
     }
 
-    todo.updateCompleted(request.getIsCompleted());
-    return TodoListResponseDto.from(todo);
+    todo.updateCompleted(request.getIsCompleted(), LocalDateTime.now(clock));
+    return TodoListResponseDto.from(todo, clock);
   }
 
   @Transactional
@@ -402,7 +407,7 @@ public class TodoService {
     }
 
     todo.updatePinned(request.getIsPinned());
-    return TodoListResponseDto.from(todo);
+    return TodoListResponseDto.from(todo, clock);
   }
 
   @Transactional
