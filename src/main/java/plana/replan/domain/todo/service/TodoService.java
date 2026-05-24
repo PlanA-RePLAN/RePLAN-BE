@@ -101,6 +101,10 @@ public class TodoService {
       throw new CustomException(TodoErrorCode.TODO_NOT_FOUND);
     }
 
+    if (parent.getParent() != null) {
+      throw new CustomException(TodoErrorCode.TODO_NOT_FOUND);
+    }
+
     Todo subTodo =
         Todo.builder().title(request.getTitle()).user(user).parent(parent).isPinned(false).build();
 

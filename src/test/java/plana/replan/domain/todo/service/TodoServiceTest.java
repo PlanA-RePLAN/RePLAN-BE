@@ -293,6 +293,27 @@ class TodoServiceTest {
     assertThat(ReflectionTestUtils.getField(saved, "routine")).isNull();
   }
 
+  @Test
+  @DisplayName("parent가 이미 서브투두인 경우: TODO_NOT_FOUND 예외, save 미호출")
+  void createSubTodo_parentIsSubTodo_throws() {
+    User user = testUser();
+    Todo grandParent = testTodo(5L, user);
+    Todo parentSubTodo = testTodo(10L, user);
+    ReflectionTestUtils.setField(parentSubTodo, "parent", grandParent);
+
+    given(userRepository.findById(1L)).willReturn(Optional.of(user));
+    given(todoRepository.findById(10L)).willReturn(Optional.of(parentSubTodo));
+
+    assertThatThrownBy(() -> todoService.createSubTodo(1L, 10L, subRequest("하위 투두")))
+        .isInstanceOf(CustomException.class)
+        .satisfies(
+            e ->
+                assertThat(((CustomException) e).getErrorCode())
+                    .isEqualTo(TodoErrorCode.TODO_NOT_FOUND));
+
+    verify(todoRepository, never()).save(any());
+  }
+
   // ── updateSubTodo ──────────────────────────────────────────────────────────
 
   @Test
