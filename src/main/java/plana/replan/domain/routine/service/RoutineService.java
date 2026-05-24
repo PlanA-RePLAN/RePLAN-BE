@@ -120,8 +120,12 @@ public class RoutineService {
               .goal(routine.getGoal())
               .routine(routine)
               .build());
-    } catch (DataIntegrityViolationException ignored) {
-      // 동시 실행 시 unique 제약 충돌은 정상 상황 — 이미 생성된 것으로 간주
+    } catch (DataIntegrityViolationException e) {
+      String msg = e.getMostSpecificCause().getMessage();
+      if (msg == null || !msg.contains("uq_todo_routine_duedate")) {
+        throw e;
+      }
+      // uq_todo_routine_duedate 충돌 — 동시 실행으로 이미 생성된 것으로 간주
     }
   }
 
