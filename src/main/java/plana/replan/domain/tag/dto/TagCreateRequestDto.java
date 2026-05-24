@@ -11,7 +11,7 @@ import plana.replan.domain.tag.entity.TagColor;
 @NoArgsConstructor
 public class TagCreateRequestDto {
 
-  @NotBlank
+  @NotBlank(message = "태그 이름은 필수입니다.")
   @Schema(description = "태그 이름", example = "영어", requiredMode = Schema.RequiredMode.REQUIRED)
   private String title;
 
