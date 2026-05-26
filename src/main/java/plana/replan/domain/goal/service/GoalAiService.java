@@ -1,0 +1,154 @@
+package plana.replan.domain.goal.service;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+import java.util.Map;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.MediaType;
+import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientException;
+import plana.replan.domain.goal.dto.GoalRefinementRequestDto;
+import plana.replan.domain.goal.dto.GoalRefinementResponseDto;
+import plana.replan.domain.goal.dto.RefinedDeadline;
+import plana.replan.domain.goal.dto.RefinedField;
+import plana.replan.domain.goal.exception.GoalErrorCode;
+import plana.replan.global.exception.CustomException;
+
+@Slf4j
+@Service
+@RequiredArgsConstructor
+public class GoalAiService {
+
+  private static final String GEMINI_URL =
+      "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent";
+
+  private final RestClient geminiRestClient;
+  private final ObjectMapper objectMapper;
+
+  @Value("${gemini.api-key}")
+  private String apiKey;
+
+  public GoalRefinementResponseDto refineGoal(GoalRefinementRequestDto request) {
+    String today = LocalDate.now().format(DateTimeFormatter.ISO_LOCAL_DATE);
+    String prompt = buildRefinePrompt(request, today);
+    String raw = callGemini(prompt);
+    return parseRefineResponse(raw);
+  }
+
+  private String buildRefinePrompt(GoalRefinementRequestDto req, String today) {
+    return """
+        당신은 목표 달성 플래닝 전문가입니다.
+        사용자가 제공한 목표 초안을 분석하고, 투두 리스트 생성에 최적화되도록 정제하세요.
+
+        입력:
+        목표: %s
+        마감기한: %s
+        현재수준: %s
+        투자가능시간: %s
+        특이사항: %s
+
+        정제 규칙:
+        1. 사용자가 변경 불가한 제약(특정 요일, 교재, 장소 등)은 반드시 그대로 유지
+        2. 투자 가능 시간 대비 과도한 목표라면 현실적으로 조정
+        3. currentLevel은 구체적 수치나 단계로 명확하게 표현
+        4. availableTime은 일/주/월 단위 환산 포함
+        5. deadline은 오늘 날짜(%s) 기준으로 date(yyyy-MM-dd), time(HH:mm)으로 분리 변환. 사용자가 "기한 없음", "마감기한 설정 안할래요" 등을 명시하면 date와 time 모두 null
+        6. 목표 달성에 교재·강의가 필요하지만 사용자가 언급하지 않았다면 Google Search로 사용자 수준에 맞는 교재·강의를 검색하여 notes에 추가
+        7. notes에 투두 생성에 필요한 교재·루틴·전략 정보가 부족하면 AI가 채워 넣기
+        8. 각 필드마다 변경 이유를 한 문장으로 작성 (변경 없으면 "사용자 입력을 그대로 유지했습니다."로 작성)
+
+        반드시 아래 JSON만 출력하세요 (다른 설명 없이):
+        {"goal":{"value":"","reason":""},"deadline":{"date":null,"time":null,"reason":""},"currentLevel":{"value":"","reason":""},"availableTime":{"value":"","reason":""},"notes":{"value":"","reason":""}}
+        """
+        .formatted(
+            req.goal(),
+            req.deadline(),
+            req.currentLevel() != null ? req.currentLevel() : "미입력",
+            req.availableTime() != null ? req.availableTime() : "미입력",
+            req.notes() != null ? req.notes() : "미입력",
+            today);
+  }
+
+  private GoalRefinementResponseDto parseRefineResponse(String raw) {
+    try {
+      String json = extractJson(raw);
+      JsonNode root = objectMapper.readTree(json);
+
+      RefinedField goal =
+          new RefinedField(
+              root.path("goal").path("value").asText(), root.path("goal").path("reason").asText());
+
+      JsonNode dl = root.path("deadline");
+      String dlDate = dl.path("date").isNull() ? null : dl.path("date").asText(null);
+      String dlTime = dl.path("time").isNull() ? null : dl.path("time").asText(null);
+      RefinedDeadline deadline = new RefinedDeadline(dlDate, dlTime, dl.path("reason").asText());
+
+      RefinedField currentLevel =
+          new RefinedField(
+              root.path("currentLevel").path("value").asText(),
+              root.path("currentLevel").path("reason").asText());
+
+      RefinedField availableTime =
+          new RefinedField(
+              root.path("availableTime").path("value").asText(),
+              root.path("availableTime").path("reason").asText());
+
+      RefinedField notes =
+          new RefinedField(
+              root.path("notes").path("value").asText(),
+              root.path("notes").path("reason").asText());
+
+      return new GoalRefinementResponseDto(goal, deadline, currentLevel, availableTime, notes);
+    } catch (Exception e) {
+      log.error("Gemini refine 응답 파싱 실패: {}", raw, e);
+      throw new CustomException(GoalErrorCode.GEMINI_PARSE_ERROR);
+    }
+  }
+
+  String callGemini(String prompt) {
+    Map<String, Object> body =
+        Map.of(
+            "tools", new Object[] {Map.of("google_search", Map.of())},
+            "contents", new Object[] {Map.of("parts", new Object[] {Map.of("text", prompt)})});
+
+    try {
+      String response =
+          geminiRestClient
+              .post()
+              .uri(GEMINI_URL + "?key=" + apiKey)
+              .contentType(MediaType.APPLICATION_JSON)
+              .body(body)
+              .retrieve()
+              .body(String.class);
+
+      JsonNode root = objectMapper.readTree(response);
+      return root.path("candidates")
+          .path(0)
+          .path("content")
+          .path("parts")
+          .path(0)
+          .path("text")
+          .asText();
+    } catch (RestClientException e) {
+      log.error("Gemini API 호출 실패", e);
+      throw new CustomException(GoalErrorCode.GEMINI_API_ERROR);
+    } catch (Exception e) {
+      log.error("Gemini 응답 처리 실패", e);
+      throw new CustomException(GoalErrorCode.GEMINI_PARSE_ERROR);
+    }
+  }
+
+  private String extractJson(String text) {
+    int start = text.indexOf('{');
+    int end = text.lastIndexOf('}');
+    if (start == -1 || end == -1 || end < start) {
+      throw new IllegalArgumentException("JSON 블록을 찾을 수 없습니다: " + text);
+    }
+    return text.substring(start, end + 1);
+  }
+}
