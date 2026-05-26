@@ -28,4 +28,6 @@ public record RecommendedTodoDto(
             nullable = true)
         Integer routineDate,
     @Schema(description = "AI가 이 투두를 생성한 이유", example = "목표 달성을 위해 매일 꾸준한 단어 암기가 필요합니다.")
-        String reason) {}
+        String reason,
+    @Schema(description = "출처 정보. 강의면 플랫폼명, 책이면 저자명. 해당 없으면 null", example = "인프런", nullable = true)
+        String source) {}

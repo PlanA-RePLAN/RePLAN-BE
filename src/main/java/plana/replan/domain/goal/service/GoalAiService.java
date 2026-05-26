@@ -140,30 +140,41 @@ public class GoalAiService {
         특이사항:
         %s
 
-        투두 생성 규칙:
-        1. notes에 교재·강의명이 있으면 반드시 Google Search로 해당 교재·강의의 목차·총 페이지·총 강수·Day 구성 등 분량 정보를 먼저 검색한다
-        2. 검색 결과를 기반으로 아래 유형별 기준에 따라 투두를 세분화한다:
-           - 책·교재: 챕터 또는 페이지 단위로 분할. 예) "해커스 토익 RC 1~3챕터 (pp.1~60) 학습"
-           - 인터넷 강의: 강 단위로 분할. 예) "해커스 인강 RC 1~5강 수강"
-           - 단어장·VOCA: Day 또는 Unit 단위로 분할. 예) "해커스 VOCA Day 1~5 암기 (150단어)"
-           - 문제집·기출: 파트 또는 회차 단위로 분할. 예) "토익 기출문제집 1~3회차 풀이"
-           - 워크북·연습장: 유닛 또는 파트 단위로 분할
-        3. 하루 투자 가능 시간 대비 1회 투두 분량이 1~2시간을 초과하지 않도록 조정한다
-        4. 교재·강의가 없으면 notes에 제공된 정보만으로 투두 생성 (새 교재·강의 검색·추천 금지)
-        5. RECURRING 투두는 매번 내용이 동일한 작업만 해당 (예: 매일 단어 암기, 매일 운동)
-        6. 인강 수강처럼 매번 다른 내용을 학습하는 것은 ONE_TIME 투두 여러 개로 생성
-        7. 이론 나열 금지. '수기 복습', '문제 풀이', '오답 노트' 등 아웃풋 태스크 반드시 중간에 배치
-        8. 마감 D-1~2는 진도 금지. '실전 모의고사', '백지 복습', '최종 점검' 등 마무리 태스크만 배치
-        9. WEEKLY routineDate는 bitmask: 월=1, 화=2, 수=4, 목=8, 금=16, 토=32, 일=64
-        10. MONTHLY routineDate는 일자(1~31)
-        11. DAILY는 routineDate 불필요 (null)
-        12. dueDate는 yyyy-MM-ddT00:00:00 형식 또는 null
-        13. type은 "ONE_TIME" 또는 "RECURRING"만 허용
-        14. routineType은 "DAILY", "WEEKLY", "MONTHLY" 중 하나 (ONE_TIME이면 null)
-        15. reason 포함 모든 텍스트는 "~합니다", "~했습니다" 등 서술형으로 작성. "~하세요", "~하시기 바랍니다" 등 조언·명령형 말투 절대 금지
+        [1단계 — 교재·강의 정보 수집, 투두 생성 전 반드시 먼저 수행]
+        notes에 교재·강의명이 하나라도 있으면:
+        - notes에 언급된 교재·강의를 빠짐없이 목록화한다
+        - 강의인 경우 플랫폼(인프런, freeCodeCamp, 해커스, 패스트캠퍼스, Udemy 등)을 파악한다. 플랫폼이 명시되지 않았으면 Google Search로 해당 강의가 어느 플랫폼에 있는지 먼저 검색한다
+        - 유튜브 강의는 목차 검색 대상에서 제외한다. 유튜브 강의는 강수·목차 없이 주제 단위로 투두를 생성한다
+        - 유튜브 외 플랫폼 강의와 교재는 Google Search로 아래 정보를 검색한다:
+          · 인터넷 강의(유튜브 제외): 플랫폼명 + 강의명으로 검색하여 총 강수, 각 강의 제목(목차 전체) 확인
+          · 책·교재: 총 챕터 수, 총 페이지 수, 챕터별 제목
+          · 단어장·VOCA: 총 Day/Unit 수, Day당 단어 수
+          · 문제집: 총 파트 수, 총 회차 수
+        - 검색으로 목차·분량을 확인한 경우에만 강수·챕터 단위로 세분화한다
+        - 검색으로 확인되지 않으면 투두 제목에 "(목차 미확인)"을 명시하고 주제 단위로 생성한다. 절대 임의로 강수나 페이지를 채워넣지 않는다
+
+        [2단계 — 투두 생성 규칙]
+        1. notes에 언급된 모든 교재·강의를 빠짐없이 커버한다 (일부만 반영 금지)
+        2. 총 분량 ÷ 남은 기간 ÷ 하루 투자시간으로 1회 투두 분량을 계산하여 배분한다
+        3. 투두 제목에 검색으로 확인된 실제 강의 제목 또는 챕터명을 포함한다
+           예) "인프런 - 한입 리액트 13강 컴포넌트 만들기 수강" (검색으로 확인된 실제 제목)
+        4. 1회 투두 분량은 하루 투자시간의 50%%를 초과하지 않는다
+        5. 교재·강의가 없으면 notes에 제공된 정보만으로 투두 생성 (새 교재·강의 검색·추천 금지)
+        6. source 필드: 강의면 플랫폼명(인프런, freeCodeCamp, 해커스 등), 책이면 저자명, 해당 없으면 null
+        7. RECURRING 투두는 매번 내용이 동일한 작업만 해당 (예: 매일 단어 암기, 매일 운동)
+        8. 인강 수강처럼 매번 다른 내용을 학습하는 것은 ONE_TIME 투두 여러 개로 생성
+        9. 이론 나열 금지. '수기 복습', '문제 풀이', '오답 노트' 등 아웃풋 태스크 반드시 중간에 배치
+        10. 마감 D-1~2는 진도 금지. '최종 점검', '백지 복습' 등 마무리 태스크만 배치
+        11. WEEKLY routineDate는 bitmask: 월=1, 화=2, 수=4, 목=8, 금=16, 토=32, 일=64
+        12. MONTHLY routineDate는 일자(1~31)
+        13. DAILY는 routineDate 불필요 (null)
+        14. dueDate는 yyyy-MM-ddT00:00:00 형식 또는 null
+        15. type은 "ONE_TIME" 또는 "RECURRING"만 허용
+        16. routineType은 "DAILY", "WEEKLY", "MONTHLY" 중 하나 (ONE_TIME이면 null)
+        17. reason 포함 모든 텍스트는 "~합니다", "~했습니다" 등 서술형으로 작성. "~하세요", "~하시기 바랍니다" 등 조언·명령형 말투 절대 금지
 
         반드시 아래 JSON만 출력하세요 (다른 설명 없이):
-        {"todos":[{"type":"","title":"","dueDate":null,"routineType":null,"routineDate":null,"reason":""}]}
+        {"todos":[{"type":"","title":"","dueDate":null,"routineType":null,"routineDate":null,"reason":"","source":null}]}
         """
         .formatted(
             req.goal(), req.deadline(), req.currentLevel(), req.availableTime(), req.notes());
@@ -194,7 +205,12 @@ public class GoalAiService {
           }
         }
         String reason = node.path("reason").asText(null);
-        todos.add(new RecommendedTodoDto(type, title, dueDate, routineType, routineDate, reason));
+        String source =
+            node.path("source").isNull() || node.path("source").isMissingNode()
+                ? null
+                : node.path("source").asText(null);
+        todos.add(
+            new RecommendedTodoDto(type, title, dueDate, routineType, routineDate, reason, source));
       }
       return new TodoRecommendationResponseDto(todos);
     } catch (Exception e) {

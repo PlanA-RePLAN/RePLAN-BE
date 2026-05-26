@@ -759,6 +759,7 @@ public interface GoalControllerDocs {
           | todos[].routineType | string | RECURRING만: `DAILY` / `WEEKLY` / `MONTHLY`. ONE_TIME이면 null |
           | todos[].routineDate | integer | RECURRING WEEKLY: 요일 bitmask. MONTHLY: 일자. DAILY·ONE_TIME: null |
           | todos[].reason | string | AI가 이 투두를 생성한 이유 |
+          | todos[].source | string | 강의면 플랫폼명, 책이면 저자명. 없으면 null |
 
           ---
 
@@ -789,7 +790,8 @@ public interface GoalControllerDocs {
                                     "dueDate": "2025-08-25T00:00:00",
                                     "routineType": "DAILY",
                                     "routineDate": null,
-                                    "reason": "목표 달성을 위해 매일 꾸준한 단어 암기가 필요합니다."
+                                    "reason": "목표 달성을 위해 매일 꾸준한 단어 암기가 필요합니다.",
+                                    "source": "해커스"
                                   },
                                   {
                                     "type": "ONE_TIME",
@@ -797,7 +799,8 @@ public interface GoalControllerDocs {
                                     "dueDate": "2025-06-10T00:00:00",
                                     "routineType": null,
                                     "routineDate": null,
-                                    "reason": "RC 파트의 기초 개념을 먼저 잡아야 이후 문제 풀이 효율이 높아집니다."
+                                    "reason": "RC 파트의 기초 개념을 먼저 잡아야 이후 문제 풀이 효율이 높아집니다.",
+                                    "source": "해커스"
                                   },
                                   {
                                     "type": "ONE_TIME",
@@ -805,7 +808,8 @@ public interface GoalControllerDocs {
                                     "dueDate": "2025-08-24T00:00:00",
                                     "routineType": null,
                                     "routineDate": null,
-                                    "reason": "마감 D-1일에 전체 실력을 점검하여 시험 당일 컨디션을 최적화합니다."
+                                    "reason": "마감 D-1일에 전체 실력을 점검하여 시험 당일 컨디션을 최적화합니다.",
+                                    "source": null
                                   }
                                 ]
                               },
