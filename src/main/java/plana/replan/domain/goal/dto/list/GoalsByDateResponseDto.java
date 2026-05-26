@@ -1,8 +1,9 @@
-package plana.replan.domain.goal.dto;
+package plana.replan.domain.goal.dto.list;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.LocalDate;
 import java.util.List;
+import plana.replan.domain.goal.dto.common.GoalSingleResponseDto;
 
 @Schema(description = "날짜별 목표 묶음")
 public record GoalsByDateResponseDto(

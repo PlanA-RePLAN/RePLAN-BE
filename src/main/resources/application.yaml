@@ -47,3 +47,6 @@ cloud:
       bucket: ${AWS_S3_BUCKET}
     cloudfront:
       domain: ${AWS_CLOUDFRONT_DOMAIN}
+
+gemini:
+  api-key: ${GEMINI_API_KEY}

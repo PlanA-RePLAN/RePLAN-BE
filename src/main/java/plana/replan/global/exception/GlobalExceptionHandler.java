@@ -20,10 +20,11 @@ public class GlobalExceptionHandler {
 
   @ExceptionHandler(CustomException.class)
   public ResponseEntity<ApiResult<?>> handleCustomException(CustomException e) {
-    log.error("CustomException: {}", e.getMessage());
+    String ref = UUID.randomUUID().toString().substring(0, 8);
+    log.error("[{}] CustomException", ref, e);
     int status = e.getErrorCode().getStatus();
     return ResponseEntity.status(status)
-        .body(ApiResult.error(status, ErrorDetail.of(e.getErrorCode(), e.getDetail())));
+        .body(ApiResult.error(status, ErrorDetail.of(e.getErrorCode(), "(ref: " + ref + ")")));
   }
 
   @ExceptionHandler(MethodArgumentNotValidException.class)
