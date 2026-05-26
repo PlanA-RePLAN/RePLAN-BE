@@ -7,7 +7,6 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -80,7 +79,7 @@ public class GoalAiService {
             req.deadline(),
             req.currentLevel() != null ? req.currentLevel() : "미입력",
             req.availableTime() != null ? req.availableTime() : "미입력",
-            formatNotes(req.notes()),
+            req.notes() != null ? req.notes() : "미입력",
             today);
   }
 
@@ -157,11 +156,7 @@ public class GoalAiService {
         {"todos":[{"type":"","title":"","dueDate":null,"routineType":null,"routineDate":null}]}
         """
         .formatted(
-            req.goal(),
-            req.deadline(),
-            req.currentLevel(),
-            req.availableTime(),
-            formatNotes(req.notes()));
+            req.goal(), req.deadline(), req.currentLevel(), req.availableTime(), req.notes());
   }
 
   private TodoRecommendationResponseDto parseRecommendResponse(String raw) {
@@ -186,13 +181,6 @@ public class GoalAiService {
       log.error("Gemini recommend 응답 파싱 실패: {}", raw, e);
       throw new CustomException(GoalErrorCode.GEMINI_PARSE_ERROR);
     }
-  }
-
-  private String formatNotes(List<NoteItemDto> notes) {
-    if (notes == null || notes.isEmpty()) return "미입력";
-    return notes.stream()
-        .map(n -> "- " + n.title() + ": " + n.content())
-        .collect(Collectors.joining("\n"));
   }
 
   String callGemini(String prompt) {
