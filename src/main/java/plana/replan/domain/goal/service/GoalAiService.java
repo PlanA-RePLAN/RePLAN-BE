@@ -153,7 +153,7 @@ public class GoalAiService {
         12. routineType은 "DAILY", "WEEKLY", "MONTHLY" 중 하나 (ONE_TIME이면 null)
 
         반드시 아래 JSON만 출력하세요 (다른 설명 없이):
-        {"todos":[{"type":"","title":"","dueDate":null,"routineType":null,"routineDate":null}]}
+        {"todos":[{"type":"","title":"","dueDate":null,"routineType":null,"routineDate":null,"reason":""}]}
         """
         .formatted(
             req.goal(), req.deadline(), req.currentLevel(), req.availableTime(), req.notes());
@@ -174,7 +174,8 @@ public class GoalAiService {
             node.path("routineType").isNull() ? null : node.path("routineType").asText(null);
         Integer routineDate =
             node.path("routineDate").isNull() ? null : node.path("routineDate").intValue();
-        todos.add(new RecommendedTodoDto(type, title, dueDate, routineType, routineDate));
+        String reason = node.path("reason").asText(null);
+        todos.add(new RecommendedTodoDto(type, title, dueDate, routineType, routineDate, reason));
       }
       return new TodoRecommendationResponseDto(todos);
     } catch (Exception e) {
