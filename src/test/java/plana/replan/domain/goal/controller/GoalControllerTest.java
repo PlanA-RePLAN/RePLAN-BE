@@ -27,6 +27,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import plana.replan.domain.goal.dto.GoalSingleResponseDto;
 import plana.replan.domain.goal.dto.GoalsByDateResponseDto;
 import plana.replan.domain.goal.exception.GoalErrorCode;
+import plana.replan.domain.goal.service.GoalAiService;
 import plana.replan.domain.goal.service.GoalService;
 import plana.replan.global.config.SecurityConfig;
 import plana.replan.global.exception.CustomException;
@@ -39,6 +40,7 @@ class GoalControllerTest {
   @Autowired private MockMvc mockMvc;
 
   @MockitoBean private GoalService goalService;
+  @MockitoBean private GoalAiService goalAiService;
   @MockitoBean private JwtUtil jwtUtil;
 
   private UsernamePasswordAuthenticationToken authToken(Long userId) {

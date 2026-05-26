@@ -33,7 +33,7 @@ public class GoalAiService {
       "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent";
 
   private final RestClient geminiRestClient;
-  private final ObjectMapper objectMapper;
+  private final ObjectMapper objectMapper = new ObjectMapper();
 
   @Value("${gemini.api-key}")
   private String apiKey;
