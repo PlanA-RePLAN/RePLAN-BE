@@ -183,7 +183,7 @@ public class GoalAiService {
           } else if (routineDateNode.isTextual()) {
             routineDate = Integer.valueOf(routineDateNode.asText());
           } else {
-            throw new IllegalArgumentException("routineDate must be integer or numeric string");
+            throw new CustomException(GoalErrorCode.GEMINI_PARSE_ERROR);
           }
         }
         String reason = node.path("reason").asText(null);
