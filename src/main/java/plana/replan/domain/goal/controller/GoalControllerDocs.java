@@ -534,7 +534,7 @@ public interface GoalControllerDocs {
           | deadline | ✅ 필수 | string | 마감기한 (자연어). 기한 없음도 자연어로 가능 | `"3달 안에"` |
           | currentLevel | ❌ 선택 | string | 현재 수준 (자연어) | `"현재 600점"` |
           | availableTime | ❌ 선택 | string | 투자 가능 시간 (자연어) | `"하루 1시간"` |
-          | notes | ❌ 선택 | string | 특이사항 (자유 형식) | `"해커스 교재 쓰고 싶음"` |
+          | notes | ❌ 선택 | array | 특이사항 항목 목록. 각 항목은 `{ "title": "...", "content": "..." }` 형태 | - |
 
           > ❌ 선택 필드는 생략하거나 null로 전달해도 동일하게 처리됩니다.
 
@@ -572,7 +572,15 @@ public interface GoalControllerDocs {
                                 "deadline": { "date": "2025-08-25", "time": "08:00", "reason": "오늘부터 3개월, 마지막 1주는 점검 기간으로 배정했습니다." },
                                 "currentLevel": { "value": "토익 600점 (LC 310·RC 290 추정)", "reason": "섹션별 수치로 구체화했습니다." },
                                 "availableTime": { "value": "평일 1시간·주말 4시간 (주 약 13시간)", "reason": "주말 활용 시 목표 달성 가능성을 높였습니다." },
-                                "notes": { "value": "해커스 보카·RC·LC 활용. 주 1회 모의고사. 매주 오답 노트 정리.", "reason": "교재 명시 및 복습 루틴을 추가했습니다." }
+                                "notes": {
+                  "value": [
+                    { "title": "교재 및 컨텐츠", "content": "해커스 토익 기출 VOCA, 해커스 토익 기출문제집 1000제 (LC/RC)" },
+                    { "title": "학습 전략", "content": "개념 정리 후 바로 단편 문제 풀이로 이어지는 숏폼 루틴 적용" },
+                    { "title": "암기 루틴", "content": "집중도가 높은 평일 아침 자투리 시간에 단어 암기 및 복습 우선 배치" },
+                    { "title": "마무리", "content": "마감 D-2일 실전 모의고사 1회 + D-1일 오답 노트 백지 복습으로 마무리" }
+                  ],
+                  "reason": "카테고리별로 구조화하여 투두 생성에 바로 활용할 수 있도록 구체화했습니다."
+                }
                               },
                               "error": null
                             }
@@ -672,7 +680,9 @@ public interface GoalControllerDocs {
                                   "deadline": "3달 안에",
                                   "currentLevel": "현재 600점",
                                   "availableTime": "하루 1시간",
-                                  "notes": "해커스 교재 쓰고 싶음"
+                                  "notes": [
+                                    { "title": "교재", "content": "해커스 교재 쓰고 싶음" }
+                                  ]
                                 }
                                 """),
                         @ExampleObject(
@@ -724,7 +734,7 @@ public interface GoalControllerDocs {
           | deadline | ✅ 필수 | string | 마감기한 | `"2025-08-25"` |
           | currentLevel | ✅ 필수 | string | 현재 수준 | `"토익 600점"` |
           | availableTime | ✅ 필수 | string | 투자 가능 시간 | `"평일 1시간·주말 4시간"` |
-          | notes | ✅ 필수 | string | 특이사항 (교재·루틴·전략 포함 권장) | `"해커스 보카·RC·LC 활용"` |
+          | notes | ✅ 필수 | array | 특이사항 항목 목록. 각 항목은 `{ "title": "...", "content": "..." }` 형태. 빈 배열 가능 | - |
 
           ---
 
@@ -883,7 +893,12 @@ public interface GoalControllerDocs {
                                     "deadline": "2025-08-25",
                                     "currentLevel": "토익 600점 (LC 310·RC 290 추정)",
                                     "availableTime": "평일 1시간·주말 4시간 (주 약 13시간)",
-                                    "notes": "해커스 보카·RC·LC 활용. 주 1회 모의고사. 매주 오답 노트 정리."
+                                    "notes": [
+                                      { "title": "교재 및 컨텐츠", "content": "해커스 토익 기출 VOCA, 해커스 토익 기출문제집 1000제 (LC/RC)" },
+                                      { "title": "학습 전략", "content": "개념 정리 후 바로 단편 문제 풀이로 이어지는 숏폼 루틴 적용" },
+                                      { "title": "암기 루틴", "content": "집중도가 높은 평일 아침 자투리 시간에 단어 암기 및 복습 우선 배치" },
+                                      { "title": "마무리", "content": "마감 D-2일 실전 모의고사 1회 + D-1일 오답 노트 백지 복습으로 마무리" }
+                                    ]
                                   }
                                   """)))
           @Valid

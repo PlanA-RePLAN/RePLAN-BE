@@ -8,4 +8,4 @@ public record GoalRefinementResponseDto(
     @Schema(description = "정제된 마감기한") RefinedDeadline deadline,
     @Schema(description = "정제된 현재 수준") RefinedField currentLevel,
     @Schema(description = "정제된 투자 가능 시간") RefinedField availableTime,
-    @Schema(description = "정제된 특이사항") RefinedField notes) {}
+    @Schema(description = "정제된 특이사항") RefinedNotes notes) {}

@@ -2,6 +2,7 @@ package plana.replan.domain.goal.dto;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
+import java.util.List;
 
 @Schema(description = "AI 목표 정제 요청")
 public record GoalRefinementRequestDto(
@@ -19,4 +20,4 @@ public record GoalRefinementRequestDto(
         String deadline,
     @Schema(description = "현재 수준 (자연어, 선택)", example = "현재 600점") String currentLevel,
     @Schema(description = "투자 가능 시간 (자연어, 선택)", example = "하루 1시간") String availableTime,
-    @Schema(description = "특이사항 (자유 형식, 선택)", example = "해커스 교재 쓰고 싶음") String notes) {}
+    @Schema(description = "특이사항 항목 목록 (선택)") List<NoteItemDto> notes) {}

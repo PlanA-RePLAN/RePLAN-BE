@@ -7,6 +7,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -16,9 +17,11 @@ import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 import plana.replan.domain.goal.dto.GoalRefinementRequestDto;
 import plana.replan.domain.goal.dto.GoalRefinementResponseDto;
+import plana.replan.domain.goal.dto.NoteItemDto;
 import plana.replan.domain.goal.dto.RecommendedTodoDto;
 import plana.replan.domain.goal.dto.RefinedDeadline;
 import plana.replan.domain.goal.dto.RefinedField;
+import plana.replan.domain.goal.dto.RefinedNotes;
 import plana.replan.domain.goal.dto.TodoRecommendationRequestDto;
 import plana.replan.domain.goal.dto.TodoRecommendationResponseDto;
 import plana.replan.domain.goal.exception.GoalErrorCode;
@@ -55,27 +58,29 @@ public class GoalAiService {
         마감기한: %s
         현재수준: %s
         투자가능시간: %s
-        특이사항: %s
+        특이사항:
+        %s
 
         정제 규칙:
         1. 사용자가 변경 불가한 제약(특정 요일, 교재, 장소 등)은 반드시 그대로 유지
-        2. 투자 가능 시간 대비 과도한 목표라면 현실적으로 조정
-        3. currentLevel은 구체적 수치나 단계로 명확하게 표현
-        4. availableTime은 일/주/월 단위 환산 포함
-        5. deadline은 오늘 날짜(%s) 기준으로 date(yyyy-MM-dd), time(HH:mm)으로 분리 변환. 사용자가 "기한 없음", "마감기한 설정 안할래요" 등을 명시하면 date와 time 모두 null
+        2. goal: 막연한 표현을 제거하고 측정 가능한 수치·기준을 포함해 구체화. 섹션별 목표가 있으면 명시 (예: "토익 900점" → "토익 900점 달성 (LC 450·RC 450 이상)"). 투자 가능 시간 대비 과도하면 현실적으로 조정하고 이유 명시
+        3. currentLevel: 구체적 수치·단계로 표현하고, 현재 수준에서 목표까지의 격차와 달성 난이도를 한 줄로 평가
+        4. availableTime: 일/주/월 단위로 환산하고, 총 가용 학습 시간을 합산한 뒤 목표 달성 가능성을 한 줄로 평가
+        5. deadline: 오늘 날짜(%s) 기준으로 date(yyyy-MM-dd), time(HH:mm)으로 분리 변환. 사용자가 "기한 없음", "마감기한 설정 안할래요" 등을 명시하면 date와 time 모두 null
         6. 목표 달성에 교재·강의가 필요하지만 사용자가 언급하지 않았다면 Google Search로 사용자 수준에 맞는 교재·강의를 검색하여 notes에 추가
-        7. notes에 투두 생성에 필요한 교재·루틴·전략 정보가 부족하면 AI가 채워 넣기
-        8. 각 필드마다 변경 이유를 한 문장으로 작성 (변경 없으면 "사용자 입력을 그대로 유지했습니다."로 작성)
+        7. notes.value는 목표에 맞는 카테고리(교재/학습전략/루틴/마무리 등, 고정 아님)로 3~5개 항목을 구조화. 각 항목 content는 투두 생성에 바로 쓸 수 있도록 교재명·전략·루틴 방식을 구체적으로 서술
+        8. notes.reason은 notes 전체에 대한 이유를 1문장으로 작성
+        9. 각 필드 reason은 1~2문장으로 구체적으로 작성 (변경 없으면 "사용자 입력을 그대로 유지했습니다."로 작성)
 
         반드시 아래 JSON만 출력하세요 (다른 설명 없이):
-        {"goal":{"value":"","reason":""},"deadline":{"date":null,"time":null,"reason":""},"currentLevel":{"value":"","reason":""},"availableTime":{"value":"","reason":""},"notes":{"value":"","reason":""}}
+        {"goal":{"value":"","reason":""},"deadline":{"date":null,"time":null,"reason":""},"currentLevel":{"value":"","reason":""},"availableTime":{"value":"","reason":""},"notes":{"value":[{"title":"","content":""}],"reason":""}}
         """
         .formatted(
             req.goal(),
             req.deadline(),
             req.currentLevel() != null ? req.currentLevel() : "미입력",
             req.availableTime() != null ? req.availableTime() : "미입력",
-            req.notes() != null ? req.notes() : "미입력",
+            formatNotes(req.notes()),
             today);
   }
 
@@ -103,10 +108,12 @@ public class GoalAiService {
               root.path("availableTime").path("value").asText(),
               root.path("availableTime").path("reason").asText());
 
-      RefinedField notes =
-          new RefinedField(
-              root.path("notes").path("value").asText(),
-              root.path("notes").path("reason").asText());
+      JsonNode notesNode = root.path("notes");
+      List<NoteItemDto> noteItems = new ArrayList<>();
+      for (JsonNode item : notesNode.path("value")) {
+        noteItems.add(new NoteItemDto(item.path("title").asText(), item.path("content").asText()));
+      }
+      RefinedNotes notes = new RefinedNotes(noteItems, notesNode.path("reason").asText());
 
       return new GoalRefinementResponseDto(goal, deadline, currentLevel, availableTime, notes);
     } catch (Exception e) {
@@ -129,7 +136,8 @@ public class GoalAiService {
         마감기한: %s
         현재수준: %s
         투자가능시간: %s
-        특이사항: %s
+        특이사항:
+        %s
 
         투두 생성 규칙:
         1. 교재·강의가 포함된 경우 Google Search로 해당 교재·강의의 목차와 분량을 검색하여 그 분량 기반으로 투두를 세분화
@@ -149,7 +157,11 @@ public class GoalAiService {
         {"todos":[{"type":"","title":"","dueDate":null,"routineType":null,"routineDate":null}]}
         """
         .formatted(
-            req.goal(), req.deadline(), req.currentLevel(), req.availableTime(), req.notes());
+            req.goal(),
+            req.deadline(),
+            req.currentLevel(),
+            req.availableTime(),
+            formatNotes(req.notes()));
   }
 
   private TodoRecommendationResponseDto parseRecommendResponse(String raw) {
@@ -174,6 +186,13 @@ public class GoalAiService {
       log.error("Gemini recommend 응답 파싱 실패: {}", raw, e);
       throw new CustomException(GoalErrorCode.GEMINI_PARSE_ERROR);
     }
+  }
+
+  private String formatNotes(List<NoteItemDto> notes) {
+    if (notes == null || notes.isEmpty()) return "미입력";
+    return notes.stream()
+        .map(n -> "- " + n.title() + ": " + n.content())
+        .collect(Collectors.joining("\n"));
   }
 
   String callGemini(String prompt) {

@@ -2,6 +2,8 @@ package plana.replan.domain.goal.dto;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import java.util.List;
 
 @Schema(description = "AI 투두 추천 요청 (정제된 값을 입력 권장)")
 public record TodoRecommendationRequestDto(
@@ -29,9 +31,6 @@ public record TodoRecommendationRequestDto(
             requiredMode = Schema.RequiredMode.REQUIRED)
         @NotBlank(message = "투자 가능 시간은 필수입니다.")
         String availableTime,
-    @Schema(
-            description = "특이사항",
-            example = "해커스 보카·RC·LC 활용. 주 1회 모의고사. 매주 오답 노트 정리.",
-            requiredMode = Schema.RequiredMode.REQUIRED)
-        @NotBlank(message = "특이사항은 필수입니다.")
-        String notes) {}
+    @Schema(description = "특이사항 항목 목록", requiredMode = Schema.RequiredMode.REQUIRED)
+        @NotNull(message = "특이사항은 필수입니다.")
+        List<NoteItemDto> notes) {}
