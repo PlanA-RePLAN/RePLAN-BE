@@ -19,9 +19,9 @@ import plana.replan.domain.goal.dto.recommend.TodoRecommendationRequestDto;
 import plana.replan.domain.goal.dto.recommend.TodoRecommendationResponseDto;
 import plana.replan.domain.goal.dto.refine.GoalRefinementRequestDto;
 import plana.replan.domain.goal.dto.refine.GoalRefinementResponseDto;
-import plana.replan.domain.goal.dto.refine.NoteItemDto;
 import plana.replan.domain.goal.dto.refine.RefinedDeadline;
 import plana.replan.domain.goal.dto.refine.RefinedField;
+import plana.replan.domain.goal.dto.refine.RefinedNoteItem;
 import plana.replan.domain.goal.dto.refine.RefinedNotes;
 import plana.replan.domain.goal.exception.GoalErrorCode;
 import plana.replan.global.exception.CustomException;
@@ -109,9 +109,10 @@ public class GoalAiService {
               root.path("availableTime").path("reason").asText());
 
       JsonNode notesNode = root.path("notes");
-      List<NoteItemDto> noteItems = new ArrayList<>();
+      List<RefinedNoteItem> noteItems = new ArrayList<>();
       for (JsonNode item : notesNode.path("value")) {
-        noteItems.add(new NoteItemDto(item.path("title").asText(), item.path("content").asText()));
+        noteItems.add(
+            new RefinedNoteItem(item.path("title").asText(), item.path("content").asText()));
       }
       RefinedNotes notes = new RefinedNotes(noteItems, notesNode.path("reason").asText());
 
