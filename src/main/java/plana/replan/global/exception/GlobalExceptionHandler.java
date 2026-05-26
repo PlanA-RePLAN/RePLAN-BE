@@ -21,7 +21,7 @@ public class GlobalExceptionHandler {
   @ExceptionHandler(CustomException.class)
   public ResponseEntity<ApiResult<?>> handleCustomException(CustomException e) {
     String ref = UUID.randomUUID().toString().substring(0, 8);
-    log.error("[{}] CustomException: {}", ref, e.getMessage(), e);
+    log.error("[{}] CustomException", ref, e);
     int status = e.getErrorCode().getStatus();
     return ResponseEntity.status(status)
         .body(ApiResult.error(status, ErrorDetail.of(e.getErrorCode(), "(ref: " + ref + ")")));
