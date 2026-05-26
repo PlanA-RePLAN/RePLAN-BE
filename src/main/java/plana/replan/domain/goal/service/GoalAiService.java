@@ -175,8 +175,17 @@ public class GoalAiService {
         String dueDate = node.path("dueDate").isNull() ? null : node.path("dueDate").asText(null);
         String routineType =
             node.path("routineType").isNull() ? null : node.path("routineType").asText(null);
-        Integer routineDate =
-            node.path("routineDate").isNull() ? null : node.path("routineDate").intValue();
+        Integer routineDate = null;
+        JsonNode routineDateNode = node.path("routineDate");
+        if (!routineDateNode.isNull() && !routineDateNode.isMissingNode()) {
+          if (routineDateNode.isInt()) {
+            routineDate = routineDateNode.intValue();
+          } else if (routineDateNode.isTextual()) {
+            routineDate = Integer.valueOf(routineDateNode.asText());
+          } else {
+            throw new IllegalArgumentException("routineDate must be integer or numeric string");
+          }
+        }
         String reason = node.path("reason").asText(null);
         todos.add(new RecommendedTodoDto(type, title, dueDate, routineType, routineDate, reason));
       }
