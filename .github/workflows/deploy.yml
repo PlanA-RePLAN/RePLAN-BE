@@ -70,6 +70,7 @@ jobs:
             aws ssm get-parameter --name /replan/prod/GOOGLE_WEB_CLIENT_ID --with-decryption --query Parameter.Value --output text --region ${{ secrets.AWS_REGION }} | xargs -I{} echo "GOOGLE_WEB_CLIENT_ID={}" >> /home/ubuntu/app/.env
             aws ssm get-parameter --name /replan/prod/REDIS_HOST --query Parameter.Value --output text --region ${{ secrets.AWS_REGION }} | xargs -I{} echo "REDIS_HOST={}" >> /home/ubuntu/app/.env
             aws ssm get-parameter --name /replan/prod/REDIS_PORT --query Parameter.Value --output text --region ${{ secrets.AWS_REGION }} | xargs -I{} echo "REDIS_PORT={}" >> /home/ubuntu/app/.env
+            aws ssm get-parameter --name /replan/prod/GEMINI_API_KEY --query Parameter.Value --output text --region ${{ secrets.AWS_REGION }} | xargs -I{} echo "GEMINI_API_KEY={}" >> /home/ubuntu/app/.env
             
             # GitHub Secrets에서 ECR 정보 추가
             echo "ECR_REGISTRY=${{ secrets.ECR_REGISTRY }}" >> /home/ubuntu/app/.env
