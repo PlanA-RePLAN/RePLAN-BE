@@ -24,8 +24,8 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
-import plana.replan.domain.goal.dto.GoalSingleResponseDto;
-import plana.replan.domain.goal.dto.GoalsByDateResponseDto;
+import plana.replan.domain.goal.dto.common.GoalSingleResponseDto;
+import plana.replan.domain.goal.dto.list.GoalsByDateResponseDto;
 import plana.replan.domain.goal.exception.GoalErrorCode;
 import plana.replan.domain.goal.service.GoalAiService;
 import plana.replan.domain.goal.service.GoalService;

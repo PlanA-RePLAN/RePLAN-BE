@@ -17,13 +17,13 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
-import plana.replan.domain.goal.dto.GoalCreateRequestDto;
-import plana.replan.domain.goal.dto.GoalRefinementRequestDto;
-import plana.replan.domain.goal.dto.GoalRefinementResponseDto;
-import plana.replan.domain.goal.dto.GoalSingleResponseDto;
-import plana.replan.domain.goal.dto.GoalsByDateResponseDto;
-import plana.replan.domain.goal.dto.TodoRecommendationRequestDto;
-import plana.replan.domain.goal.dto.TodoRecommendationResponseDto;
+import plana.replan.domain.goal.dto.common.GoalSingleResponseDto;
+import plana.replan.domain.goal.dto.create.GoalCreateRequestDto;
+import plana.replan.domain.goal.dto.list.GoalsByDateResponseDto;
+import plana.replan.domain.goal.dto.recommend.TodoRecommendationRequestDto;
+import plana.replan.domain.goal.dto.recommend.TodoRecommendationResponseDto;
+import plana.replan.domain.goal.dto.refine.GoalRefinementRequestDto;
+import plana.replan.domain.goal.dto.refine.GoalRefinementResponseDto;
 import plana.replan.global.common.ApiResult;
 
 @Tag(name = "Goal", description = "목표(Goal) 관련 API. 모든 요청에 JWT 인증 필수.")
