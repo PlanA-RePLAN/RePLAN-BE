@@ -353,10 +353,10 @@ public interface GoalControllerDocs {
 
           ### Query Parameters
 
-          | 파라미터명 | 필수 여부 | 타입 | 기본값 | 설명 | 예시 |
-          |-----------|-----------|------|--------|------|------|
-          | year | ❌ 선택 | integer | 없음 (전체) | 조회할 연도 (생성일 기준). 없으면 전체 목표 반환 | `2026` |
-          | month | ❌ 선택 | integer | 없음 (연도 전체) | 조회할 월 (1~12). **year 파라미터가 함께 있어야 함**. 범위 밖 값이면 400 | `5` |
+          | 파라미터명 | 필수 여부 | 타입 | 설명 | 예시 |
+          |-----------|-----------|------|------|------|
+          | year | ❌ 선택 | integer | 조회할 연도 (생성일 기준) | `2026` |
+          | month | ❌ 선택 | integer | 조회할 월 (1~12). **year가 없으면 400** | `5` |
 
           ---
 
@@ -374,14 +374,26 @@ public interface GoalControllerDocs {
           ---
 
           ### 주의사항
-          - `month`만 단독으로 전달하고 `year`가 없으면 400 반환
+
+          **조회 케이스**
+
+          | year | month | 동작 |
+          |------|-------|------|
+          | ❌ | ❌ | <span style="color:green">전체 조회</span> |
+          | ⭕ | ❌ | <span style="color:green">해당 연도 전체 조회</span> |
+          | ⭕ | ⭕ | <span style="color:green">해당 연도·월 조회</span> |
+          | ❌ | ⭕ | <span style="color:red">400 오류 — year 없이 month만 전달 불가</span> |
+
           - 날짜 내림차순(최신 날짜 먼저) 반환
           - 같은 날짜 내 목표는 생성 순서(ID 오름차순)로 반환
           """,
       security = @SecurityRequirement(name = "Bearer Authentication"))
   @Parameters({
-    @Parameter(name = "year", description = "조회할 연도 (생성일 기준). 없으면 전체 조회.", example = "2026"),
-    @Parameter(name = "month", description = "조회할 월 (year 필수). 없으면 연도 전체 조회.", example = "5")
+    @Parameter(name = "year", description = "조회할 연도. 없으면 전체 조회, 있으면 연도별 조회.", example = "2026"),
+    @Parameter(
+        name = "month",
+        description = "조회할 월 (1~12). year와 함께 전달해야 월별 조회. year 없이 month만 전달하면 400.",
+        example = "5")
   })
   @ApiResponses({
     @ApiResponse(
