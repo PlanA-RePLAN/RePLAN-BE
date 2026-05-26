@@ -28,3 +28,6 @@ cloud:
       bucket: test-bucket
     cloudfront:
       domain: test.cloudfront.net
+
+gemini:
+  api-key: test-gemini-api-key

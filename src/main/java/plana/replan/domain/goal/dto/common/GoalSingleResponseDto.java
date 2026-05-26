@@ -1,4 +1,4 @@
-package plana.replan.domain.goal.dto;
+package plana.replan.domain.goal.dto.common;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.LocalDateTime;

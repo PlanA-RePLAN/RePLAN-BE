@@ -10,15 +10,20 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import java.util.List;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
-import plana.replan.domain.goal.dto.GoalCreateRequestDto;
-import plana.replan.domain.goal.dto.GoalSingleResponseDto;
-import plana.replan.domain.goal.dto.GoalsByDateResponseDto;
+import plana.replan.domain.goal.dto.common.GoalSingleResponseDto;
+import plana.replan.domain.goal.dto.create.GoalCreateRequestDto;
+import plana.replan.domain.goal.dto.list.GoalsByDateResponseDto;
+import plana.replan.domain.goal.dto.recommend.TodoRecommendationRequestDto;
+import plana.replan.domain.goal.dto.recommend.TodoRecommendationResponseDto;
+import plana.replan.domain.goal.dto.refine.GoalRefinementRequestDto;
+import plana.replan.domain.goal.dto.refine.GoalRefinementResponseDto;
 import plana.replan.global.common.ApiResult;
 
 @Tag(name = "Goal", description = "목표(Goal) 관련 API. 모든 요청에 JWT 인증 필수.")
@@ -348,10 +353,10 @@ public interface GoalControllerDocs {
 
           ### Query Parameters
 
-          | 파라미터명 | 필수 여부 | 타입 | 기본값 | 설명 | 예시 |
-          |-----------|-----------|------|--------|------|------|
-          | year | ❌ 선택 | integer | 없음 (전체) | 조회할 연도 (생성일 기준). 없으면 전체 목표 반환 | `2026` |
-          | month | ❌ 선택 | integer | 없음 (연도 전체) | 조회할 월 (1~12). **year 파라미터가 함께 있어야 함**. 범위 밖 값이면 400 | `5` |
+          | 파라미터명 | 필수 여부 | 타입 | 설명 | 예시 |
+          |-----------|-----------|------|------|------|
+          | year | ❌ 선택 | integer | 조회할 연도 (생성일 기준) | `2026` |
+          | month | ❌ 선택 | integer | 조회할 월 (1~12). **year가 없으면 400** | `5` |
 
           ---
 
@@ -369,14 +374,26 @@ public interface GoalControllerDocs {
           ---
 
           ### 주의사항
-          - `month`만 단독으로 전달하고 `year`가 없으면 400 반환
+
+          **조회 케이스**
+
+          | year | month | 동작 |
+          |------|-------|------|
+          | ❌ | ❌ | <span style="color:green">전체 조회</span> |
+          | ⭕ | ❌ | <span style="color:green">해당 연도 전체 조회</span> |
+          | ⭕ | ⭕ | <span style="color:green">해당 연도·월 조회</span> |
+          | ❌ | ⭕ | <span style="color:red">400 오류 — year 없이 month만 전달 불가</span> |
+
           - 날짜 내림차순(최신 날짜 먼저) 반환
           - 같은 날짜 내 목표는 생성 순서(ID 오름차순)로 반환
           """,
       security = @SecurityRequirement(name = "Bearer Authentication"))
   @Parameters({
-    @Parameter(name = "year", description = "조회할 연도 (생성일 기준). 없으면 전체 조회.", example = "2026"),
-    @Parameter(name = "month", description = "조회할 월 (year 필수). 없으면 연도 전체 조회.", example = "5")
+    @Parameter(name = "year", description = "조회할 연도. 없으면 전체 조회, 있으면 연도별 조회.", example = "2026"),
+    @Parameter(
+        name = "month",
+        description = "조회할 월 (1~12). year와 함께 전달해야 월별 조회. year 없이 month만 전달하면 400.",
+        example = "5")
   })
   @ApiResponses({
     @ApiResponse(
@@ -503,4 +520,401 @@ public interface GoalControllerDocs {
       @AuthenticationPrincipal Long userId,
       @RequestParam(required = false) Integer year,
       @RequestParam(required = false) Integer month);
+
+  @Operation(
+      summary = "AI 목표 정제",
+      description =
+          """
+          사용자가 자연어로 입력한 목표 초안을 AI가 분석하여 투두 리스트 생성에 최적화된 형태로 정제합니다.
+
+          ---
+
+          ### Request Headers
+
+          | 헤더명 | 필수 여부 | 타입 | 설명 |
+          |--------|-----------|------|------|
+          | Authorization | ✅ 필수 | string | `Bearer {accessToken}` 형식의 JWT 액세스 토큰 |
+          | Content-Type | ✅ 필수 | string | `application/json` |
+
+          ---
+
+          ### Request Body
+
+          | 필드명 | 필수 여부 | 타입 | 설명 | 예시 |
+          |--------|-----------|------|------|------|
+          | goal | ✅ 필수 | string | 목표 (자연어) | `"토익 900점"` |
+          | deadline | ✅ 필수 | string | 마감기한 (자연어). 기한 없음도 자연어로 가능 | `"3달 안에"` |
+          | currentLevel | ❌ 선택 | string | 현재 수준 (자연어) | `"현재 600점"` |
+          | availableTime | ❌ 선택 | string | 투자 가능 시간 (자연어) | `"하루 1시간"` |
+          | notes | ❌ 선택 | string | 특이사항 (자유 형식) | `"해커스 교재 쓰고 싶음"` |
+
+          > ❌ 선택 필드는 생략하거나 null로 전달해도 동일하게 처리됩니다.
+
+          ---
+
+          ### Response Elements
+
+          각 필드는 `{ "value": "정제된 값", "reason": "AI 근거" }` 형태로 반환됩니다.
+          deadline은 `{ "date": "yyyy-MM-dd", "time": "HH:mm", "reason": "..." }` 형태이며,
+          사용자가 마감기한을 설정하지 않겠다고 명시한 경우 date와 time이 null입니다.
+
+          ---
+
+          ### 주의사항
+          - AI가 인터넷 검색(Google Search)을 통해 적합한 교재·강의를 추천할 수 있습니다.
+          - 응답 시간이 일반 API보다 길 수 있습니다 (최대 30초).
+          - AI 서비스 장애 시 502 반환.
+          """,
+      security = @SecurityRequirement(name = "Bearer Authentication"))
+  @ApiResponses({
+    @ApiResponse(
+        responseCode = "200",
+        description = "목표 정제 성공",
+        content =
+            @Content(
+                examples =
+                    @ExampleObject(
+                        value =
+                            """
+                            {
+                              "status": 200,
+                              "success": true,
+                              "data": {
+                                "goal": { "value": "토익 900점 달성 (LC 450·RC 450 이상)", "reason": "섹션별 목표를 명시해 학습 방향을 명확히 했습니다." },
+                                "deadline": { "date": "2025-08-25", "time": "08:00", "reason": "오늘부터 3개월, 마지막 1주는 점검 기간으로 배정했습니다." },
+                                "currentLevel": { "value": "토익 600점 (LC 310·RC 290 추정)", "reason": "섹션별 수치로 구체화했습니다." },
+                                "availableTime": { "value": "평일 1시간·주말 4시간 (주 약 13시간)", "reason": "주말 활용 시 목표 달성 가능성을 높였습니다." },
+                                "notes": {
+                  "value": [
+                    { "title": "교재 및 컨텐츠", "content": "해커스 토익 기출 VOCA, 해커스 토익 기출문제집 1000제 (LC/RC)" },
+                    { "title": "학습 전략", "content": "개념 정리 후 바로 단편 문제 풀이로 이어지는 숏폼 루틴 적용" },
+                    { "title": "암기 루틴", "content": "집중도가 높은 평일 아침 자투리 시간에 단어 암기 및 복습 우선 배치" },
+                    { "title": "마무리", "content": "마감 D-2일 실전 모의고사 1회 + D-1일 오답 노트 백지 복습으로 마무리" }
+                  ],
+                  "reason": "카테고리별로 구조화하여 투두 생성에 바로 활용할 수 있도록 구체화했습니다."
+                }
+                              },
+                              "error": null
+                            }
+                            """))),
+    @ApiResponse(
+        responseCode = "400",
+        description = "goal 또는 deadline 누락",
+        content =
+            @Content(
+                examples =
+                    @ExampleObject(
+                        value =
+                            """
+                            {
+                              "status": 400,
+                              "success": false,
+                              "data": null,
+                              "error": {
+                                "code": "INVALID_INPUT",
+                                "message": "목표는 필수입니다.",
+                                "detail": null
+                              }
+                            }
+                            """))),
+    @ApiResponse(
+        responseCode = "401",
+        description = "인증 실패",
+        content =
+            @Content(
+                examples = {
+                  @ExampleObject(
+                      name = "토큰 없음",
+                      value =
+                          """
+                          {
+                            "status": 401,
+                            "success": false,
+                            "data": null,
+                            "error": { "code": "EMPTY_TOKEN", "message": "토큰이 없습니다.", "detail": null }
+                          }
+                          """),
+                  @ExampleObject(
+                      name = "만료된 토큰",
+                      value =
+                          """
+                          {
+                            "status": 401,
+                            "success": false,
+                            "data": null,
+                            "error": { "code": "EXPIRED_TOKEN", "message": "만료된 토큰입니다.", "detail": null }
+                          }
+                          """)
+                })),
+    @ApiResponse(
+        responseCode = "502",
+        description = "AI 서비스 오류",
+        content =
+            @Content(
+                examples = {
+                  @ExampleObject(
+                      name = "Gemini API 오류",
+                      value =
+                          """
+                          {
+                            "status": 502,
+                            "success": false,
+                            "data": null,
+                            "error": { "code": "GEMINI_API_ERROR", "message": "AI 추천 서비스에 일시적인 오류가 발생했습니다.", "detail": null }
+                          }
+                          """),
+                  @ExampleObject(
+                      name = "응답 파싱 오류",
+                      value =
+                          """
+                          {
+                            "status": 502,
+                            "success": false,
+                            "data": null,
+                            "error": { "code": "GEMINI_PARSE_ERROR", "message": "AI 응답을 처리하는 중 오류가 발생했습니다.", "detail": null }
+                          }
+                          """)
+                }))
+  })
+  ResponseEntity<ApiResult<GoalRefinementResponseDto>> refineGoal(
+      @AuthenticationPrincipal Long userId,
+      @io.swagger.v3.oas.annotations.parameters.RequestBody(
+              content =
+                  @Content(
+                      mediaType = "application/json",
+                      examples = {
+                        @ExampleObject(
+                            name = "전체 필드 포함",
+                            value =
+                                """
+                                {
+                                  "goal": "토익 900점",
+                                  "deadline": "3달 안에",
+                                  "currentLevel": "현재 600점",
+                                  "availableTime": "하루 1시간",
+                                  "notes": "해커스 교재 쓰고 싶음"
+                                }
+                                """),
+                        @ExampleObject(
+                            name = "필수 필드만",
+                            value =
+                                """
+                                {
+                                  "goal": "토익 900점",
+                                  "deadline": "3달 안에"
+                                }
+                                """),
+                        @ExampleObject(
+                            name = "마감기한 없음",
+                            value =
+                                """
+                                {
+                                  "goal": "토익 900점",
+                                  "deadline": "마감기한 설정 안할래요"
+                                }
+                                """)
+                      }))
+          @Valid
+          @RequestBody
+          GoalRefinementRequestDto request);
+
+  @Operation(
+      summary = "AI 투두 추천",
+      description =
+          """
+          목표 정보를 기반으로 AI가 달성에 필요한 투두 리스트를 추천합니다.
+          반환된 데이터를 사용해 클라이언트가 기존 투두/루틴 생성 API를 호출하여 실제 투두를 생성합니다.
+
+          ---
+
+          ### Request Headers
+
+          | 헤더명 | 필수 여부 | 타입 | 설명 |
+          |--------|-----------|------|------|
+          | Authorization | ✅ 필수 | string | `Bearer {accessToken}` 형식의 JWT 액세스 토큰 |
+          | Content-Type | ✅ 필수 | string | `application/json` |
+
+          ---
+
+          ### Request Body
+
+          | 필드명 | 필수 여부 | 타입 | 설명 | 예시 |
+          |--------|-----------|------|------|------|
+          | goal | ✅ 필수 | string | 목표 | `"토익 900점 달성"` |
+          | deadline | ✅ 필수 | string | 마감기한 | `"2025-08-25"` |
+          | currentLevel | ✅ 필수 | string | 현재 수준 | `"토익 600점"` |
+          | availableTime | ✅ 필수 | string | 투자 가능 시간 | `"평일 1시간·주말 4시간"` |
+          | notes | ✅ 필수 | string | 특이사항 (교재·루틴·전략 포함 권장) | `"해커스 보카·RC·LC 활용"` |
+
+          ---
+
+          ### Response Elements
+
+          | 필드명 | 타입 | 설명 |
+          |--------|------|------|
+          | todos | array | 추천 투두 목록 |
+          | todos[].type | string | `ONE_TIME` (일회형) 또는 `RECURRING` (반복형) |
+          | todos[].title | string | 투두 제목 |
+          | todos[].dueDate | string | 마감일 (ISO 8601). 없으면 null |
+          | todos[].routineType | string | RECURRING만: `DAILY` / `WEEKLY` / `MONTHLY`. ONE_TIME이면 null |
+          | todos[].routineDate | integer | RECURRING WEEKLY: 요일 bitmask. MONTHLY: 일자. DAILY·ONE_TIME: null |
+          | todos[].reason | string | AI가 이 투두를 생성한 이유 |
+          | todos[].source | string | 강의면 플랫폼명, 책이면 저자명. 없으면 null |
+
+          ---
+
+          ### 주의사항
+          - 추천 결과는 실제 투두 생성이 아닙니다. 클라이언트가 `POST /api/todos/create` 또는 루틴 생성 API를 별도 호출해야 합니다.
+          - 교재·강의가 포함된 경우 Google Search로 목차·분량을 검색하여 투두를 세분화합니다.
+          - 응답 시간이 일반 API보다 길 수 있습니다 (최대 30초).
+          """,
+      security = @SecurityRequirement(name = "Bearer Authentication"))
+  @ApiResponses({
+    @ApiResponse(
+        responseCode = "200",
+        description = "투두 추천 성공",
+        content =
+            @Content(
+                examples =
+                    @ExampleObject(
+                        value =
+                            """
+                            {
+                              "status": 200,
+                              "success": true,
+                              "data": {
+                                "todos": [
+                                  {
+                                    "type": "RECURRING",
+                                    "title": "해커스 보카 30단어 암기 및 복습",
+                                    "dueDate": "2025-08-25T00:00:00",
+                                    "routineType": "DAILY",
+                                    "routineDate": null,
+                                    "reason": "목표 달성을 위해 매일 꾸준한 단어 암기가 필요합니다.",
+                                    "source": "해커스"
+                                  },
+                                  {
+                                    "type": "ONE_TIME",
+                                    "title": "해커스 RC 1~5강 수강",
+                                    "dueDate": "2025-06-10T00:00:00",
+                                    "routineType": null,
+                                    "routineDate": null,
+                                    "reason": "RC 파트의 기초 개념을 먼저 잡아야 이후 문제 풀이 효율이 높아집니다.",
+                                    "source": "해커스"
+                                  },
+                                  {
+                                    "type": "ONE_TIME",
+                                    "title": "실전 모의고사 최종 점검",
+                                    "dueDate": "2025-08-24T00:00:00",
+                                    "routineType": null,
+                                    "routineDate": null,
+                                    "reason": "마감 D-1일에 전체 실력을 점검하여 시험 당일 컨디션을 최적화합니다.",
+                                    "source": null
+                                  }
+                                ]
+                              },
+                              "error": null
+                            }
+                            """))),
+    @ApiResponse(
+        responseCode = "400",
+        description = "필수 필드 누락",
+        content =
+            @Content(
+                examples =
+                    @ExampleObject(
+                        value =
+                            """
+                            {
+                              "status": 400,
+                              "success": false,
+                              "data": null,
+                              "error": {
+                                "code": "INVALID_INPUT",
+                                "message": "목표는 필수입니다.",
+                                "detail": null
+                              }
+                            }
+                            """))),
+    @ApiResponse(
+        responseCode = "401",
+        description = "인증 실패",
+        content =
+            @Content(
+                examples = {
+                  @ExampleObject(
+                      name = "토큰 없음",
+                      value =
+                          """
+                          {
+                            "status": 401,
+                            "success": false,
+                            "data": null,
+                            "error": { "code": "EMPTY_TOKEN", "message": "토큰이 없습니다.", "detail": null }
+                          }
+                          """),
+                  @ExampleObject(
+                      name = "만료된 토큰",
+                      value =
+                          """
+                          {
+                            "status": 401,
+                            "success": false,
+                            "data": null,
+                            "error": { "code": "EXPIRED_TOKEN", "message": "만료된 토큰입니다.", "detail": null }
+                          }
+                          """)
+                })),
+    @ApiResponse(
+        responseCode = "502",
+        description = "AI 서비스 오류",
+        content =
+            @Content(
+                examples = {
+                  @ExampleObject(
+                      name = "Gemini API 오류",
+                      value =
+                          """
+                          {
+                            "status": 502,
+                            "success": false,
+                            "data": null,
+                            "error": { "code": "GEMINI_API_ERROR", "message": "AI 추천 서비스에 일시적인 오류가 발생했습니다.", "detail": null }
+                          }
+                          """),
+                  @ExampleObject(
+                      name = "응답 파싱 오류",
+                      value =
+                          """
+                          {
+                            "status": 502,
+                            "success": false,
+                            "data": null,
+                            "error": { "code": "GEMINI_PARSE_ERROR", "message": "AI 응답을 처리하는 중 오류가 발생했습니다.", "detail": null }
+                          }
+                          """)
+                }))
+  })
+  ResponseEntity<ApiResult<TodoRecommendationResponseDto>> recommendTodos(
+      @AuthenticationPrincipal Long userId,
+      @io.swagger.v3.oas.annotations.parameters.RequestBody(
+              content =
+                  @Content(
+                      mediaType = "application/json",
+                      examples =
+                          @ExampleObject(
+                              name = "정제된 값으로 요청",
+                              value =
+                                  """
+                                  {
+                                    "goal": "토익 900점 달성 (LC 450·RC 450 이상)",
+                                    "deadline": "2025-08-25",
+                                    "currentLevel": "토익 600점 (LC 310·RC 290 추정)",
+                                    "availableTime": "평일 1시간·주말 4시간 (주 약 13시간)",
+                                    "notes": "해커스 보카·RC·LC 활용. 주 1회 모의고사. 매주 오답 노트 정리."
+                                  }
+                                  """)))
+          @Valid
+          @RequestBody
+          TodoRecommendationRequestDto request);
 }

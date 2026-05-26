@@ -6,9 +6,14 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
-import plana.replan.domain.goal.dto.GoalCreateRequestDto;
-import plana.replan.domain.goal.dto.GoalSingleResponseDto;
-import plana.replan.domain.goal.dto.GoalsByDateResponseDto;
+import plana.replan.domain.goal.dto.common.GoalSingleResponseDto;
+import plana.replan.domain.goal.dto.create.GoalCreateRequestDto;
+import plana.replan.domain.goal.dto.list.GoalsByDateResponseDto;
+import plana.replan.domain.goal.dto.recommend.TodoRecommendationRequestDto;
+import plana.replan.domain.goal.dto.recommend.TodoRecommendationResponseDto;
+import plana.replan.domain.goal.dto.refine.GoalRefinementRequestDto;
+import plana.replan.domain.goal.dto.refine.GoalRefinementResponseDto;
+import plana.replan.domain.goal.service.GoalAiService;
 import plana.replan.domain.goal.service.GoalService;
 import plana.replan.global.common.ApiResult;
 
@@ -18,6 +23,7 @@ import plana.replan.global.common.ApiResult;
 public class GoalController implements GoalControllerDocs {
 
   private final GoalService goalService;
+  private final GoalAiService goalAiService;
 
   @Override
   @PostMapping
@@ -41,5 +47,20 @@ public class GoalController implements GoalControllerDocs {
       @RequestParam(required = false) Integer year,
       @RequestParam(required = false) Integer month) {
     return ResponseEntity.ok(ApiResult.ok(goalService.getGoals(userId, year, month)));
+  }
+
+  @Override
+  @PostMapping("/ai/refine")
+  public ResponseEntity<ApiResult<GoalRefinementResponseDto>> refineGoal(
+      @AuthenticationPrincipal Long userId, @Valid @RequestBody GoalRefinementRequestDto request) {
+    return ResponseEntity.ok(ApiResult.ok(goalAiService.refineGoal(request)));
+  }
+
+  @Override
+  @PostMapping("/ai/todo-recommendations")
+  public ResponseEntity<ApiResult<TodoRecommendationResponseDto>> recommendTodos(
+      @AuthenticationPrincipal Long userId,
+      @Valid @RequestBody TodoRecommendationRequestDto request) {
+    return ResponseEntity.ok(ApiResult.ok(goalAiService.recommendTodos(request)));
   }
 }
