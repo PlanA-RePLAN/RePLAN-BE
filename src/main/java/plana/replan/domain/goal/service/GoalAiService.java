@@ -70,6 +70,7 @@ public class GoalAiService {
         7. notes.value는 목표에 맞는 카테고리(교재/학습전략/루틴/마무리 등, 고정 아님)로 3~5개 항목을 구조화. 각 항목 content는 투두 생성에 바로 쓸 수 있도록 교재명·전략·루틴 방식을 구체적으로 서술
         8. notes.reason은 notes 전체에 대한 이유를 1문장으로 작성
         9. 각 필드 reason은 1~2문장으로 구체적으로 작성 (변경 없으면 "사용자 입력을 그대로 유지했습니다."로 작성)
+        10. 모든 텍스트는 "~합니다", "~했습니다" 등 서술형으로 작성. "~하세요", "~하시기 바랍니다" 등 조언·명령형 말투 절대 금지
 
         반드시 아래 JSON만 출력하세요 (다른 설명 없이):
         {"goal":{"value":"","reason":""},"deadline":{"date":null,"time":null,"reason":""},"currentLevel":{"value":"","reason":""},"availableTime":{"value":"","reason":""},"notes":{"value":[{"title":"","content":""}],"reason":""}}
@@ -151,6 +152,7 @@ public class GoalAiService {
         10. dueDate는 yyyy-MM-ddT00:00:00 형식 또는 null
         11. type은 "ONE_TIME" 또는 "RECURRING"만 허용
         12. routineType은 "DAILY", "WEEKLY", "MONTHLY" 중 하나 (ONE_TIME이면 null)
+        13. reason 포함 모든 텍스트는 "~합니다", "~했습니다" 등 서술형으로 작성. "~하세요", "~하시기 바랍니다" 등 조언·명령형 말투 절대 금지
 
         반드시 아래 JSON만 출력하세요 (다른 설명 없이):
         {"todos":[{"type":"","title":"","dueDate":null,"routineType":null,"routineDate":null,"reason":""}]}
