@@ -3,12 +3,14 @@ package plana.replan.domain.tag.service;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import plana.replan.domain.routine.repository.RoutineRepository;
 import plana.replan.domain.tag.dto.TagCreateRequestDto;
 import plana.replan.domain.tag.dto.TagResponseDto;
 import plana.replan.domain.tag.dto.TagUpdateRequestDto;
 import plana.replan.domain.tag.entity.Tag;
 import plana.replan.domain.tag.exception.TagErrorCode;
 import plana.replan.domain.tag.repository.TagRepository;
+import plana.replan.domain.todo.repository.TodoRepository;
 import plana.replan.domain.user.entity.User;
 import plana.replan.domain.user.exception.UserErrorCode;
 import plana.replan.domain.user.repository.UserRepository;
@@ -21,6 +23,8 @@ public class TagService {
 
   private final TagRepository tagRepository;
   private final UserRepository userRepository;
+  private final TodoRepository todoRepository;
+  private final RoutineRepository routineRepository;
 
   @Transactional
   public TagResponseDto createTag(Long userId, TagCreateRequestDto request) {
@@ -77,6 +81,8 @@ public class TagService {
       throw new CustomException(TagErrorCode.TAG_NOT_FOUND);
     }
 
+    todoRepository.clearTagFromTodos(tag);
+    routineRepository.clearTagFromRoutines(tag);
     tag.softDelete();
   }
 }
