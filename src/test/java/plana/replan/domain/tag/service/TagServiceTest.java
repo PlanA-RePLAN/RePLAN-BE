@@ -16,6 +16,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
+import plana.replan.domain.routine.repository.RoutineRepository;
 import plana.replan.domain.tag.dto.TagCreateRequestDto;
 import plana.replan.domain.tag.dto.TagResponseDto;
 import plana.replan.domain.tag.dto.TagUpdateRequestDto;
@@ -23,6 +24,7 @@ import plana.replan.domain.tag.entity.Tag;
 import plana.replan.domain.tag.entity.TagColor;
 import plana.replan.domain.tag.exception.TagErrorCode;
 import plana.replan.domain.tag.repository.TagRepository;
+import plana.replan.domain.todo.repository.TodoRepository;
 import plana.replan.domain.user.entity.Provider;
 import plana.replan.domain.user.entity.Role;
 import plana.replan.domain.user.entity.User;
@@ -36,6 +38,8 @@ class TagServiceTest {
 
   @Mock private TagRepository tagRepository;
   @Mock private UserRepository userRepository;
+  @Mock private TodoRepository todoRepository;
+  @Mock private RoutineRepository routineRepository;
 
   @InjectMocks private TagService tagService;
 
@@ -288,7 +292,7 @@ class TagServiceTest {
   }
 
   @Test
-  @DisplayName("deleteTag - 성공: soft delete 처리")
+  @DisplayName("deleteTag - 성공: 연관 todo·루틴 tag null 처리 후 soft delete")
   void deleteTag_success() {
     User user = testUser();
     Tag tag = testTag(1L, user);
@@ -296,6 +300,8 @@ class TagServiceTest {
 
     tagService.deleteTag(1L, 1L);
 
+    verify(todoRepository).clearTagFromTodos(tag);
+    verify(routineRepository).clearTagFromRoutines(tag);
     assertThat(ReflectionTestUtils.getField(tag, "deletedAt")).isNotNull();
   }
 }
