@@ -24,8 +24,8 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
-import plana.replan.domain.goal.dto.common.GoalSingleResponseDto;
-import plana.replan.domain.goal.dto.list.GoalsByDateResponseDto;
+import plana.replan.domain.goal.dto.common.GoalSingleResponse;
+import plana.replan.domain.goal.dto.list.GoalsByDateResponse;
 import plana.replan.domain.goal.exception.GoalErrorCode;
 import plana.replan.domain.goal.service.GoalAiService;
 import plana.replan.domain.goal.service.GoalService;
@@ -52,8 +52,8 @@ class GoalControllerTest {
 
   @Test
   void 목표_생성_성공() throws Exception {
-    GoalSingleResponseDto mockResponse =
-        new GoalSingleResponseDto(
+    GoalSingleResponse mockResponse =
+        new GoalSingleResponse(
             42L, "토익 900점 달성", LocalDateTime.of(2025, 12, 31, 0, 0), "https://toeic.ets.org");
     given(goalService.createGoal(any(), any())).willReturn(mockResponse);
 
@@ -81,7 +81,7 @@ class GoalControllerTest {
 
   @Test
   void 목표_생성_optional_필드_생략해도_200() throws Exception {
-    GoalSingleResponseDto mockResponse = new GoalSingleResponseDto(42L, "토익", null, null);
+    GoalSingleResponse mockResponse = new GoalSingleResponse(42L, "토익", null, null);
     given(goalService.createGoal(any(), any())).willReturn(mockResponse);
 
     mockMvc
@@ -194,10 +194,10 @@ class GoalControllerTest {
 
   @Test
   void 목표_조회_성공_전체() throws Exception {
-    GoalSingleResponseDto goal =
-        new GoalSingleResponseDto(10L, "토익 900점", LocalDateTime.of(2026, 5, 26, 20, 0), null);
-    GoalsByDateResponseDto dateGroup =
-        new GoalsByDateResponseDto(LocalDate.of(2026, 5, 4), List.of(goal));
+    GoalSingleResponse goal =
+        new GoalSingleResponse(10L, "토익 900점", LocalDateTime.of(2026, 5, 26, 20, 0), null);
+    GoalsByDateResponse dateGroup =
+        new GoalsByDateResponse(LocalDate.of(2026, 5, 4), List.of(goal));
     given(goalService.getGoals(any(), any(), any())).willReturn(List.of(dateGroup));
 
     mockMvc

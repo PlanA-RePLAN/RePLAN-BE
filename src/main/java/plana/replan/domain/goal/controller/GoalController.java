@@ -6,13 +6,13 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
-import plana.replan.domain.goal.dto.common.GoalSingleResponseDto;
-import plana.replan.domain.goal.dto.create.GoalCreateRequestDto;
-import plana.replan.domain.goal.dto.list.GoalsByDateResponseDto;
-import plana.replan.domain.goal.dto.recommend.TodoRecommendationRequestDto;
-import plana.replan.domain.goal.dto.recommend.TodoRecommendationResponseDto;
-import plana.replan.domain.goal.dto.refine.GoalRefinementRequestDto;
-import plana.replan.domain.goal.dto.refine.GoalRefinementResponseDto;
+import plana.replan.domain.goal.dto.common.GoalSingleResponse;
+import plana.replan.domain.goal.dto.create.GoalCreateRequest;
+import plana.replan.domain.goal.dto.list.GoalsByDateResponse;
+import plana.replan.domain.goal.dto.recommend.TodoRecommendationRequest;
+import plana.replan.domain.goal.dto.recommend.TodoRecommendationResponse;
+import plana.replan.domain.goal.dto.refine.GoalRefinementRequest;
+import plana.replan.domain.goal.dto.refine.GoalRefinementResponse;
 import plana.replan.domain.goal.service.GoalAiService;
 import plana.replan.domain.goal.service.GoalService;
 import plana.replan.global.common.ApiResult;
@@ -27,8 +27,8 @@ public class GoalController implements GoalControllerDocs {
 
   @Override
   @PostMapping
-  public ResponseEntity<ApiResult<GoalSingleResponseDto>> createGoal(
-      @AuthenticationPrincipal Long userId, @Valid @RequestBody GoalCreateRequestDto request) {
+  public ResponseEntity<ApiResult<GoalSingleResponse>> createGoal(
+      @AuthenticationPrincipal Long userId, @Valid @RequestBody GoalCreateRequest request) {
     return ResponseEntity.ok(ApiResult.ok(goalService.createGoal(userId, request)));
   }
 
@@ -42,7 +42,7 @@ public class GoalController implements GoalControllerDocs {
 
   @Override
   @GetMapping
-  public ResponseEntity<ApiResult<List<GoalsByDateResponseDto>>> getGoals(
+  public ResponseEntity<ApiResult<List<GoalsByDateResponse>>> getGoals(
       @AuthenticationPrincipal Long userId,
       @RequestParam(required = false) Integer year,
       @RequestParam(required = false) Integer month) {
@@ -51,16 +51,15 @@ public class GoalController implements GoalControllerDocs {
 
   @Override
   @PostMapping("/ai/refine")
-  public ResponseEntity<ApiResult<GoalRefinementResponseDto>> refineGoal(
-      @AuthenticationPrincipal Long userId, @Valid @RequestBody GoalRefinementRequestDto request) {
+  public ResponseEntity<ApiResult<GoalRefinementResponse>> refineGoal(
+      @AuthenticationPrincipal Long userId, @Valid @RequestBody GoalRefinementRequest request) {
     return ResponseEntity.ok(ApiResult.ok(goalAiService.refineGoal(request)));
   }
 
   @Override
   @PostMapping("/ai/todo-recommendations")
-  public ResponseEntity<ApiResult<TodoRecommendationResponseDto>> recommendTodos(
-      @AuthenticationPrincipal Long userId,
-      @Valid @RequestBody TodoRecommendationRequestDto request) {
+  public ResponseEntity<ApiResult<TodoRecommendationResponse>> recommendTodos(
+      @AuthenticationPrincipal Long userId, @Valid @RequestBody TodoRecommendationRequest request) {
     return ResponseEntity.ok(ApiResult.ok(goalAiService.recommendTodos(request)));
   }
 }

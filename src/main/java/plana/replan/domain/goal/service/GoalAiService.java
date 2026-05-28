@@ -14,11 +14,11 @@ import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
-import plana.replan.domain.goal.dto.recommend.RecommendedTodoDto;
-import plana.replan.domain.goal.dto.recommend.TodoRecommendationRequestDto;
-import plana.replan.domain.goal.dto.recommend.TodoRecommendationResponseDto;
-import plana.replan.domain.goal.dto.refine.GoalRefinementRequestDto;
-import plana.replan.domain.goal.dto.refine.GoalRefinementResponseDto;
+import plana.replan.domain.goal.dto.recommend.RecommendedTodo;
+import plana.replan.domain.goal.dto.recommend.TodoRecommendationRequest;
+import plana.replan.domain.goal.dto.recommend.TodoRecommendationResponse;
+import plana.replan.domain.goal.dto.refine.GoalRefinementRequest;
+import plana.replan.domain.goal.dto.refine.GoalRefinementResponse;
 import plana.replan.domain.goal.dto.refine.RefinedDeadline;
 import plana.replan.domain.goal.dto.refine.RefinedField;
 import plana.replan.domain.goal.dto.refine.RefinedNoteItem;
@@ -40,14 +40,14 @@ public class GoalAiService {
   @Value("${gemini.api-key}")
   private String apiKey;
 
-  public GoalRefinementResponseDto refineGoal(GoalRefinementRequestDto request) {
+  public GoalRefinementResponse refineGoal(GoalRefinementRequest request) {
     String today = LocalDate.now().format(DateTimeFormatter.ISO_LOCAL_DATE);
     String prompt = buildRefinePrompt(request, today);
     String raw = callGemini(prompt);
     return parseRefineResponse(raw);
   }
 
-  private String buildRefinePrompt(GoalRefinementRequestDto req, String today) {
+  private String buildRefinePrompt(GoalRefinementRequest req, String today) {
     return """
         당신은 목표 달성 플래닝 전문가입니다.
         사용자가 제공한 목표 초안을 분석하고, 투두 리스트 생성에 최적화되도록 정제하세요.
@@ -91,7 +91,7 @@ public class GoalAiService {
             today);
   }
 
-  private GoalRefinementResponseDto parseRefineResponse(String raw) {
+  private GoalRefinementResponse parseRefineResponse(String raw) {
     try {
       String json = extractJson(raw);
       JsonNode root = objectMapper.readTree(json);
@@ -123,20 +123,21 @@ public class GoalAiService {
       }
       RefinedNotes notes = new RefinedNotes(noteItems, notesNode.path("reason").asText());
 
-      return new GoalRefinementResponseDto(goal, deadline, currentLevel, availableTime, notes);
+      return new GoalRefinementResponse(goal, deadline, currentLevel, availableTime, notes);
     } catch (Exception e) {
       log.error("Gemini refine 응답 파싱 실패: {}", raw, e);
       throw new CustomException(GoalErrorCode.GEMINI_PARSE_ERROR);
     }
   }
 
-  public TodoRecommendationResponseDto recommendTodos(TodoRecommendationRequestDto request) {
+  public TodoRecommendationResponse recommendTodos(TodoRecommendationRequest request) {
     String prompt = buildRecommendPrompt(request);
     String raw = callGemini(prompt);
     return parseRecommendResponse(raw);
   }
 
-  private String buildRecommendPrompt(TodoRecommendationRequestDto req) {
+  private String buildRecommendPrompt(TodoRecommendationRequest req) {
+    String deadlineInfo = buildDeadlineInfo(req.deadlineDate(), req.deadlineTime());
     return """
         당신은 목표 달성 플래닝 전문가입니다.
 
@@ -167,37 +168,54 @@ public class GoalAiService {
            예) "인프런 - 한입 리액트 13강 컴포넌트 만들기 수강" (검색으로 확인된 실제 제목)
         4. 1회 투두 분량은 하루 투자시간의 50%%를 초과하지 않는다
         5. 교재·강의가 없으면 notes에 제공된 정보만으로 투두 생성 (새 교재·강의 검색·추천 금지)
-        6. source 필드: 강의면 플랫폼명(인프런, freeCodeCamp, 해커스 등), 책이면 저자명, 해당 없으면 null
-        7. RECURRING 투두는 매번 내용이 동일한 작업만 해당 (예: 매일 단어 암기, 매일 운동)
-        8. 인강 수강처럼 매번 다른 내용을 학습하는 것은 ONE_TIME 투두 여러 개로 생성
-        9. 이론 나열 금지. '수기 복습', '문제 풀이', '오답 노트' 등 아웃풋 태스크 반드시 중간에 배치
-        10. 마감 D-1~2는 진도 금지. '최종 점검', '백지 복습' 등 마무리 태스크만 배치
-        11. WEEKLY routineDate는 bitmask: 월=1, 화=2, 수=4, 목=8, 금=16, 토=32, 일=64
-        12. MONTHLY routineDate는 일자(1~31)
-        13. DAILY는 routineDate 불필요 (null)
-        14. dueDate는 yyyy-MM-ddT00:00:00 형식 또는 null
-        15. type은 "ONE_TIME" 또는 "RECURRING"만 허용
-        16. routineType은 "DAILY", "WEEKLY", "MONTHLY" 중 하나 (ONE_TIME이면 null)
-        17. reason 포함 모든 텍스트는 "~합니다", "~했습니다" 등 서술형으로 작성. "~하세요", "~하시기 바랍니다" 등 조언·명령형 말투 절대 금지
+        6. RECURRING 투두는 매번 내용이 동일한 작업만 해당 (예: 매일 단어 암기, 매일 운동)
+        7. 인강 수강처럼 매번 다른 내용을 학습하는 것은 ONE_TIME 투두 여러 개로 생성
+        8. 이론 나열 금지. '수기 복습', '문제 풀이', '오답 노트' 등 아웃풋 태스크 반드시 중간에 배치
+        9. 마감 D-1~2는 진도 금지. '최종 점검', '백지 복습' 등 마무리 태스크만 배치
+        10. WEEKLY routineDate는 bitmask: 월=1, 화=2, 수=4, 목=8, 금=16, 토=32, 일=64
+        11. MONTHLY routineDate는 일자(1~31)
+        12. DAILY는 routineDate 불필요 (null)
+        13. dueDate는 yyyy-MM-dd 형식 또는 null, dueTime은 HH:mm 형식 또는 null
+        14. type은 "ONE_TIME" 또는 "RECURRING"만 허용
+        15. routineType은 "DAILY", "WEEKLY", "MONTHLY" 중 하나 (ONE_TIME이면 null)
+        16. overallReason: 이 추천 전체에 대한 총평을 서술체("~합니다", "~했습니다")로 작성. 조언·명령형("~하세요") 절대 금지.
+            - 어떤 기준으로 투두를 구성했는지, 핵심 전략이 무엇인지 서술
+            - 교재·강의가 포함된 경우 각 항목마다 아래 형식으로 출처 정보를 포함:
+              · 책: "교재명 (저자: OOO / 출판사: OOO / 링크: https://...)"
+              · 강의: "강의명 (강사: OOO / 플랫폼: OOO / 링크: https://...)"
+            - 링크는 Google Search로 확인된 실제 URL만 사용. 확인 불가 시 링크 생략
 
         반드시 아래 JSON만 출력하세요 (다른 설명 없이):
-        {"todos":[{"type":"","title":"","dueDate":null,"routineType":null,"routineDate":null,"reason":"","source":null}]}
+        {"overallReason":"","todos":[{"type":"","title":"","dueDate":null,"dueTime":null,"routineType":null,"routineDate":null}]}
         """
         .formatted(
-            req.goal(), req.deadline(), req.currentLevel(), req.availableTime(), req.notes());
+            req.goal(),
+            deadlineInfo,
+            req.currentLevel() != null ? req.currentLevel() : "미입력",
+            req.availableTime() != null ? req.availableTime() : "미입력",
+            req.notes() != null ? req.notes() : "미입력");
   }
 
-  private TodoRecommendationResponseDto parseRecommendResponse(String raw) {
+  private String buildDeadlineInfo(String deadlineDate, String deadlineTime) {
+    if (deadlineDate == null && deadlineTime == null) return "미입력";
+    if (deadlineDate != null && deadlineTime != null) return deadlineDate + " " + deadlineTime;
+    if (deadlineDate != null) return deadlineDate;
+    return deadlineTime;
+  }
+
+  private TodoRecommendationResponse parseRecommendResponse(String raw) {
     try {
       String json = extractJson(raw);
       JsonNode root = objectMapper.readTree(json);
+      String overallReason = root.path("overallReason").asText(null);
       JsonNode todosNode = root.path("todos");
 
-      List<RecommendedTodoDto> todos = new ArrayList<>();
+      List<RecommendedTodo> todos = new ArrayList<>();
       for (JsonNode node : todosNode) {
         String type = node.path("type").asText();
         String title = node.path("title").asText();
         String dueDate = node.path("dueDate").isNull() ? null : node.path("dueDate").asText(null);
+        String dueTime = node.path("dueTime").isNull() ? null : node.path("dueTime").asText(null);
         String routineType =
             node.path("routineType").isNull() ? null : node.path("routineType").asText(null);
         Integer routineDate = null;
@@ -211,15 +229,9 @@ public class GoalAiService {
             throw new CustomException(GoalErrorCode.GEMINI_PARSE_ERROR);
           }
         }
-        String reason = node.path("reason").asText(null);
-        String source =
-            node.path("source").isNull() || node.path("source").isMissingNode()
-                ? null
-                : node.path("source").asText(null);
-        todos.add(
-            new RecommendedTodoDto(type, title, dueDate, routineType, routineDate, reason, source));
+        todos.add(new RecommendedTodo(type, title, dueDate, dueTime, routineType, routineDate));
       }
-      return new TodoRecommendationResponseDto(todos);
+      return new TodoRecommendationResponse(overallReason, todos);
     } catch (Exception e) {
       log.error("Gemini recommend 응답 파싱 실패: {}", raw, e);
       throw new CustomException(GoalErrorCode.GEMINI_PARSE_ERROR);

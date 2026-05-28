@@ -5,7 +5,7 @@ import jakarta.validation.constraints.NotBlank;
 import java.time.LocalDateTime;
 
 @Schema(description = "목표 생성 요청")
-public record GoalCreateRequestDto(
+public record GoalCreateRequest(
     @Schema(
             description = "목표 제목",
             example = "토익 900점 달성",
