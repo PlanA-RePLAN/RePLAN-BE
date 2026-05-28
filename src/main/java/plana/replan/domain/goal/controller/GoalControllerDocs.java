@@ -755,15 +755,13 @@ public interface GoalControllerDocs {
 
           | 필드명 | 타입 | 설명 |
           |--------|------|------|
-          | overallReason | string | 전체 추천에 대한 총평 |
+          | overallReason | string | 전체 추천 총평. 교재·강의가 포함된 경우 저자/출판사/링크 또는 강사/플랫폼/링크 포함 |
           | todos | array | 추천 투두 목록 |
           | todos[].type | string | `ONE_TIME` (일회형) 또는 `RECURRING` (반복형) |
           | todos[].title | string | 투두 제목 |
           | todos[].dueDate | string | 마감일 (ISO 8601). 없으면 null |
           | todos[].routineType | string | RECURRING만: `DAILY` / `WEEKLY` / `MONTHLY`. ONE_TIME이면 null |
           | todos[].routineDate | integer | RECURRING WEEKLY: 요일 bitmask. MONTHLY: 일자. DAILY·ONE_TIME: null |
-          | todos[].reason | string | AI가 이 투두를 생성한 이유 |
-          | todos[].source | string | 강의면 플랫폼명, 책이면 저자명. 없으면 null |
 
           ---
 
@@ -787,34 +785,28 @@ public interface GoalControllerDocs {
                               "status": 200,
                               "success": true,
                               "data": {
-                                "overallReason": "해커스 교재를 기반으로 단어 암기와 RC 강의 수강을 병행하고, 마감 D-1에 최종 점검을 배치했습니다. 하루 투자시간의 50%를 초과하지 않도록 분량을 조정했습니다.",
+                                "overallReason": "단어 암기와 RC 강의 수강을 병행하고 마감 D-1에 최종 점검을 배치했습니다. 하루 투자시간의 50%를 초과하지 않도록 분량을 조정했습니다. 사용 교재: 해커스 토익 기출 VOCA (저자: 해커스어학연구소 / 출판사: 해커스어학원 / 링크: https://www.yes24.com/product/goods/97469327), 해커스 토익 실전 1000제 RC (저자: 해커스어학연구소 / 출판사: 해커스어학원 / 링크: https://www.yes24.com/product/goods/74369738).",
                                 "todos": [
                                   {
                                     "type": "RECURRING",
                                     "title": "해커스 보카 30단어 암기 및 복습",
                                     "dueDate": "2025-08-25T00:00:00",
                                     "routineType": "DAILY",
-                                    "routineDate": null,
-                                    "reason": "목표 달성을 위해 매일 꾸준한 단어 암기가 필요합니다.",
-                                    "source": "해커스"
+                                    "routineDate": null
                                   },
                                   {
                                     "type": "ONE_TIME",
                                     "title": "해커스 RC 1~5강 수강",
                                     "dueDate": "2025-06-10T00:00:00",
                                     "routineType": null,
-                                    "routineDate": null,
-                                    "reason": "RC 파트의 기초 개념을 먼저 잡아야 이후 문제 풀이 효율이 높아집니다.",
-                                    "source": "해커스"
+                                    "routineDate": null
                                   },
                                   {
                                     "type": "ONE_TIME",
                                     "title": "실전 모의고사 최종 점검",
                                     "dueDate": "2025-08-24T00:00:00",
                                     "routineType": null,
-                                    "routineDate": null,
-                                    "reason": "마감 D-1일에 전체 실력을 점검하여 시험 당일 컨디션을 최적화합니다.",
-                                    "source": null
+                                    "routineDate": null
                                   }
                                 ]
                               },
