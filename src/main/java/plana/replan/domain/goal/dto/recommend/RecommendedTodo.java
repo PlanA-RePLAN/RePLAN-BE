@@ -3,7 +3,7 @@ package plana.replan.domain.goal.dto.recommend;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 @Schema(description = "AI 추천 투두 항목")
-public record RecommendedTodoDto(
+public record RecommendedTodo(
     @Schema(
             description = "투두 유형. ONE_TIME: 일회형, RECURRING: 반복형",
             example = "RECURRING",
@@ -11,10 +11,12 @@ public record RecommendedTodoDto(
         String type,
     @Schema(description = "투두 제목", example = "해커스 보카 30단어 암기") String title,
     @Schema(
-            description = "마감일 (ISO 8601 형식). 없으면 null",
-            example = "2025-08-25T00:00:00",
+            description = "마감 날짜 (yyyy-MM-dd 형식). 없으면 null",
+            example = "2025-08-25",
             nullable = true)
         String dueDate,
+    @Schema(description = "마감 시간 (HH:mm 형식). 없으면 null", example = "08:00", nullable = true)
+        String dueTime,
     @Schema(
             description = "반복 유형 (RECURRING만 사용). DAILY·WEEKLY·MONTHLY",
             example = "WEEKLY",
@@ -26,8 +28,4 @@ public record RecommendedTodoDto(
                 "반복 날짜 (RECURRING만 사용). WEEKLY: 요일 bitmask (월=1,화=2,수=4,목=8,금=16,토=32,일=64). MONTHLY: 일자(1~31). DAILY: null.",
             example = "62",
             nullable = true)
-        Integer routineDate,
-    @Schema(description = "AI가 이 투두를 생성한 이유", example = "목표 달성을 위해 매일 꾸준한 단어 암기가 필요합니다.")
-        String reason,
-    @Schema(description = "출처 정보. 강의면 플랫폼명, 책이면 저자명. 해당 없으면 null", example = "인프런", nullable = true)
-        String source) {}
+        Integer routineDate) {}
