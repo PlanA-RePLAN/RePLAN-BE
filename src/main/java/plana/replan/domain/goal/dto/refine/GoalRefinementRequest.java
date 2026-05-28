@@ -4,7 +4,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 
 @Schema(description = "AI 목표 정제 요청")
-public record GoalRefinementRequestDto(
+public record GoalRefinementRequest(
     @Schema(
             description = "목표 (자연어)",
             example = "토익 900점",

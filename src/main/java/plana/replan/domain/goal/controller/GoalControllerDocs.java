@@ -17,13 +17,13 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
-import plana.replan.domain.goal.dto.common.GoalSingleResponseDto;
-import plana.replan.domain.goal.dto.create.GoalCreateRequestDto;
-import plana.replan.domain.goal.dto.list.GoalsByDateResponseDto;
-import plana.replan.domain.goal.dto.recommend.TodoRecommendationRequestDto;
-import plana.replan.domain.goal.dto.recommend.TodoRecommendationResponseDto;
-import plana.replan.domain.goal.dto.refine.GoalRefinementRequestDto;
-import plana.replan.domain.goal.dto.refine.GoalRefinementResponseDto;
+import plana.replan.domain.goal.dto.common.GoalSingleResponse;
+import plana.replan.domain.goal.dto.create.GoalCreateRequest;
+import plana.replan.domain.goal.dto.list.GoalsByDateResponse;
+import plana.replan.domain.goal.dto.recommend.TodoRecommendationRequest;
+import plana.replan.domain.goal.dto.recommend.TodoRecommendationResponse;
+import plana.replan.domain.goal.dto.refine.GoalRefinementRequest;
+import plana.replan.domain.goal.dto.refine.GoalRefinementResponse;
 import plana.replan.global.common.ApiResult;
 
 @Tag(name = "Goal", description = "목표(Goal) 관련 API. 모든 요청에 JWT 인증 필수.")
@@ -70,7 +70,7 @@ public interface GoalControllerDocs {
         description = "목표 생성 성공",
         content =
             @Content(
-                schema = @Schema(implementation = GoalSingleResponseDto.class),
+                schema = @Schema(implementation = GoalSingleResponse.class),
                 examples =
                     @ExampleObject(
                         value =
@@ -165,7 +165,7 @@ public interface GoalControllerDocs {
                             }
                             """)))
   })
-  ResponseEntity<ApiResult<GoalSingleResponseDto>> createGoal(
+  ResponseEntity<ApiResult<GoalSingleResponse>> createGoal(
       @AuthenticationPrincipal Long userId,
       @io.swagger.v3.oas.annotations.parameters.RequestBody(
               content =
@@ -204,7 +204,7 @@ public interface GoalControllerDocs {
                                 """)
                       }))
           @RequestBody
-          GoalCreateRequestDto request);
+          GoalCreateRequest request);
 
   @Operation(
       summary = "목표 삭제",
@@ -516,7 +516,7 @@ public interface GoalControllerDocs {
                           """)
                 }))
   })
-  ResponseEntity<ApiResult<List<GoalsByDateResponseDto>>> getGoals(
+  ResponseEntity<ApiResult<List<GoalsByDateResponse>>> getGoals(
       @AuthenticationPrincipal Long userId,
       @RequestParam(required = false) Integer year,
       @RequestParam(required = false) Integer month);
@@ -676,7 +676,7 @@ public interface GoalControllerDocs {
                           """)
                 }))
   })
-  ResponseEntity<ApiResult<GoalRefinementResponseDto>> refineGoal(
+  ResponseEntity<ApiResult<GoalRefinementResponse>> refineGoal(
       @AuthenticationPrincipal Long userId,
       @io.swagger.v3.oas.annotations.parameters.RequestBody(
               content =
@@ -716,7 +716,7 @@ public interface GoalControllerDocs {
                       }))
           @Valid
           @RequestBody
-          GoalRefinementRequestDto request);
+          GoalRefinementRequest request);
 
   @Operation(
       summary = "AI 투두 추천",
@@ -741,10 +741,13 @@ public interface GoalControllerDocs {
           | 필드명 | 필수 여부 | 타입 | 설명 | 예시 |
           |--------|-----------|------|------|------|
           | goal | ✅ 필수 | string | 목표 | `"토익 900점 달성"` |
-          | deadline | ✅ 필수 | string | 마감기한 | `"2025-08-25"` |
-          | currentLevel | ✅ 필수 | string | 현재 수준 | `"토익 600점"` |
-          | availableTime | ✅ 필수 | string | 투자 가능 시간 | `"평일 1시간·주말 4시간"` |
-          | notes | ✅ 필수 | string | 특이사항 (교재·루틴·전략 포함 권장) | `"해커스 보카·RC·LC 활용"` |
+          | deadlineDate | ❌ 선택 | string | 마감 날짜 (yyyy-MM-dd 형식) | `"2025-08-25"` |
+          | deadlineTime | ❌ 선택 | string | 마감 시간 (HH:mm 형식) | `"08:00"` |
+          | currentLevel | ❌ 선택 | string | 현재 수준 | `"토익 600점"` |
+          | availableTime | ❌ 선택 | string | 투자 가능 시간 | `"평일 1시간·주말 4시간"` |
+          | notes | ❌ 선택 | string | 특이사항 (교재·루틴·전략 포함 권장) | `"해커스 보카·RC·LC 활용"` |
+
+          > ❌ 선택 필드는 생략하거나 null로 전달해도 동일하게 처리됩니다.
 
           ---
 
@@ -752,6 +755,7 @@ public interface GoalControllerDocs {
 
           | 필드명 | 타입 | 설명 |
           |--------|------|------|
+          | overallReason | string | 전체 추천에 대한 총평 |
           | todos | array | 추천 투두 목록 |
           | todos[].type | string | `ONE_TIME` (일회형) 또는 `RECURRING` (반복형) |
           | todos[].title | string | 투두 제목 |
@@ -783,6 +787,7 @@ public interface GoalControllerDocs {
                               "status": 200,
                               "success": true,
                               "data": {
+                                "overallReason": "해커스 교재를 기반으로 단어 암기와 RC 강의 수강을 병행하고, 마감 D-1에 최종 점검을 배치했습니다. 하루 투자시간의 50%를 초과하지 않도록 분량을 조정했습니다.",
                                 "todos": [
                                   {
                                     "type": "RECURRING",
@@ -895,26 +900,37 @@ public interface GoalControllerDocs {
                           """)
                 }))
   })
-  ResponseEntity<ApiResult<TodoRecommendationResponseDto>> recommendTodos(
+  ResponseEntity<ApiResult<TodoRecommendationResponse>> recommendTodos(
       @AuthenticationPrincipal Long userId,
       @io.swagger.v3.oas.annotations.parameters.RequestBody(
               content =
                   @Content(
                       mediaType = "application/json",
-                      examples =
-                          @ExampleObject(
-                              name = "정제된 값으로 요청",
-                              value =
-                                  """
-                                  {
-                                    "goal": "토익 900점 달성 (LC 450·RC 450 이상)",
-                                    "deadline": "2025-08-25",
-                                    "currentLevel": "토익 600점 (LC 310·RC 290 추정)",
-                                    "availableTime": "평일 1시간·주말 4시간 (주 약 13시간)",
-                                    "notes": "해커스 보카·RC·LC 활용. 주 1회 모의고사. 매주 오답 노트 정리."
-                                  }
-                                  """)))
+                      examples = {
+                        @ExampleObject(
+                            name = "전체 필드 포함",
+                            value =
+                                """
+                                {
+                                  "goal": "토익 900점 달성 (LC 450·RC 450 이상)",
+                                  "deadlineDate": "2025-08-25",
+                                  "deadlineTime": "08:00",
+                                  "currentLevel": "토익 600점 (LC 310·RC 290 추정)",
+                                  "availableTime": "평일 1시간·주말 4시간 (주 약 13시간)",
+                                  "notes": "해커스 보카·RC·LC 활용. 주 1회 모의고사. 매주 오답 노트 정리."
+                                }
+                                """),
+                        @ExampleObject(
+                            name = "필수 필드만 (선택 필드 생략)",
+                            summary = "goal만 필수. 나머지는 생략하면 미입력으로 처리됩니다.",
+                            value =
+                                """
+                                {
+                                  "goal": "토익 900점 달성 (LC 450·RC 450 이상)"
+                                }
+                                """)
+                      }))
           @Valid
           @RequestBody
-          TodoRecommendationRequestDto request);
+          TodoRecommendationRequest request);
 }

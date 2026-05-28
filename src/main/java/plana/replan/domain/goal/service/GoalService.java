@@ -9,9 +9,9 @@ import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import plana.replan.domain.goal.dto.common.GoalSingleResponseDto;
-import plana.replan.domain.goal.dto.create.GoalCreateRequestDto;
-import plana.replan.domain.goal.dto.list.GoalsByDateResponseDto;
+import plana.replan.domain.goal.dto.common.GoalSingleResponse;
+import plana.replan.domain.goal.dto.create.GoalCreateRequest;
+import plana.replan.domain.goal.dto.list.GoalsByDateResponse;
 import plana.replan.domain.goal.entity.Goal;
 import plana.replan.domain.goal.exception.GoalErrorCode;
 import plana.replan.domain.goal.repository.GoalRepository;
@@ -28,7 +28,7 @@ public class GoalService {
   private final UserRepository userRepository;
 
   @Transactional
-  public GoalSingleResponseDto createGoal(Long userId, GoalCreateRequestDto request) {
+  public GoalSingleResponse createGoal(Long userId, GoalCreateRequest request) {
     User user = findUser(userId);
     Goal goal =
         Goal.builder()
@@ -37,7 +37,7 @@ public class GoalService {
             .reference(request.reference())
             .user(user)
             .build();
-    return GoalSingleResponseDto.from(goalRepository.save(goal));
+    return GoalSingleResponse.from(goalRepository.save(goal));
   }
 
   @Transactional
@@ -53,7 +53,7 @@ public class GoalService {
   }
 
   @Transactional(readOnly = true)
-  public List<GoalsByDateResponseDto> getGoals(Long userId, Integer year, Integer month) {
+  public List<GoalsByDateResponse> getGoals(Long userId, Integer year, Integer month) {
     if (year == null && month != null) {
       throw new CustomException(GoalErrorCode.GOAL_INVALID_FILTER);
     }
@@ -80,11 +80,11 @@ public class GoalService {
     return byDate.entrySet().stream()
         .map(
             e ->
-                new GoalsByDateResponseDto(
+                new GoalsByDateResponse(
                     e.getKey(),
                     e.getValue().stream()
                         .sorted(Comparator.comparing(Goal::getId))
-                        .map(GoalSingleResponseDto::from)
+                        .map(GoalSingleResponse::from)
                         .toList()))
         .toList();
   }

@@ -3,7 +3,7 @@ package plana.replan.domain.goal.dto.recommend;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 @Schema(description = "AI 추천 투두 항목")
-public record RecommendedTodoDto(
+public record RecommendedTodo(
     @Schema(
             description = "투두 유형. ONE_TIME: 일회형, RECURRING: 반복형",
             example = "RECURRING",

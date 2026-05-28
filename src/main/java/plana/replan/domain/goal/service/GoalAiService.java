@@ -14,11 +14,11 @@ import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
-import plana.replan.domain.goal.dto.recommend.RecommendedTodoDto;
-import plana.replan.domain.goal.dto.recommend.TodoRecommendationRequestDto;
-import plana.replan.domain.goal.dto.recommend.TodoRecommendationResponseDto;
-import plana.replan.domain.goal.dto.refine.GoalRefinementRequestDto;
-import plana.replan.domain.goal.dto.refine.GoalRefinementResponseDto;
+import plana.replan.domain.goal.dto.recommend.RecommendedTodo;
+import plana.replan.domain.goal.dto.recommend.TodoRecommendationRequest;
+import plana.replan.domain.goal.dto.recommend.TodoRecommendationResponse;
+import plana.replan.domain.goal.dto.refine.GoalRefinementRequest;
+import plana.replan.domain.goal.dto.refine.GoalRefinementResponse;
 import plana.replan.domain.goal.dto.refine.RefinedDeadline;
 import plana.replan.domain.goal.dto.refine.RefinedField;
 import plana.replan.domain.goal.dto.refine.RefinedNoteItem;
@@ -40,14 +40,14 @@ public class GoalAiService {
   @Value("${gemini.api-key}")
   private String apiKey;
 
-  public GoalRefinementResponseDto refineGoal(GoalRefinementRequestDto request) {
+  public GoalRefinementResponse refineGoal(GoalRefinementRequest request) {
     String today = LocalDate.now().format(DateTimeFormatter.ISO_LOCAL_DATE);
     String prompt = buildRefinePrompt(request, today);
     String raw = callGemini(prompt);
     return parseRefineResponse(raw);
   }
 
-  private String buildRefinePrompt(GoalRefinementRequestDto req, String today) {
+  private String buildRefinePrompt(GoalRefinementRequest req, String today) {
     return """
         당신은 목표 달성 플래닝 전문가입니다.
         사용자가 제공한 목표 초안을 분석하고, 투두 리스트 생성에 최적화되도록 정제하세요.
@@ -91,7 +91,7 @@ public class GoalAiService {
             today);
   }
 
-  private GoalRefinementResponseDto parseRefineResponse(String raw) {
+  private GoalRefinementResponse parseRefineResponse(String raw) {
     try {
       String json = extractJson(raw);
       JsonNode root = objectMapper.readTree(json);
@@ -123,20 +123,21 @@ public class GoalAiService {
       }
       RefinedNotes notes = new RefinedNotes(noteItems, notesNode.path("reason").asText());
 
-      return new GoalRefinementResponseDto(goal, deadline, currentLevel, availableTime, notes);
+      return new GoalRefinementResponse(goal, deadline, currentLevel, availableTime, notes);
     } catch (Exception e) {
       log.error("Gemini refine 응답 파싱 실패: {}", raw, e);
       throw new CustomException(GoalErrorCode.GEMINI_PARSE_ERROR);
     }
   }
 
-  public TodoRecommendationResponseDto recommendTodos(TodoRecommendationRequestDto request) {
+  public TodoRecommendationResponse recommendTodos(TodoRecommendationRequest request) {
     String prompt = buildRecommendPrompt(request);
     String raw = callGemini(prompt);
     return parseRecommendResponse(raw);
   }
 
-  private String buildRecommendPrompt(TodoRecommendationRequestDto req) {
+  private String buildRecommendPrompt(TodoRecommendationRequest req) {
+    String deadlineInfo = buildDeadlineInfo(req.deadlineDate(), req.deadlineTime());
     return """
         당신은 목표 달성 플래닝 전문가입니다.
 
@@ -179,21 +180,34 @@ public class GoalAiService {
         15. type은 "ONE_TIME" 또는 "RECURRING"만 허용
         16. routineType은 "DAILY", "WEEKLY", "MONTHLY" 중 하나 (ONE_TIME이면 null)
         17. reason 포함 모든 텍스트는 "~합니다", "~했습니다" 등 서술형으로 작성. "~하세요", "~하시기 바랍니다" 등 조언·명령형 말투 절대 금지
+        18. overallReason: 이 추천 전체에 대한 총평. 어떤 기준으로 투두를 구성했는지, 핵심 전략이 무엇인지 2~3문장 서술체로 작성
 
         반드시 아래 JSON만 출력하세요 (다른 설명 없이):
-        {"todos":[{"type":"","title":"","dueDate":null,"routineType":null,"routineDate":null,"reason":"","source":null}]}
+        {"overallReason":"","todos":[{"type":"","title":"","dueDate":null,"routineType":null,"routineDate":null,"reason":"","source":null}]}
         """
         .formatted(
-            req.goal(), req.deadline(), req.currentLevel(), req.availableTime(), req.notes());
+            req.goal(),
+            deadlineInfo,
+            req.currentLevel() != null ? req.currentLevel() : "미입력",
+            req.availableTime() != null ? req.availableTime() : "미입력",
+            req.notes() != null ? req.notes() : "미입력");
   }
 
-  private TodoRecommendationResponseDto parseRecommendResponse(String raw) {
+  private String buildDeadlineInfo(String deadlineDate, String deadlineTime) {
+    if (deadlineDate == null && deadlineTime == null) return "미입력";
+    if (deadlineDate != null && deadlineTime != null) return deadlineDate + " " + deadlineTime;
+    if (deadlineDate != null) return deadlineDate;
+    return deadlineTime;
+  }
+
+  private TodoRecommendationResponse parseRecommendResponse(String raw) {
     try {
       String json = extractJson(raw);
       JsonNode root = objectMapper.readTree(json);
+      String overallReason = root.path("overallReason").asText(null);
       JsonNode todosNode = root.path("todos");
 
-      List<RecommendedTodoDto> todos = new ArrayList<>();
+      List<RecommendedTodo> todos = new ArrayList<>();
       for (JsonNode node : todosNode) {
         String type = node.path("type").asText();
         String title = node.path("title").asText();
@@ -217,9 +231,9 @@ public class GoalAiService {
                 ? null
                 : node.path("source").asText(null);
         todos.add(
-            new RecommendedTodoDto(type, title, dueDate, routineType, routineDate, reason, source));
+            new RecommendedTodo(type, title, dueDate, routineType, routineDate, reason, source));
       }
-      return new TodoRecommendationResponseDto(todos);
+      return new TodoRecommendationResponse(overallReason, todos);
     } catch (Exception e) {
       log.error("Gemini recommend 응답 파싱 실패: {}", raw, e);
       throw new CustomException(GoalErrorCode.GEMINI_PARSE_ERROR);
