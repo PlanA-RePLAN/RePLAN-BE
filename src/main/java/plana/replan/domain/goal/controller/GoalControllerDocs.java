@@ -759,7 +759,8 @@ public interface GoalControllerDocs {
           | todos | array | 추천 투두 목록 |
           | todos[].type | string | `ONE_TIME` (일회형) 또는 `RECURRING` (반복형) |
           | todos[].title | string | 투두 제목 |
-          | todos[].dueDate | string | 마감일 (ISO 8601). 없으면 null |
+          | todos[].dueDate | string | 마감 날짜 (yyyy-MM-dd 형식). 없으면 null |
+          | todos[].dueTime | string | 마감 시간 (HH:mm 형식). 없으면 null |
           | todos[].routineType | string | RECURRING만: `DAILY` / `WEEKLY` / `MONTHLY`. ONE_TIME이면 null |
           | todos[].routineDate | integer | RECURRING WEEKLY: 요일 bitmask. MONTHLY: 일자. DAILY·ONE_TIME: null |
 
@@ -790,21 +791,24 @@ public interface GoalControllerDocs {
                                   {
                                     "type": "RECURRING",
                                     "title": "해커스 보카 30단어 암기 및 복습",
-                                    "dueDate": "2025-08-25T00:00:00",
+                                    "dueDate": "2025-08-25",
+                                    "dueTime": null,
                                     "routineType": "DAILY",
                                     "routineDate": null
                                   },
                                   {
                                     "type": "ONE_TIME",
                                     "title": "해커스 RC 1~5강 수강",
-                                    "dueDate": "2025-06-10T00:00:00",
+                                    "dueDate": "2025-06-10",
+                                    "dueTime": "08:00",
                                     "routineType": null,
                                     "routineDate": null
                                   },
                                   {
                                     "type": "ONE_TIME",
                                     "title": "실전 모의고사 최종 점검",
-                                    "dueDate": "2025-08-24T00:00:00",
+                                    "dueDate": "2025-08-24",
+                                    "dueTime": null,
                                     "routineType": null,
                                     "routineDate": null
                                   }

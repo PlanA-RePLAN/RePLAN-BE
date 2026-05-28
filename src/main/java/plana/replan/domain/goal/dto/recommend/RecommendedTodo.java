@@ -11,10 +11,12 @@ public record RecommendedTodo(
         String type,
     @Schema(description = "투두 제목", example = "해커스 보카 30단어 암기") String title,
     @Schema(
-            description = "마감일 (ISO 8601 형식). 없으면 null",
-            example = "2025-08-25T00:00:00",
+            description = "마감 날짜 (yyyy-MM-dd 형식). 없으면 null",
+            example = "2025-08-25",
             nullable = true)
         String dueDate,
+    @Schema(description = "마감 시간 (HH:mm 형식). 없으면 null", example = "08:00", nullable = true)
+        String dueTime,
     @Schema(
             description = "반복 유형 (RECURRING만 사용). DAILY·WEEKLY·MONTHLY",
             example = "WEEKLY",

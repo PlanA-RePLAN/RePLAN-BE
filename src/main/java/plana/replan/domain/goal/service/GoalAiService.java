@@ -175,7 +175,7 @@ public class GoalAiService {
         10. WEEKLY routineDate는 bitmask: 월=1, 화=2, 수=4, 목=8, 금=16, 토=32, 일=64
         11. MONTHLY routineDate는 일자(1~31)
         12. DAILY는 routineDate 불필요 (null)
-        13. dueDate는 yyyy-MM-ddT00:00:00 형식 또는 null
+        13. dueDate는 yyyy-MM-dd 형식 또는 null, dueTime은 HH:mm 형식 또는 null
         14. type은 "ONE_TIME" 또는 "RECURRING"만 허용
         15. routineType은 "DAILY", "WEEKLY", "MONTHLY" 중 하나 (ONE_TIME이면 null)
         16. overallReason: 이 추천 전체에 대한 총평을 서술체("~합니다", "~했습니다")로 작성. 조언·명령형("~하세요") 절대 금지.
@@ -186,7 +186,7 @@ public class GoalAiService {
             - 링크는 Google Search로 확인된 실제 URL만 사용. 확인 불가 시 링크 생략
 
         반드시 아래 JSON만 출력하세요 (다른 설명 없이):
-        {"overallReason":"","todos":[{"type":"","title":"","dueDate":null,"routineType":null,"routineDate":null}]}
+        {"overallReason":"","todos":[{"type":"","title":"","dueDate":null,"dueTime":null,"routineType":null,"routineDate":null}]}
         """
         .formatted(
             req.goal(),
@@ -215,6 +215,7 @@ public class GoalAiService {
         String type = node.path("type").asText();
         String title = node.path("title").asText();
         String dueDate = node.path("dueDate").isNull() ? null : node.path("dueDate").asText(null);
+        String dueTime = node.path("dueTime").isNull() ? null : node.path("dueTime").asText(null);
         String routineType =
             node.path("routineType").isNull() ? null : node.path("routineType").asText(null);
         Integer routineDate = null;
@@ -228,7 +229,7 @@ public class GoalAiService {
             throw new CustomException(GoalErrorCode.GEMINI_PARSE_ERROR);
           }
         }
-        todos.add(new RecommendedTodo(type, title, dueDate, routineType, routineDate));
+        todos.add(new RecommendedTodo(type, title, dueDate, dueTime, routineType, routineDate));
       }
       return new TodoRecommendationResponse(overallReason, todos);
     } catch (Exception e) {
