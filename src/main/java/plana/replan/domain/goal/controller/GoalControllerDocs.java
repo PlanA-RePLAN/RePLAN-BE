@@ -53,7 +53,8 @@ public interface GoalControllerDocs {
           | 필드명 | 필수 여부 | 타입 | 설명 | 예시 |
           |--------|-----------|------|------|------|
           | title | ✅ 필수 | string | 목표 제목. 공백만 있으면 유효성 오류 | `"토익 900점 달성"` |
-          | dueDate | ❌ 선택 | string | 목표 기한 (ISO 8601 형식). 생략 가능 | `"2025-12-31T00:00:00"` |
+          | dueDate | ❌ 선택 | string | 목표 기한 날짜 (yyyy-MM-dd 형식) | `"2025-12-31"` |
+          | dueTime | ❌ 선택 | string | 목표 기한 시간 (HH:mm 형식). dueDate 없이 단독 사용 불가. | `"09:00"` |
           | reference | ❌ 선택 | string | 참고 자료 (URL 또는 자유 텍스트). 생략 가능 | `"https://toeic.ets.org"` |
 
           > ❌ 선택 필드는 생략하거나 null로 전달해도 동일하게 처리됩니다.
@@ -62,7 +63,8 @@ public interface GoalControllerDocs {
 
           ### 주의사항
           - `title`이 없거나 공백이면 400 반환
-          - `dueDate`, `reference`는 생략하거나 null로 전달해도 동일하게 처리됨 (null 저장)
+          - `dueTime`만 있고 `dueDate`가 없으면 400 반환
+          - `dueDate`, `dueTime`, `reference`는 생략하거나 null로 전달해도 동일하게 처리됨 (null 저장)
           - JSON 파싱 실패(잘못된 형식, 타입 불일치 등)도 400 반환
           """,
       security = @SecurityRequirement(name = "Bearer Authentication"))
@@ -180,28 +182,27 @@ public interface GoalControllerDocs {
                                 """
                                 {
                                   "title": "토익 900점 달성",
-                                  "dueDate": "2025-12-31T00:00:00",
+                                  "dueDate": "2025-12-31",
+                                  "dueTime": "09:00",
                                   "reference": "https://toeic.ets.org"
                                 }
                                 """),
                         @ExampleObject(
-                            name = "title만 (optional 생략)",
-                            summary = "dueDate, reference를 생략하면 null로 처리됨",
-                            value =
-                                """
-                                {
-                                  "title": "토익 900점 달성"
-                                }
-                                """),
-                        @ExampleObject(
-                            name = "optional null 명시",
-                            summary = "생략과 동일한 동작",
+                            name = "날짜만 (시간 생략)",
                             value =
                                 """
                                 {
                                   "title": "토익 900점 달성",
-                                  "dueDate": null,
-                                  "reference": null
+                                  "dueDate": "2025-12-31"
+                                }
+                                """),
+                        @ExampleObject(
+                            name = "title만 (optional 생략)",
+                            summary = "dueDate, dueTime, reference를 생략하면 null로 처리됨",
+                            value =
+                                """
+                                {
+                                  "title": "토익 900점 달성"
                                 }
                                 """)
                       }))
@@ -231,7 +232,8 @@ public interface GoalControllerDocs {
           | 필드명 | 필수 여부 | 타입 | 설명 | 예시 |
           |--------|-----------|------|------|------|
           | title | ✅ 필수 | string | 목표 제목 | `"토익 900점 달성"` |
-          | dueDate | ❌ 선택 | string | 목표 기한 (ISO 8601 형식) | `"2025-12-31T00:00:00"` |
+          | dueDate | ❌ 선택 | string | 목표 기한 날짜 (yyyy-MM-dd 형식) | `"2025-12-31"` |
+          | dueTime | ❌ 선택 | string | 목표 기한 시간 (HH:mm 형식). dueDate 없이 단독 사용 불가. | `"09:00"` |
           | reference | ❌ 선택 | string | 참고 자료 (URL 또는 메모) | `"https://toeic.ets.org"` |
           | todos | ✅ 필수 | array | 생성할 투두 목록 | |
           | todos[].type | ✅ 필수 | string | `ONE_TIME` (일반형) 또는 `RECURRING` (반복형) | `"ONE_TIME"` |
@@ -372,7 +374,8 @@ public interface GoalControllerDocs {
                                 """
                                 {
                                   "title": "토익 900점 달성",
-                                  "dueDate": "2025-12-31T00:00:00",
+                                  "dueDate": "2025-12-31",
+                                  "dueTime": "09:00",
                                   "reference": "https://toeic.ets.org",
                                   "todos": [
                                     {

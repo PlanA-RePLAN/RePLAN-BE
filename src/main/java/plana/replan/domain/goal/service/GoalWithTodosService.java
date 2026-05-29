@@ -55,7 +55,7 @@ public class GoalWithTodosService {
         goalRepository.save(
             Goal.builder()
                 .title(request.title())
-                .dueDate(request.dueDate())
+                .dueDate(parseGoalDueDate(request.dueDate(), request.dueTime()))
                 .reference(request.reference())
                 .user(user)
                 .build());
@@ -144,10 +144,21 @@ public class GoalWithTodosService {
     return tag;
   }
 
+  private LocalDateTime parseGoalDueDate(String date, String time) {
+    if (date == null && time != null) {
+      throw new CustomException(GoalErrorCode.GOAL_DUE_TIME_WITHOUT_DATE);
+    }
+    return parseDateTime(date, time);
+  }
+
   private LocalDateTime parseDueDate(String date, String time) {
     if (date == null && time != null) {
       throw new CustomException(GoalErrorCode.TODO_DUE_TIME_WITHOUT_DATE);
     }
+    return parseDateTime(date, time);
+  }
+
+  private LocalDateTime parseDateTime(String date, String time) {
     if (date == null) return null;
     LocalDate localDate = LocalDate.parse(date, DATE_FORMATTER);
     LocalTime localTime =
