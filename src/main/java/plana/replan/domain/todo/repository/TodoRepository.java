@@ -2,6 +2,9 @@ package plana.replan.domain.todo.repository;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -22,6 +25,31 @@ public interface TodoRepository extends JpaRepository<Todo, Long> {
   @Query("SELECT t FROM Todo t WHERE t.routine IS NOT NULL AND t.dueDate BETWEEN :start AND :end")
   List<Todo> findRoutineTodosByDueDateRange(
       @Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
+
+  @Query(
+      "SELECT t FROM Todo t JOIN t.routine r"
+          + " WHERE t.parent IS NULL"
+          + " AND t.dueDate BETWEEN :start AND :end"
+          + " AND r.deletedAt IS NULL")
+  List<Todo> findMotherRoutineTodosForRollover(
+      @Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
+
+  @Query(
+      "SELECT t FROM Todo t"
+          + " WHERE t.routine = :routine"
+          + " AND t.parent IS NULL"
+          + " AND t.dueDate >= :fromDate"
+          + " ORDER BY t.dueDate ASC")
+  List<Todo> findUpcomingMotherTodosByRoutine(
+      @Param("routine") Routine routine,
+      @Param("fromDate") LocalDateTime fromDate,
+      Pageable pageable);
+
+  default Optional<Todo> findFirstUpcomingMotherTodoByRoutine(
+      Routine routine, LocalDateTime fromDate) {
+    return findUpcomingMotherTodosByRoutine(routine, fromDate, PageRequest.of(0, 1)).stream()
+        .findFirst();
+  }
 
   @Query("SELECT t FROM Todo t WHERE t.user = :user AND t.parent IS NULL AND t.isCompleted = false")
   List<Todo> findActiveTodosForUser(@Param("user") User user);
