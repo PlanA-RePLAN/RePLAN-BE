@@ -2,6 +2,14 @@
 
 ## 필수 규칙
 
+### 작업 시작 절차
+모든 신규 작업은 다음 순서로 시작한다.
+
+1. `git checkout develop && git pull` — develop 브랜치 최신화
+2. GitHub 이슈 생성 — 반드시 `.github/ISSUE_TEMPLATE/이슈-템플릿.md` 템플릿 구조(`Issue?`, `Details`, `References`)를 그대로 사용한다.
+3. `git checkout -b {type}/{issueNumber}-{slug}` — 이슈 번호를 포함한 브랜치를 develop 기준으로 생성하고 체크아웃
+4. 위 절차를 완료한 뒤에야 코드 작업을 시작한다.
+
 ### 빌드 & 테스트
 **매 작업 완료 후 반드시 빌드(테스트 포함)를 실행해야 한다.**
 
