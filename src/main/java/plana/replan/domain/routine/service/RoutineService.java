@@ -3,7 +3,6 @@ package plana.replan.domain.routine.service;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
@@ -84,21 +83,12 @@ public class RoutineService {
 
   @Transactional
   public void generateDailyTodos() {
-    List<Routine> routines = routineRepository.findAll();
-    routines.stream().filter(this::isTodayMatch).forEach(this::createTodoFromRoutine);
-  }
-
-  public boolean isTodayMatch(Routine routine) {
-    LocalDate today = LocalDate.now(clock);
-    return switch (routine.getRoutineType()) {
-      case DAILY -> true;
-      case WEEKLY -> {
-        int dayBit = 1 << (today.getDayOfWeek().getValue() - 1);
-        yield routine.getRoutineDate() != null && (routine.getRoutineDate() & dayBit) != 0;
-      }
-      case MONTHLY -> routine.getRoutineDate() != null
-          && routine.getRoutineDate() == today.getDayOfMonth();
-    };
+    LocalDate yesterday = LocalDate.now(clock).minusDays(1);
+    LocalDateTime start = yesterday.atStartOfDay();
+    LocalDateTime end = yesterday.atTime(23, 59, 59);
+    todoRepository
+        .findRoutineTodosByDueDateRange(start, end)
+        .forEach(todo -> createTodoFromRoutine(todo.getRoutine()));
   }
 
   public void createTodoFromRoutine(Routine routine) {
