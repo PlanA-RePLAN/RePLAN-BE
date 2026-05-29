@@ -102,16 +102,16 @@ public class RoutineService {
   }
 
   public void createTodoFromRoutine(Routine routine) {
-    LocalDateTime todayStart = LocalDate.now(clock).atStartOfDay();
-    if (todoRepository.existsByRoutineAndDueDateBetween(
-        routine, todayStart, todayStart.plusDays(1))) {
+    LocalDate today = LocalDate.now(clock);
+    LocalDateTime dueDate = nextOccurrence(routine, today).atStartOfDay();
+    if (todoRepository.existsByRoutineAndDueDateBetween(routine, dueDate, dueDate.plusDays(1))) {
       return;
     }
     try {
       todoRepository.saveAndFlush(
           Todo.builder()
               .title(routine.getTitle())
-              .dueDate(todayStart)
+              .dueDate(dueDate)
               .isPinned(false)
               .user(routine.getUser())
               .tag(routine.getTag())
@@ -125,6 +125,36 @@ public class RoutineService {
       }
       // uq_todo_routine_duedate 충돌 — 동시 실행으로 이미 생성된 것으로 간주
     }
+  }
+
+  private LocalDate nextOccurrence(Routine routine, LocalDate today) {
+    return switch (routine.getRoutineType()) {
+      case DAILY -> today;
+      case WEEKLY -> {
+        int mask = routine.getRoutineDate();
+        for (int i = 0; i < 7; i++) {
+          LocalDate d = today.plusDays(i);
+          int bit = 1 << (d.getDayOfWeek().getValue() - 1);
+          if ((mask & bit) != 0) {
+            yield d;
+          }
+        }
+        yield today;
+      }
+      case MONTHLY -> {
+        int day = routine.getRoutineDate();
+        for (int k = 0; k < 12; k++) {
+          LocalDate firstOfMonth = today.withDayOfMonth(1).plusMonths(k);
+          if (firstOfMonth.lengthOfMonth() >= day) {
+            LocalDate candidate = firstOfMonth.withDayOfMonth(day);
+            if (!candidate.isBefore(today)) {
+              yield candidate;
+            }
+          }
+        }
+        yield today;
+      }
+    };
   }
 
   private void validateRoutineDate(RoutineType routineType, Integer routineDate) {

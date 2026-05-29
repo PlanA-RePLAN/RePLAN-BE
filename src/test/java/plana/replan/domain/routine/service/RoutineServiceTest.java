@@ -17,6 +17,7 @@ import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -391,15 +392,17 @@ class RoutineServiceTest {
   }
 
   @Test
-  void 루틴_생성_WEEKLY_오늘_요일_미포함이어도_Todo_즉시_생성됨() {
-    // TEST_DATE = Monday(bit=1). routineDate=2 → Tuesday만 포함 → 반복일 아니지만 오늘자 Todo 생성
+  void 루틴_생성_WEEKLY_오늘_요일_미포함이어도_Todo_즉시_생성되고_다음_반복일이_dueDate() {
+    // TEST_DATE = 2024-01-15(Mon). routineDate=2 → Tuesday만 → 다음 발생 = 2024-01-16
     given(userRepository.findById(1L)).willReturn(Optional.of(testUser()));
     given(routineRepository.save(any(Routine.class))).willAnswer(inv -> inv.getArgument(0));
 
     routineService.createRoutine(
         1L, new RoutineCreateRequestDto("루틴", null, RoutineType.WEEKLY, 2, null, null));
 
-    verify(todoRepository).saveAndFlush(any(Todo.class));
+    ArgumentCaptor<Todo> captor = ArgumentCaptor.forClass(Todo.class);
+    verify(todoRepository).saveAndFlush(captor.capture());
+    assertThat(captor.getValue().getDueDate()).isEqualTo(LocalDate.of(2024, 1, 16).atStartOfDay());
   }
 
   @Test
@@ -415,15 +418,17 @@ class RoutineServiceTest {
   }
 
   @Test
-  void 루틴_생성_MONTHLY_오늘_날짜_불일치여도_Todo_즉시_생성됨() {
-    // TEST_DATE = 15일. routineDate=16 → 반복일 아니지만 오늘자 Todo 생성
+  void 루틴_생성_MONTHLY_오늘_날짜_불일치여도_Todo_즉시_생성되고_다음_반복일이_dueDate() {
+    // TEST_DATE = 2024-01-15. routineDate=16 → 다음 발생 = 2024-01-16
     given(userRepository.findById(1L)).willReturn(Optional.of(testUser()));
     given(routineRepository.save(any(Routine.class))).willAnswer(inv -> inv.getArgument(0));
 
     routineService.createRoutine(
         1L, new RoutineCreateRequestDto("루틴", null, RoutineType.MONTHLY, 16, null, null));
 
-    verify(todoRepository).saveAndFlush(any(Todo.class));
+    ArgumentCaptor<Todo> captor = ArgumentCaptor.forClass(Todo.class);
+    verify(todoRepository).saveAndFlush(captor.capture());
+    assertThat(captor.getValue().getDueDate()).isEqualTo(LocalDate.of(2024, 1, 16).atStartOfDay());
   }
 
   @Test
