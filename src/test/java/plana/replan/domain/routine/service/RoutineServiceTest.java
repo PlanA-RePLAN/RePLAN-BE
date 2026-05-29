@@ -391,15 +391,15 @@ class RoutineServiceTest {
   }
 
   @Test
-  void 루틴_생성_WEEKLY_오늘_요일_미포함_Todo_생성_안됨() {
-    // TEST_DATE = Monday(bit=1). routineDate=2 → Tuesday만 포함 → 불일치
+  void 루틴_생성_WEEKLY_오늘_요일_미포함이어도_Todo_즉시_생성됨() {
+    // TEST_DATE = Monday(bit=1). routineDate=2 → Tuesday만 포함 → 반복일 아니지만 오늘자 Todo 생성
     given(userRepository.findById(1L)).willReturn(Optional.of(testUser()));
     given(routineRepository.save(any(Routine.class))).willAnswer(inv -> inv.getArgument(0));
 
     routineService.createRoutine(
         1L, new RoutineCreateRequestDto("루틴", null, RoutineType.WEEKLY, 2, null, null));
 
-    verify(todoRepository, never()).saveAndFlush(any(Todo.class));
+    verify(todoRepository).saveAndFlush(any(Todo.class));
   }
 
   @Test
@@ -415,15 +415,15 @@ class RoutineServiceTest {
   }
 
   @Test
-  void 루틴_생성_MONTHLY_오늘_날짜_불일치_Todo_생성_안됨() {
-    // TEST_DATE = 15일. routineDate=16 → 불일치
+  void 루틴_생성_MONTHLY_오늘_날짜_불일치여도_Todo_즉시_생성됨() {
+    // TEST_DATE = 15일. routineDate=16 → 반복일 아니지만 오늘자 Todo 생성
     given(userRepository.findById(1L)).willReturn(Optional.of(testUser()));
     given(routineRepository.save(any(Routine.class))).willAnswer(inv -> inv.getArgument(0));
 
     routineService.createRoutine(
         1L, new RoutineCreateRequestDto("루틴", null, RoutineType.MONTHLY, 16, null, null));
 
-    verify(todoRepository, never()).saveAndFlush(any(Todo.class));
+    verify(todoRepository).saveAndFlush(any(Todo.class));
   }
 
   @Test

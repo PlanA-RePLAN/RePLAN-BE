@@ -77,9 +77,7 @@ public class RoutineService {
                 .goal(goal)
                 .build());
 
-    if (isTodayMatch(routine)) {
-      createTodoFromRoutine(routine);
-    }
+    createTodoFromRoutine(routine);
 
     return RoutineResponseDto.from(routine);
   }
