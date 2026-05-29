@@ -29,6 +29,7 @@ import plana.replan.domain.goal.dto.list.GoalsByDateResponse;
 import plana.replan.domain.goal.exception.GoalErrorCode;
 import plana.replan.domain.goal.service.GoalAiService;
 import plana.replan.domain.goal.service.GoalService;
+import plana.replan.domain.goal.service.GoalWithTodosService;
 import plana.replan.global.config.SecurityConfig;
 import plana.replan.global.exception.CustomException;
 import plana.replan.global.jwt.JwtUtil;
@@ -41,6 +42,7 @@ class GoalControllerTest {
 
   @MockitoBean private GoalService goalService;
   @MockitoBean private GoalAiService goalAiService;
+  @MockitoBean private GoalWithTodosService goalWithTodosService;
   @MockitoBean private JwtUtil jwtUtil;
 
   private UsernamePasswordAuthenticationToken authToken(Long userId) {

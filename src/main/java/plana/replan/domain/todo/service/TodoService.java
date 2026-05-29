@@ -11,6 +11,9 @@ import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import plana.replan.domain.goal.entity.Goal;
+import plana.replan.domain.goal.exception.GoalErrorCode;
+import plana.replan.domain.goal.repository.GoalRepository;
 import plana.replan.domain.routine.entity.Routine;
 import plana.replan.domain.routine.entity.RoutineType;
 import plana.replan.domain.routine.exception.RoutineErrorCode;
@@ -46,6 +49,7 @@ public class TodoService {
   private final UserRepository userRepository;
   private final TagRepository tagRepository;
   private final RoutineRepository routineRepository;
+  private final GoalRepository goalRepository;
 
   @Transactional
   public TodoResponseDto createTodo(Long userId, TodoCreateRequestDto request) {
@@ -68,6 +72,14 @@ public class TodoService {
       }
     }
 
+    Goal goal = null;
+    if (request.getGoalId() != null) {
+      goal =
+          goalRepository
+              .findById(request.getGoalId())
+              .orElseThrow(() -> new CustomException(GoalErrorCode.GOAL_NOT_FOUND));
+    }
+
     Todo todo =
         Todo.builder()
             .title(request.getTitle())
@@ -75,6 +87,7 @@ public class TodoService {
             .isPinned(false)
             .user(user)
             .tag(tag)
+            .goal(goal)
             .build();
 
     todoRepository.save(todo);

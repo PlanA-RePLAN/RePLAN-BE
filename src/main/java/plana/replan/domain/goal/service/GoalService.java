@@ -1,6 +1,9 @@
 package plana.replan.domain.goal.service;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.time.format.DateTimeFormatter;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -24,6 +27,9 @@ import plana.replan.global.exception.CustomException;
 @RequiredArgsConstructor
 public class GoalService {
 
+  private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+  private static final DateTimeFormatter TIME_FORMATTER = DateTimeFormatter.ofPattern("HH:mm");
+
   private final GoalRepository goalRepository;
   private final UserRepository userRepository;
 
@@ -33,7 +39,7 @@ public class GoalService {
     Goal goal =
         Goal.builder()
             .title(request.title())
-            .dueDate(request.dueDate())
+            .dueDate(parseDueDate(request.dueDate(), request.dueTime()))
             .reference(request.reference())
             .user(user)
             .build();
@@ -87,6 +93,17 @@ public class GoalService {
                         .map(GoalSingleResponse::from)
                         .toList()))
         .toList();
+  }
+
+  private LocalDateTime parseDueDate(String date, String time) {
+    if (date == null && time != null) {
+      throw new CustomException(GoalErrorCode.GOAL_DUE_TIME_WITHOUT_DATE);
+    }
+    if (date == null) return null;
+    LocalDate localDate = LocalDate.parse(date, DATE_FORMATTER);
+    LocalTime localTime =
+        (time != null) ? LocalTime.parse(time, TIME_FORMATTER) : LocalTime.MIDNIGHT;
+    return LocalDateTime.of(localDate, localTime);
   }
 
   private User findUser(Long userId) {

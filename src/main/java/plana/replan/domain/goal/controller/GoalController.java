@@ -8,6 +8,8 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import plana.replan.domain.goal.dto.common.GoalSingleResponse;
 import plana.replan.domain.goal.dto.create.GoalCreateRequest;
+import plana.replan.domain.goal.dto.create.GoalWithTodosCreateRequest;
+import plana.replan.domain.goal.dto.create.GoalWithTodosCreateResponse;
 import plana.replan.domain.goal.dto.list.GoalsByDateResponse;
 import plana.replan.domain.goal.dto.recommend.TodoRecommendationRequest;
 import plana.replan.domain.goal.dto.recommend.TodoRecommendationResponse;
@@ -15,6 +17,7 @@ import plana.replan.domain.goal.dto.refine.GoalRefinementRequest;
 import plana.replan.domain.goal.dto.refine.GoalRefinementResponse;
 import plana.replan.domain.goal.service.GoalAiService;
 import plana.replan.domain.goal.service.GoalService;
+import plana.replan.domain.goal.service.GoalWithTodosService;
 import plana.replan.global.common.ApiResult;
 
 @RestController
@@ -24,6 +27,7 @@ public class GoalController implements GoalControllerDocs {
 
   private final GoalService goalService;
   private final GoalAiService goalAiService;
+  private final GoalWithTodosService goalWithTodosService;
 
   @Override
   @PostMapping
@@ -47,6 +51,14 @@ public class GoalController implements GoalControllerDocs {
       @RequestParam(required = false) Integer year,
       @RequestParam(required = false) Integer month) {
     return ResponseEntity.ok(ApiResult.ok(goalService.getGoals(userId, year, month)));
+  }
+
+  @Override
+  @PostMapping("/with-todos")
+  public ResponseEntity<ApiResult<GoalWithTodosCreateResponse>> createGoalWithTodos(
+      @AuthenticationPrincipal Long userId,
+      @Valid @RequestBody GoalWithTodosCreateRequest request) {
+    return ResponseEntity.ok(ApiResult.ok(goalWithTodosService.create(userId, request)));
   }
 
   @Override
