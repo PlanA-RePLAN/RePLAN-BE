@@ -88,10 +88,10 @@ public class TodoController implements TodoControllerDocs {
 
   @Override
   @DeleteMapping("/{todoId}")
-  public ResponseEntity<Void> deleteTodo(
+  public ResponseEntity<ApiResult<String>> deleteTodo(
       @AuthenticationPrincipal Long userId, @PathVariable Long todoId) {
     todoService.deleteTodo(userId, todoId);
-    return ResponseEntity.noContent().build();
+    return ResponseEntity.ok(ApiResult.ok("투두가 성공적으로 삭제되었습니다."));
   }
 
   @Override
@@ -134,11 +134,11 @@ public class TodoController implements TodoControllerDocs {
 
   @Override
   @DeleteMapping("/{parentId}/sub-todos/{subTodoId}")
-  public ResponseEntity<Void> deleteSubTodo(
+  public ResponseEntity<ApiResult<String>> deleteSubTodo(
       @AuthenticationPrincipal Long userId,
       @PathVariable Long parentId,
       @PathVariable Long subTodoId) {
     todoService.deleteSubTodo(userId, parentId, subTodoId);
-    return ResponseEntity.noContent().build();
+    return ResponseEntity.ok(ApiResult.ok("하위 투두가 성공적으로 삭제되었습니다."));
   }
 }

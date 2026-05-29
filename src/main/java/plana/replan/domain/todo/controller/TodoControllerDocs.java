@@ -636,7 +636,22 @@ public interface TodoControllerDocs {
           """,
       security = @SecurityRequirement(name = "Bearer Authentication"))
   @ApiResponses({
-    @ApiResponse(responseCode = "204", description = "투두 삭제 성공"),
+    @ApiResponse(
+        responseCode = "200",
+        description = "투두 삭제 성공",
+        content =
+            @Content(
+                examples =
+                    @ExampleObject(
+                        value =
+                            """
+                            {
+                              "status": 200,
+                              "success": true,
+                              "data": "투두가 성공적으로 삭제되었습니다.",
+                              "error": null
+                            }
+                            """))),
     @ApiResponse(
         responseCode = "401",
         description = "AccessToken 없음 또는 만료",
@@ -695,7 +710,7 @@ public interface TodoControllerDocs {
                             }
                             """)))
   })
-  ResponseEntity<Void> deleteTodo(
+  ResponseEntity<ApiResult<String>> deleteTodo(
       @AuthenticationPrincipal Long userId,
       @Parameter(description = "삭제할 투두 ID", example = "1") @PathVariable Long todoId);
 
@@ -1583,7 +1598,22 @@ public interface TodoControllerDocs {
           """,
       security = @SecurityRequirement(name = "Bearer Authentication"))
   @ApiResponses({
-    @ApiResponse(responseCode = "204", description = "하위 투두 삭제 성공"),
+    @ApiResponse(
+        responseCode = "200",
+        description = "하위 투두 삭제 성공",
+        content =
+            @Content(
+                examples =
+                    @ExampleObject(
+                        value =
+                            """
+                            {
+                              "status": 200,
+                              "success": true,
+                              "data": "하위 투두가 성공적으로 삭제되었습니다.",
+                              "error": null
+                            }
+                            """))),
     @ApiResponse(
         responseCode = "401",
         description = "AccessToken 없음 또는 만료",
@@ -1642,7 +1672,7 @@ public interface TodoControllerDocs {
                             }
                             """)))
   })
-  ResponseEntity<Void> deleteSubTodo(
+  ResponseEntity<ApiResult<String>> deleteSubTodo(
       @AuthenticationPrincipal Long userId,
       @Parameter(description = "상위 투두 ID", example = "42") @PathVariable Long parentId,
       @Parameter(description = "삭제할 하위 투두 ID", example = "43") @PathVariable Long subTodoId);

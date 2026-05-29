@@ -381,13 +381,15 @@ class TodoControllerTest {
   }
 
   @Test
-  @DisplayName("하위 투두 삭제 성공: status=204, 응답 바디 없음")
+  @DisplayName("하위 투두 삭제 성공: status=200, data=성공 메시지")
   void deleteSubTodo_success() throws Exception {
     willDoNothing().given(todoService).deleteSubTodo(any(), any(), any());
 
     mockMvc
         .perform(delete("/api/todos/10/sub-todos/43").with(authentication(authToken(1L))))
-        .andExpect(status().isNoContent());
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.success").value(true))
+        .andExpect(jsonPath("$.data").value("하위 투두가 성공적으로 삭제되었습니다."));
   }
 
   @Test
@@ -653,13 +655,15 @@ class TodoControllerTest {
   }
 
   @Test
-  @DisplayName("투두 삭제 성공: status=204, 응답 바디 없음")
+  @DisplayName("투두 삭제 성공: status=200, data=성공 메시지")
   void deleteTodo_success() throws Exception {
     willDoNothing().given(todoService).deleteTodo(any(), any());
 
     mockMvc
         .perform(delete("/api/todos/1").with(authentication(authToken(1L))))
-        .andExpect(status().isNoContent());
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.success").value(true))
+        .andExpect(jsonPath("$.data").value("투두가 성공적으로 삭제되었습니다."));
   }
 
   @Test
