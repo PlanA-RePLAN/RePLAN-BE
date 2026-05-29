@@ -19,6 +19,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 import plana.replan.domain.goal.dto.common.GoalSingleResponse;
 import plana.replan.domain.goal.dto.create.GoalCreateRequest;
+import plana.replan.domain.goal.dto.create.GoalWithTodosCreateRequest;
+import plana.replan.domain.goal.dto.create.GoalWithTodosCreateResponse;
 import plana.replan.domain.goal.dto.list.GoalsByDateResponse;
 import plana.replan.domain.goal.dto.recommend.TodoRecommendationRequest;
 import plana.replan.domain.goal.dto.recommend.TodoRecommendationResponse;
@@ -205,6 +207,215 @@ public interface GoalControllerDocs {
                       }))
           @RequestBody
           GoalCreateRequest request);
+
+  @Operation(
+      summary = "목표+투두 일괄 생성",
+      description =
+          """
+          목표와 투두(일반형/반복형) 및 하위투두를 단일 요청으로 일괄 생성합니다.
+          투두 추천 결과를 그대로 저장할 때 사용합니다.
+
+          ---
+
+          ### Request Headers
+
+          | 헤더명 | 필수 여부 | 타입 | 설명 |
+          |--------|-----------|------|------|
+          | Authorization | ✅ 필수 | string | `Bearer {accessToken}` 형식의 JWT 액세스 토큰 |
+          | Content-Type | ✅ 필수 | string | `application/json` |
+
+          ---
+
+          ### Request Body
+
+          | 필드명 | 필수 여부 | 타입 | 설명 | 예시 |
+          |--------|-----------|------|------|------|
+          | title | ✅ 필수 | string | 목표 제목 | `"토익 900점 달성"` |
+          | dueDate | ❌ 선택 | string | 목표 기한 (ISO 8601 형식) | `"2025-12-31T00:00:00"` |
+          | reference | ❌ 선택 | string | 참고 자료 (URL 또는 메모) | `"https://toeic.ets.org"` |
+          | todos | ✅ 필수 | array | 생성할 투두 목록 | |
+          | todos[].type | ✅ 필수 | string | `ONE_TIME` (일반형) 또는 `RECURRING` (반복형) | `"ONE_TIME"` |
+          | todos[].title | ✅ 필수 | string | 투두 제목 | `"단어 암기"` |
+          | todos[].dueDate | ❌ 선택 | string | 마감 날짜 (yyyy-MM-dd 형식). ONE_TIME만 사용. | `"2025-06-01"` |
+          | todos[].dueTime | ❌ 선택 | string | 마감 시간 (HH:mm 형식). ONE_TIME만 사용. | `"09:00"` |
+          | todos[].routineType | ❌ 선택 | string | 반복 유형. RECURRING만 사용. `DAILY` / `WEEKLY` / `MONTHLY` | `"DAILY"` |
+          | todos[].routineDate | ❌ 선택 | integer | 반복 날짜. RECURRING만 사용. WEEKLY: 요일 bitmask, MONTHLY: 일자(1~31), DAILY: null | `null` |
+          | todos[].tagId | ❌ 선택 | integer | 태그 ID | `1` |
+          | todos[].subTodos | ❌ 선택 | array | 하위 투두 제목 목록. ONE_TIME만 사용 가능. | `["챕터 1"]` |
+
+          > ❌ 선택 필드는 생략하거나 null로 전달해도 동일하게 처리됩니다.
+
+          ---
+
+          ### Response Elements
+
+          | 필드명 | 타입 | 설명 |
+          |--------|------|------|
+          | goalId | integer | 생성된 목표 ID |
+          | todos | array | 생성된 투두/루틴 목록 |
+          | todos[].type | string | `ONE_TIME` 또는 `RECURRING` |
+          | todos[].title | string | 투두 제목 |
+          | todos[].todoId | integer | 생성된 투두 ID. ONE_TIME만 해당. RECURRING이면 null. |
+          | todos[].routineId | integer | 생성된 루틴 ID. RECURRING만 해당. ONE_TIME이면 null. |
+
+          ---
+
+          ### 주의사항
+          - 모든 생성은 단일 트랜잭션으로 처리됩니다. 하나라도 실패하면 전체 롤백됩니다.
+          - RECURRING 투두는 오늘 날짜가 반복 조건과 일치하면 자동으로 오늘의 투두가 생성됩니다.
+          - 하위투두는 ONE_TIME 투두에만 생성할 수 있습니다.
+          """,
+      security = @SecurityRequirement(name = "Bearer Authentication"))
+  @ApiResponses({
+    @ApiResponse(
+        responseCode = "200",
+        description = "일괄 생성 성공",
+        content =
+            @Content(
+                examples =
+                    @ExampleObject(
+                        value =
+                            """
+                            {
+                              "status": 200,
+                              "success": true,
+                              "data": {
+                                "goalId": 10,
+                                "todos": [
+                                  { "type": "ONE_TIME", "title": "단어 암기", "todoId": 101, "routineId": null },
+                                  { "type": "RECURRING", "title": "리스닝 연습", "todoId": null, "routineId": 201 }
+                                ]
+                              },
+                              "error": null
+                            }
+                            """))),
+    @ApiResponse(
+        responseCode = "400",
+        description = "요청 데이터 유효성 오류",
+        content =
+            @Content(
+                examples =
+                    @ExampleObject(
+                        value =
+                            """
+                            {
+                              "status": 400,
+                              "success": false,
+                              "data": null,
+                              "error": {
+                                "code": "INVALID_INPUT",
+                                "message": "제목은 필수입니다.",
+                                "detail": null
+                              }
+                            }
+                            """))),
+    @ApiResponse(
+        responseCode = "401",
+        description = "인증 실패 — 토큰 없음 또는 만료",
+        content =
+            @Content(
+                examples = {
+                  @ExampleObject(
+                      name = "토큰 없음",
+                      value =
+                          """
+                          {
+                            "status": 401,
+                            "success": false,
+                            "data": null,
+                            "error": { "code": "EMPTY_TOKEN", "message": "토큰이 없습니다.", "detail": null }
+                          }
+                          """),
+                  @ExampleObject(
+                      name = "만료된 토큰",
+                      value =
+                          """
+                          {
+                            "status": 401,
+                            "success": false,
+                            "data": null,
+                            "error": { "code": "EXPIRED_TOKEN", "message": "만료된 토큰입니다.", "detail": null }
+                          }
+                          """)
+                })),
+    @ApiResponse(
+        responseCode = "404",
+        description = "유저 또는 태그를 찾을 수 없음",
+        content =
+            @Content(
+                examples =
+                    @ExampleObject(
+                        value =
+                            """
+                            {
+                              "status": 404,
+                              "success": false,
+                              "data": null,
+                              "error": {
+                                "code": "TAG_NOT_FOUND",
+                                "message": "태그를 찾을 수 없습니다.",
+                                "detail": null
+                              }
+                            }
+                            """)))
+  })
+  ResponseEntity<ApiResult<GoalWithTodosCreateResponse>> createGoalWithTodos(
+      @AuthenticationPrincipal Long userId,
+      @io.swagger.v3.oas.annotations.parameters.RequestBody(
+              content =
+                  @Content(
+                      mediaType = "application/json",
+                      examples = {
+                        @ExampleObject(
+                            name = "전체 필드 포함",
+                            value =
+                                """
+                                {
+                                  "title": "토익 900점 달성",
+                                  "dueDate": "2025-12-31T00:00:00",
+                                  "reference": "https://toeic.ets.org",
+                                  "todos": [
+                                    {
+                                      "type": "ONE_TIME",
+                                      "title": "단어 암기",
+                                      "dueDate": "2025-06-01",
+                                      "dueTime": "09:00",
+                                      "routineType": null,
+                                      "routineDate": null,
+                                      "tagId": 1,
+                                      "subTodos": ["챕터 1", "챕터 2"]
+                                    },
+                                    {
+                                      "type": "RECURRING",
+                                      "title": "리스닝 연습",
+                                      "dueDate": null,
+                                      "dueTime": null,
+                                      "routineType": "DAILY",
+                                      "routineDate": null,
+                                      "tagId": null,
+                                      "subTodos": []
+                                    }
+                                  ]
+                                }
+                                """),
+                        @ExampleObject(
+                            name = "필수 필드만 (선택 필드 생략)",
+                            value =
+                                """
+                                {
+                                  "title": "토익 900점 달성",
+                                  "todos": [
+                                    {
+                                      "type": "ONE_TIME",
+                                      "title": "단어 암기",
+                                      "subTodos": []
+                                    }
+                                  ]
+                                }
+                                """)
+                      }))
+          @RequestBody
+          GoalWithTodosCreateRequest request);
 
   @Operation(
       summary = "목표 삭제",
