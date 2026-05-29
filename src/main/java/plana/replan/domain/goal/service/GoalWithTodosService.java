@@ -28,6 +28,7 @@ import plana.replan.domain.user.entity.User;
 import plana.replan.domain.user.exception.UserErrorCode;
 import plana.replan.domain.user.repository.UserRepository;
 import plana.replan.global.exception.CustomException;
+import plana.replan.global.exception.GlobalErrorCode;
 
 @Service
 @RequiredArgsConstructor
@@ -144,6 +145,9 @@ public class GoalWithTodosService {
   }
 
   private LocalDateTime parseDueDate(String date, String time) {
+    if (date == null && time != null) {
+      throw new CustomException(GlobalErrorCode.INVALID_INPUT);
+    }
     if (date == null) return null;
     LocalDate localDate = LocalDate.parse(date, DATE_FORMATTER);
     LocalTime localTime =
