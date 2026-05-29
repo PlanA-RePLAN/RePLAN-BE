@@ -1,5 +1,6 @@
 package plana.replan.domain.tag.service;
 
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -25,6 +26,21 @@ public class TagService {
   private final UserRepository userRepository;
   private final TodoRepository todoRepository;
   private final RoutineRepository routineRepository;
+
+  @Transactional(readOnly = true)
+  public List<TagResponseDto> getTags(Long userId) {
+    if (userId == null) {
+      throw new CustomException(UserErrorCode.USER_NOT_FOUND);
+    }
+    User user =
+        userRepository
+            .findById(userId)
+            .orElseThrow(() -> new CustomException(UserErrorCode.USER_NOT_FOUND));
+
+    return tagRepository.findAllByUserOrderByCreatedAtDescIdDesc(user).stream()
+        .map(TagResponseDto::from)
+        .toList();
+  }
 
   @Transactional
   public TagResponseDto createTag(Long userId, TagCreateRequestDto request) {
