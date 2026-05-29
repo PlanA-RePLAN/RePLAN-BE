@@ -451,7 +451,22 @@ public interface TagControllerDocs {
           """,
       security = @SecurityRequirement(name = "Bearer Authentication"))
   @ApiResponses({
-    @ApiResponse(responseCode = "204", description = "태그 삭제 성공"),
+    @ApiResponse(
+        responseCode = "200",
+        description = "태그 삭제 성공",
+        content =
+            @Content(
+                examples =
+                    @ExampleObject(
+                        value =
+                            """
+                            {
+                              "status": 200,
+                              "success": true,
+                              "data": "태그가 성공적으로 삭제되었습니다.",
+                              "error": null
+                            }
+                            """))),
     @ApiResponse(
         responseCode = "401",
         description = "AccessToken 없음 또는 만료",
@@ -510,7 +525,7 @@ public interface TagControllerDocs {
                             }
                             """)))
   })
-  ResponseEntity<Void> deleteTag(
+  ResponseEntity<ApiResult<String>> deleteTag(
       @AuthenticationPrincipal Long userId,
       @Parameter(description = "삭제할 태그 ID", example = "1") @PathVariable Long tagId);
 }

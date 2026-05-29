@@ -53,9 +53,9 @@ public class TagController implements TagControllerDocs {
 
   @Override
   @DeleteMapping("/{tagId}")
-  public ResponseEntity<Void> deleteTag(
+  public ResponseEntity<ApiResult<String>> deleteTag(
       @AuthenticationPrincipal Long userId, @PathVariable Long tagId) {
     tagService.deleteTag(userId, tagId);
-    return ResponseEntity.noContent().build();
+    return ResponseEntity.ok(ApiResult.ok("태그가 성공적으로 삭제되었습니다."));
   }
 }

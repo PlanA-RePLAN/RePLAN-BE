@@ -258,13 +258,15 @@ class TagControllerTest {
   }
 
   @Test
-  @DisplayName("태그 삭제 성공: status=204, 응답 바디 없음")
+  @DisplayName("태그 삭제 성공: status=200, data=성공 메시지")
   void deleteTag_success() throws Exception {
     willDoNothing().given(tagService).deleteTag(any(), any());
 
     mockMvc
         .perform(delete("/api/tags/1").with(authentication(authToken(1L))))
-        .andExpect(status().isNoContent());
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.success").value(true))
+        .andExpect(jsonPath("$.data").value("태그가 성공적으로 삭제되었습니다."));
   }
 
   @Test
