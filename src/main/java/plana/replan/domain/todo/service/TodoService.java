@@ -165,7 +165,8 @@ public class TodoService {
   }
 
   @Transactional(readOnly = true)
-  public List<TodoListResponseDto> getTodos(Long userId, String filter, String sort) {
+  public List<TodoListResponseDto> getTodos(
+      Long userId, String filter, String sort, LocalDate date) {
     if (userId == null) {
       throw new CustomException(UserErrorCode.USER_NOT_FOUND);
     }
@@ -183,7 +184,7 @@ public class TodoService {
 
     Comparator<Todo> sortComparator = buildSortComparator(sort);
 
-    LocalDate today = LocalDate.now(clock);
+    LocalDate today = date != null ? date : LocalDate.now(clock);
     var startOfDay = today.atStartOfDay();
     var endOfDay = today.atTime(LocalTime.MAX);
 
