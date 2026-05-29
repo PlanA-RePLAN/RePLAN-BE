@@ -522,7 +522,7 @@ class TodoServiceTest {
   @Test
   @DisplayName("getTodos - userId null: USER_NOT_FOUND 예외")
   void getTodos_nullUserId_throws() {
-    assertThatThrownBy(() -> todoService.getTodos(null, "all", "priority"))
+    assertThatThrownBy(() -> todoService.getTodos(null, "all", "priority", null))
         .isInstanceOf(CustomException.class)
         .satisfies(
             e ->
@@ -533,7 +533,7 @@ class TodoServiceTest {
   @Test
   @DisplayName("getTodos - filter null: INVALID_FILTER 예외")
   void getTodos_nullFilter_throws() {
-    assertThatThrownBy(() -> todoService.getTodos(1L, null, "priority"))
+    assertThatThrownBy(() -> todoService.getTodos(1L, null, "priority", null))
         .isInstanceOf(CustomException.class)
         .satisfies(
             e ->
@@ -544,7 +544,7 @@ class TodoServiceTest {
   @Test
   @DisplayName("getTodos - sort null: INVALID_SORT 예외")
   void getTodos_nullSort_throws() {
-    assertThatThrownBy(() -> todoService.getTodos(1L, "all", null))
+    assertThatThrownBy(() -> todoService.getTodos(1L, "all", null, null))
         .isInstanceOf(CustomException.class)
         .satisfies(
             e ->
@@ -557,7 +557,7 @@ class TodoServiceTest {
   void getTodos_userNotFound_throws() {
     given(userRepository.findById(99L)).willReturn(Optional.empty());
 
-    assertThatThrownBy(() -> todoService.getTodos(99L, "all", "priority"))
+    assertThatThrownBy(() -> todoService.getTodos(99L, "all", "priority", null))
         .isInstanceOf(CustomException.class)
         .satisfies(
             e ->
@@ -573,7 +573,7 @@ class TodoServiceTest {
     given(todoRepository.findActiveTodosForUser(user))
         .willReturn(List.of(activeTodo(1L, user), activeTodo(2L, user)));
 
-    List<TodoListResponseDto> result = todoService.getTodos(1L, "all", "priority");
+    List<TodoListResponseDto> result = todoService.getTodos(1L, "all", "priority", null);
 
     assertThat(result).hasSize(2);
     assertThat(result).extracting("isCompleted").containsOnly(false);
@@ -586,7 +586,7 @@ class TodoServiceTest {
     given(userRepository.findById(1L)).willReturn(Optional.of(user));
     given(todoRepository.findActiveTodosForUser(user)).willReturn(List.of());
 
-    assertThat(todoService.getTodos(1L, "all", "priority")).isEmpty();
+    assertThat(todoService.getTodos(1L, "all", "priority", null)).isEmpty();
   }
 
   @Test
@@ -599,7 +599,7 @@ class TodoServiceTest {
     given(todoRepository.findCompletedTodosByCompletedTimeRange(any(), any(), any()))
         .willReturn(List.of(completedTodo(2L, user)));
 
-    List<TodoListResponseDto> result = todoService.getTodos(1L, "day", "priority");
+    List<TodoListResponseDto> result = todoService.getTodos(1L, "day", "priority", null);
 
     assertThat(result).hasSize(2);
     assertThat(result.get(0).isCompleted()).isFalse();
@@ -614,7 +614,7 @@ class TodoServiceTest {
     given(todoRepository.findActiveTodosByDueDateRange(any(), any(), any()))
         .willReturn(List.of(activeTodo(1L, user)));
 
-    todoService.getTodos(1L, "week", "priority");
+    todoService.getTodos(1L, "week", "priority", null);
 
     verify(todoRepository, never()).findCompletedTodosByCompletedTimeRange(any(), any(), any());
   }
@@ -627,7 +627,7 @@ class TodoServiceTest {
     given(todoRepository.findActiveTodosByDueDateRange(any(), any(), any()))
         .willReturn(List.of(activeTodo(1L, user)));
 
-    todoService.getTodos(1L, "month", "priority");
+    todoService.getTodos(1L, "month", "priority", null);
 
     verify(todoRepository, never()).findCompletedTodosByCompletedTimeRange(any(), any(), any());
   }
@@ -637,7 +637,7 @@ class TodoServiceTest {
   void getTodos_invalidFilter_throws() {
     given(userRepository.findById(1L)).willReturn(Optional.of(testUser()));
 
-    assertThatThrownBy(() -> todoService.getTodos(1L, "invalid", "priority"))
+    assertThatThrownBy(() -> todoService.getTodos(1L, "invalid", "priority", null))
         .isInstanceOf(CustomException.class)
         .satisfies(
             e ->
@@ -657,7 +657,7 @@ class TodoServiceTest {
 
     given(todoRepository.findActiveTodosForUser(user)).willReturn(List.of(t1, t3, t2));
 
-    List<TodoListResponseDto> result = todoService.getTodos(1L, "all", "priority");
+    List<TodoListResponseDto> result = todoService.getTodos(1L, "all", "priority", null);
 
     assertThat(result).extracting("todoId").containsExactly(2L, 1L, 3L);
   }
@@ -680,7 +680,7 @@ class TodoServiceTest {
     given(todoRepository.findActiveTodosForUser(user))
         .willReturn(List.of(noDate, lateDate, earlyDate, midDate));
 
-    List<TodoListResponseDto> result = todoService.getTodos(1L, "all", "dueDate");
+    List<TodoListResponseDto> result = todoService.getTodos(1L, "all", "dueDate", null);
 
     assertThat(result).extracting("todoId").containsExactly(3L, 4L, 2L, 1L);
   }
@@ -690,7 +690,7 @@ class TodoServiceTest {
   void getTodos_invalidSort_throws() {
     given(userRepository.findById(1L)).willReturn(Optional.of(testUser()));
 
-    assertThatThrownBy(() -> todoService.getTodos(1L, "all", "invalid"))
+    assertThatThrownBy(() -> todoService.getTodos(1L, "all", "invalid", null))
         .isInstanceOf(CustomException.class)
         .satisfies(
             e ->
@@ -705,7 +705,8 @@ class TodoServiceTest {
     given(userRepository.findById(1L)).willReturn(Optional.of(user));
     given(todoRepository.findActiveTodosForUser(any())).willReturn(List.of());
 
-    assertThatCode(() -> todoService.getTodos(1L, "ALL", "priority")).doesNotThrowAnyException();
+    assertThatCode(() -> todoService.getTodos(1L, "ALL", "priority", null))
+        .doesNotThrowAnyException();
   }
 
   @Test
@@ -713,7 +714,7 @@ class TodoServiceTest {
   void getTodos_sortCaseMismatch_throws() {
     given(userRepository.findById(1L)).willReturn(Optional.of(testUser()));
 
-    assertThatThrownBy(() -> todoService.getTodos(1L, "all", "PRIORITY"))
+    assertThatThrownBy(() -> todoService.getTodos(1L, "all", "PRIORITY", null))
         .isInstanceOf(CustomException.class)
         .satisfies(
             e ->
@@ -730,7 +731,7 @@ class TodoServiceTest {
     given(userRepository.findById(1L)).willReturn(Optional.of(user));
     given(todoRepository.findActiveTodosForUser(any())).willReturn(List.of(overdue));
 
-    List<TodoListResponseDto> result = todoService.getTodos(1L, "all", "priority");
+    List<TodoListResponseDto> result = todoService.getTodos(1L, "all", "priority", null);
 
     assertThat(result.get(0).isOverdue()).isTrue();
   }
@@ -747,7 +748,7 @@ class TodoServiceTest {
     given(todoRepository.findCompletedTodosByCompletedTimeRange(any(), any(), any()))
         .willReturn(List.of(completed));
 
-    List<TodoListResponseDto> result = todoService.getTodos(1L, "day", "priority");
+    List<TodoListResponseDto> result = todoService.getTodos(1L, "day", "priority", null);
 
     assertThat(result.get(0).isOverdue()).isFalse();
   }
@@ -759,7 +760,7 @@ class TodoServiceTest {
     given(userRepository.findById(1L)).willReturn(Optional.of(user));
     given(todoRepository.findActiveTodosForUser(any())).willReturn(List.of(activeTodo(1L, user)));
 
-    List<TodoListResponseDto> result = todoService.getTodos(1L, "all", "priority");
+    List<TodoListResponseDto> result = todoService.getTodos(1L, "all", "priority", null);
 
     assertThat(result.get(0).isOverdue()).isFalse();
   }
@@ -780,7 +781,7 @@ class TodoServiceTest {
     given(userRepository.findById(1L)).willReturn(Optional.of(user));
     given(todoRepository.findActiveTodosForUser(any())).willReturn(List.of(todo));
 
-    TodoListResponseDto dto = todoService.getTodos(1L, "all", "priority").get(0);
+    TodoListResponseDto dto = todoService.getTodos(1L, "all", "priority", null).get(0);
 
     assertThat(dto.getTagId()).isEqualTo(5L);
     assertThat(dto.getTagTitle()).isEqualTo("업무");

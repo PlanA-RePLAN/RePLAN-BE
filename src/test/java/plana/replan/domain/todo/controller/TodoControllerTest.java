@@ -424,7 +424,7 @@ class TodoControllerTest {
   @Test
   @DisplayName("투두 목록 조회 성공 (기본 filter=all, sort=priority): status=200, 배열 반환")
   void getTodos_success_defaultParams() throws Exception {
-    given(todoService.getTodos(any(), any(), any()))
+    given(todoService.getTodos(any(), any(), any(), any()))
         .willReturn(List.of(sampleDto(1L, false, false), sampleDto(2L, false, false)));
 
     mockMvc
@@ -443,7 +443,7 @@ class TodoControllerTest {
     TodoListResponseDto dto =
         new TodoListResponseDto(
             1L, "투두", null, true, 500.0, false, 3L, "영어", "BLUE", "DAILY", true);
-    given(todoService.getTodos(any(), any(), any())).willReturn(List.of(dto));
+    given(todoService.getTodos(any(), any(), any(), any())).willReturn(List.of(dto));
 
     mockMvc
         .perform(get("/api/todos").with(authentication(authToken(1L))))
@@ -460,7 +460,7 @@ class TodoControllerTest {
   @Test
   @DisplayName("filter=day: status=200, 완료 투두 포함")
   void getTodos_success_dayFilter() throws Exception {
-    given(todoService.getTodos(any(), any(), any()))
+    given(todoService.getTodos(any(), any(), any(), any()))
         .willReturn(List.of(sampleDto(1L, false, false), sampleDto(2L, true, false)));
 
     mockMvc
@@ -473,7 +473,7 @@ class TodoControllerTest {
   @Test
   @DisplayName("filter=week, sort=dueDate: status=200")
   void getTodos_success_weekFilter_dueDateSort() throws Exception {
-    given(todoService.getTodos(any(), any(), any()))
+    given(todoService.getTodos(any(), any(), any(), any()))
         .willReturn(List.of(sampleDto(1L, false, false)));
 
     mockMvc
@@ -487,7 +487,7 @@ class TodoControllerTest {
   void getTodos_invalidFilter() throws Exception {
     willThrow(new CustomException(TodoErrorCode.INVALID_FILTER))
         .given(todoService)
-        .getTodos(any(), any(), any());
+        .getTodos(any(), any(), any(), any());
 
     mockMvc
         .perform(get("/api/todos?filter=invalid").with(authentication(authToken(1L))))
@@ -501,7 +501,7 @@ class TodoControllerTest {
   void getTodos_invalidSort() throws Exception {
     willThrow(new CustomException(TodoErrorCode.INVALID_SORT))
         .given(todoService)
-        .getTodos(any(), any(), any());
+        .getTodos(any(), any(), any(), any());
 
     mockMvc
         .perform(get("/api/todos?sort=invalid").with(authentication(authToken(1L))))
@@ -515,7 +515,7 @@ class TodoControllerTest {
   void getTodos_userNotFound() throws Exception {
     willThrow(new CustomException(UserErrorCode.USER_NOT_FOUND))
         .given(todoService)
-        .getTodos(any(), any(), any());
+        .getTodos(any(), any(), any(), any());
 
     mockMvc
         .perform(get("/api/todos").with(authentication(authToken(999L))))

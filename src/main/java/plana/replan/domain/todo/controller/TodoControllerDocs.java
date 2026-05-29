@@ -9,6 +9,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import java.time.LocalDate;
 import java.util.List;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -1053,15 +1054,16 @@ public interface TodoControllerDocs {
           |-----------|-----------|------|--------|------|------|
           | filter | ❌ 선택 | string | `all` | 조회 범위 필터 (`all`, `day`, `week`, `month`) | `day` |
           | sort | ❌ 선택 | string | `priority` | 정렬 기준 (`priority`, `dueDate`) | `dueDate` |
+          | date | ❌ 선택 | string | 오늘 | 기준 날짜 (yyyy-MM-dd 형식). 생략 시 서버 기준 오늘 사용 | `"2026-05-28"` |
 
           **filter 값별 조회 조건**
 
           | filter | 조회 대상 |
           |--------|----------|
-          | `all` | 완료되지 않은 모든 투두 (마감일 무관) |
-          | `day` | 오늘 마감인 미완료 투두 + 오늘 완료된 투두 |
-          | `week` | 오늘부터 7일 이내 마감인 미완료 투두 |
-          | `month` | 오늘부터 한 달 이내 마감인 미완료 투두 |
+          | `all` | 완료되지 않은 모든 투두 (마감일 무관, date 무시) |
+          | `day` | 기준 날짜에 마감인 미완료 투두 + 기준 날짜에 완료된 투두 |
+          | `week` | 기준 날짜부터 7일 이내 마감인 미완료 투두 |
+          | `month` | 기준 날짜부터 한 달 이내 마감인 미완료 투두 |
 
           **sort 값별 정렬 기준**
 
@@ -1205,7 +1207,10 @@ public interface TodoControllerDocs {
           String filter,
       @Parameter(description = "정렬 기준 (priority/dueDate)", example = "priority")
           @RequestParam(defaultValue = "priority")
-          String sort);
+          String sort,
+      @Parameter(description = "기준 날짜 (yyyy-MM-dd). 생략 시 오늘", example = "2026-05-28")
+          @RequestParam(required = false)
+          LocalDate date);
 
   @Operation(
       summary = "투두 생성",
