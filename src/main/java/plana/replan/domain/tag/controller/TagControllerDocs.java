@@ -22,6 +22,118 @@ import plana.replan.global.common.ApiResult;
 public interface TagControllerDocs {
 
   @Operation(
+      summary = "태그 목록 조회",
+      description =
+          """
+          **호출 주체**: AccessToken을 보유한 인증 사용자
+
+          **요청 방법**: `Authorization: Bearer {accessToken}` 헤더 필수
+
+          로그인 사용자가 보유한 모든 태그를 최신 생성순(createdAt 내림차순, 동일 시각이면 id 내림차순)으로 반환합니다.
+
+          **Request Headers**
+
+          | 헤더명 | 필수 여부 | 타입 | 설명 |
+          |--------|-----------|------|------|
+          | Authorization | ✅ 필수 | string | `Bearer {accessToken}` 형식의 JWT 액세스 토큰 |
+
+          **Response Elements**
+
+          | 필드명 | 타입 | 설명 |
+          |--------|------|------|
+          | tagId | integer | 태그 ID |
+          | title | string | 태그 이름 |
+          | color | string | 태그 색상 (RED/ORANGE/YELLOW/GREEN/BLUE/PURPLE/PINK/GRAY). 색상이 지정되지 않은 경우 null |
+          """,
+      security = @SecurityRequirement(name = "Bearer Authentication"))
+  @ApiResponses({
+    @ApiResponse(
+        responseCode = "200",
+        description = "태그 목록 조회 성공",
+        content =
+            @Content(
+                examples = {
+                  @ExampleObject(
+                      name = "태그 목록",
+                      value =
+                          """
+                          {
+                            "status": 200,
+                            "success": true,
+                            "data": [
+                              {
+                                "tagId": 3,
+                                "title": "업무",
+                                "color": "RED"
+                              },
+                              {
+                                "tagId": 2,
+                                "title": "독서",
+                                "color": null
+                              },
+                              {
+                                "tagId": 1,
+                                "title": "영어",
+                                "color": "BLUE"
+                              }
+                            ],
+                            "error": null
+                          }
+                          """),
+                  @ExampleObject(
+                      name = "빈 목록",
+                      value =
+                          """
+                          {
+                            "status": 200,
+                            "success": true,
+                            "data": [],
+                            "error": null
+                          }
+                          """)
+                })),
+    @ApiResponse(
+        responseCode = "401",
+        description = "AccessToken 없음 또는 만료",
+        content =
+            @Content(
+                examples = {
+                  @ExampleObject(
+                      name = "토큰 없음",
+                      value =
+                          """
+                          {
+                            "status": 401,
+                            "success": false,
+                            "data": null,
+                            "error": {
+                              "code": "EMPTY_TOKEN",
+                              "message": "토큰이 없습니다.",
+                              "detail": null
+                            }
+                          }
+                          """),
+                  @ExampleObject(
+                      name = "만료된 토큰",
+                      value =
+                          """
+                          {
+                            "status": 401,
+                            "success": false,
+                            "data": null,
+                            "error": {
+                              "code": "EXPIRED_TOKEN",
+                              "message": "만료된 토큰입니다.",
+                              "detail": null
+                            }
+                          }
+                          """)
+                }))
+  })
+  ResponseEntity<ApiResult<java.util.List<TagResponseDto>>> getTags(
+      @AuthenticationPrincipal Long userId);
+
+  @Operation(
       summary = "태그 생성",
       description =
           """
