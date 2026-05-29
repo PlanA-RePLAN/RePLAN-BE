@@ -1,6 +1,5 @@
 package plana.replan.domain.goal.service;
 
-import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
@@ -20,6 +19,7 @@ import plana.replan.domain.goal.repository.GoalRepository;
 import plana.replan.domain.routine.entity.Routine;
 import plana.replan.domain.routine.entity.RoutineType;
 import plana.replan.domain.routine.repository.RoutineRepository;
+import plana.replan.domain.routine.service.RoutineService;
 import plana.replan.domain.tag.entity.Tag;
 import plana.replan.domain.tag.exception.TagErrorCode;
 import plana.replan.domain.tag.repository.TagRepository;
@@ -37,12 +37,12 @@ public class GoalWithTodosService {
   private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd");
   private static final DateTimeFormatter TIME_FORMATTER = DateTimeFormatter.ofPattern("HH:mm");
 
-  private final Clock clock;
   private final GoalRepository goalRepository;
   private final TodoRepository todoRepository;
   private final RoutineRepository routineRepository;
   private final UserRepository userRepository;
   private final TagRepository tagRepository;
+  private final RoutineService routineService;
 
   @Transactional
   public GoalWithTodosCreateResponse create(Long userId, GoalWithTodosCreateRequest request) {
@@ -64,8 +64,10 @@ public class GoalWithTodosService {
     for (TodoItemRequest item : request.todos()) {
       if ("RECURRING".equals(item.type())) {
         createdItems.add(createRoutine(user, goal, item));
-      } else {
+      } else if ("ONE_TIME".equals(item.type())) {
         createdItems.add(createTodo(user, goal, item));
+      } else {
+        throw new CustomException(GoalErrorCode.TODO_INVALID_TYPE);
       }
     }
 
@@ -74,8 +76,7 @@ public class GoalWithTodosService {
 
   private CreatedTodoItem createTodo(User user, Goal goal, TodoItemRequest item) {
     Tag tag = resolveTag(user, item.tagId());
-
-    LocalDateTime dueDate = parseDueDate(item.dueDate(), item.dueTime());
+    LocalDateTime dueDate = parseTodoDueDate(item.dueDate(), item.dueTime());
 
     Todo todo =
         todoRepository.save(
@@ -99,9 +100,12 @@ public class GoalWithTodosService {
   }
 
   private CreatedTodoItem createRoutine(User user, Goal goal, TodoItemRequest item) {
-    Tag tag = resolveTag(user, item.tagId());
+    if (item.subTodos() != null && !item.subTodos().isEmpty()) {
+      throw new CustomException(GoalErrorCode.TODO_SUB_TODO_NOT_ALLOWED_FOR_RECURRING);
+    }
 
-    LocalDateTime dueDate = parseDueDate(item.dueDate(), item.dueTime());
+    Tag tag = resolveTag(user, item.tagId());
+    LocalDateTime dueDate = parseTodoDueDate(item.dueDate(), item.dueTime());
     Integer routineDate = item.routineType() == RoutineType.DAILY ? null : item.routineDate();
 
     Routine routine =
@@ -116,17 +120,8 @@ public class GoalWithTodosService {
                 .goal(goal)
                 .build());
 
-    if (isTodayMatch(routine)) {
-      todoRepository.save(
-          Todo.builder()
-              .title(routine.getTitle())
-              .dueDate(routine.getDueDate())
-              .isPinned(false)
-              .user(user)
-              .tag(tag)
-              .goal(goal)
-              .routine(routine)
-              .build());
+    if (routineService.isTodayMatch(routine)) {
+      routineService.createTodoFromRoutine(routine);
     }
 
     return CreatedTodoItem.ofRoutine(routine.getId(), routine.getTitle());
@@ -151,7 +146,7 @@ public class GoalWithTodosService {
     return parseDateTime(date, time);
   }
 
-  private LocalDateTime parseDueDate(String date, String time) {
+  private LocalDateTime parseTodoDueDate(String date, String time) {
     if (date == null && time != null) {
       throw new CustomException(GoalErrorCode.TODO_DUE_TIME_WITHOUT_DATE);
     }
@@ -164,18 +159,5 @@ public class GoalWithTodosService {
     LocalTime localTime =
         (time != null) ? LocalTime.parse(time, TIME_FORMATTER) : LocalTime.MIDNIGHT;
     return LocalDateTime.of(localDate, localTime);
-  }
-
-  private boolean isTodayMatch(Routine routine) {
-    LocalDate today = LocalDate.now(clock);
-    return switch (routine.getRoutineType()) {
-      case DAILY -> true;
-      case WEEKLY -> {
-        int todayBit = 1 << (today.getDayOfWeek().getValue() - 1);
-        yield routine.getRoutineDate() != null && (routine.getRoutineDate() & todayBit) != 0;
-      }
-      case MONTHLY -> routine.getRoutineDate() != null
-          && routine.getRoutineDate() == today.getDayOfMonth();
-    };
   }
 }

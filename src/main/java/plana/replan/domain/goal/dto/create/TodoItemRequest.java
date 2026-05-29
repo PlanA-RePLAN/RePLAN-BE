@@ -1,13 +1,17 @@
 package plana.replan.domain.goal.dto.create;
 
 import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.constraints.NotBlank;
 import java.util.List;
 import plana.replan.domain.routine.entity.RoutineType;
 
 @Schema(description = "투두 항목 요청")
 public record TodoItemRequest(
-    @Schema(description = "투두 유형 (ONE_TIME / RECURRING)", example = "ONE_TIME") String type,
-    @Schema(description = "투두 제목", example = "단어 암기") String title,
+    @Schema(description = "투두 유형 (ONE_TIME / RECURRING)", example = "ONE_TIME")
+        @NotBlank(message = "투두 유형은 필수입니다.")
+        String type,
+    @Schema(description = "투두 제목", example = "단어 암기") @NotBlank(message = "투두 제목은 필수입니다.")
+        String title,
     @Schema(
             description = "마감 날짜 (yyyy-MM-dd 형식). ONE_TIME만 사용. RECURRING이면 null.",
             example = "2025-06-01")

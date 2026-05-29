@@ -50,8 +50,7 @@ class GoalServiceTest {
     given(goalRepository.save(any())).willReturn(savedGoal);
 
     GoalCreateRequest request =
-        new GoalCreateRequest(
-            "토익 900점 달성", LocalDateTime.of(2025, 12, 31, 0, 0), "https://toeic.ets.org");
+        new GoalCreateRequest("토익 900점 달성", "2025-12-31", null, "https://toeic.ets.org");
 
     GoalSingleResponse response = goalService.createGoal(1L, request);
 
@@ -73,7 +72,7 @@ class GoalServiceTest {
     given(savedGoal.getReference()).willReturn(null);
     given(goalRepository.save(any())).willReturn(savedGoal);
 
-    GoalCreateRequest request = new GoalCreateRequest("독서 50권", null, null);
+    GoalCreateRequest request = new GoalCreateRequest("독서 50권", null, null, null);
 
     GoalSingleResponse response = goalService.createGoal(1L, request);
 
@@ -86,7 +85,8 @@ class GoalServiceTest {
   void 목표_생성_유저_없음_404() {
     given(userRepository.findById(999L)).willReturn(Optional.empty());
 
-    assertThatThrownBy(() -> goalService.createGoal(999L, new GoalCreateRequest("제목", null, null)))
+    assertThatThrownBy(
+            () -> goalService.createGoal(999L, new GoalCreateRequest("제목", null, null, null)))
         .isInstanceOf(CustomException.class)
         .satisfies(
             e ->

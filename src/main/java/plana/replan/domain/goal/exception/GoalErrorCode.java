@@ -13,6 +13,8 @@ public enum GoalErrorCode implements ErrorCode {
   GOAL_INVALID_MONTH(400, "월은 1 이상 12 이하여야 합니다."),
   TODO_DUE_TIME_WITHOUT_DATE(400, "dueTime을 설정하려면 dueDate가 필요합니다."),
   GOAL_DUE_TIME_WITHOUT_DATE(400, "목표 기한의 dueTime을 설정하려면 dueDate가 필요합니다."),
+  TODO_INVALID_TYPE(400, "투두 유형은 ONE_TIME 또는 RECURRING이어야 합니다."),
+  TODO_SUB_TODO_NOT_ALLOWED_FOR_RECURRING(400, "반복형 투두에는 하위 투두를 추가할 수 없습니다."),
   GEMINI_API_ERROR(502, "AI 추천 서비스에 일시적인 오류가 발생했습니다."),
   GEMINI_PARSE_ERROR(502, "AI 응답을 처리하는 중 오류가 발생했습니다.");
 
