@@ -1,6 +1,7 @@
 package plana.replan.domain.todo.controller;
 
 import jakarta.validation.Valid;
+import java.time.LocalDate;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -55,8 +56,9 @@ public class TodoController implements TodoControllerDocs {
   public ResponseEntity<ApiResult<List<TodoListResponseDto>>> getTodos(
       @AuthenticationPrincipal Long userId,
       @RequestParam(defaultValue = "all") String filter,
-      @RequestParam(defaultValue = "priority") String sort) {
-    return ResponseEntity.ok(ApiResult.ok(todoService.getTodos(userId, filter, sort)));
+      @RequestParam(defaultValue = "priority") String sort,
+      @RequestParam(required = false) LocalDate date) {
+    return ResponseEntity.ok(ApiResult.ok(todoService.getTodos(userId, filter, sort, date)));
   }
 
   @Override
