@@ -90,7 +90,7 @@ public class RoutineService {
     routines.stream().filter(this::isTodayMatch).forEach(this::createTodoFromRoutine);
   }
 
-  private boolean isTodayMatch(Routine routine) {
+  public boolean isTodayMatch(Routine routine) {
     LocalDate today = LocalDate.now(clock);
     return switch (routine.getRoutineType()) {
       case DAILY -> true;
@@ -103,7 +103,7 @@ public class RoutineService {
     };
   }
 
-  private void createTodoFromRoutine(Routine routine) {
+  public void createTodoFromRoutine(Routine routine) {
     LocalDateTime todayStart = LocalDate.now(clock).atStartOfDay();
     if (todoRepository.existsByRoutineAndDueDateBetween(
         routine, todayStart, todayStart.plusDays(1))) {
