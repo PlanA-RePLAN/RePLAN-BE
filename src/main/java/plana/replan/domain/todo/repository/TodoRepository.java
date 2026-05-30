@@ -22,10 +22,6 @@ public interface TodoRepository extends JpaRepository<Todo, Long> {
 
   boolean existsByRoutineAndDueDateBetween(Routine routine, LocalDateTime start, LocalDateTime end);
 
-  @Query("SELECT t FROM Todo t WHERE t.routine IS NOT NULL AND t.dueDate BETWEEN :start AND :end")
-  List<Todo> findRoutineTodosByDueDateRange(
-      @Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
-
   @Query(
       "SELECT t FROM Todo t JOIN t.routine r"
           + " WHERE t.parent IS NULL"

@@ -468,7 +468,7 @@ class RoutineServiceTest {
 
   @Test
   void generateDailyTodos_어제_마감_반복Todo_없으면_생성_안됨() {
-    given(todoRepository.findRoutineTodosByDueDateRange(any(), any())).willReturn(List.of());
+    given(todoRepository.findMotherRoutineTodosForRollover(any(), any())).willReturn(List.of());
 
     routineService.generateDailyTodos();
 
@@ -480,7 +480,7 @@ class RoutineServiceTest {
     // 어제(2024-01-14) dueDate DAILY 반복 Todo → nextOccurrence(오늘=2024-01-15) = 2024-01-15
     Routine routine = buildRoutine(RoutineType.DAILY, null);
     Todo yesterdayTodo = buildTodoWithRoutine(routine, LocalDate.of(2024, 1, 14).atStartOfDay());
-    given(todoRepository.findRoutineTodosByDueDateRange(any(), any()))
+    given(todoRepository.findMotherRoutineTodosForRollover(any(), any()))
         .willReturn(List.of(yesterdayTodo));
 
     routineService.generateDailyTodos();
@@ -495,7 +495,7 @@ class RoutineServiceTest {
     // 어제(2024-01-14, 일) dueDate WEEKLY(화=2) → nextOccurrence(오늘=월) = 2024-01-16(화)
     Routine routine = buildRoutine(RoutineType.WEEKLY, 2);
     Todo yesterdayTodo = buildTodoWithRoutine(routine, LocalDate.of(2024, 1, 14).atStartOfDay());
-    given(todoRepository.findRoutineTodosByDueDateRange(any(), any()))
+    given(todoRepository.findMotherRoutineTodosForRollover(any(), any()))
         .willReturn(List.of(yesterdayTodo));
 
     routineService.generateDailyTodos();
@@ -510,7 +510,7 @@ class RoutineServiceTest {
     // 어제(2024-01-14) dueDate MONTHLY(16일) → nextOccurrence(오늘=15일) = 2024-01-16
     Routine routine = buildRoutine(RoutineType.MONTHLY, 16);
     Todo yesterdayTodo = buildTodoWithRoutine(routine, LocalDate.of(2024, 1, 14).atStartOfDay());
-    given(todoRepository.findRoutineTodosByDueDateRange(any(), any()))
+    given(todoRepository.findMotherRoutineTodosForRollover(any(), any()))
         .willReturn(List.of(yesterdayTodo));
 
     routineService.generateDailyTodos();
@@ -524,7 +524,7 @@ class RoutineServiceTest {
   void generateDailyTodos_다음_반복일_Todo_이미_존재시_중복_생성_안됨() {
     Routine routine = buildRoutine(RoutineType.DAILY, null);
     Todo yesterdayTodo = buildTodoWithRoutine(routine, LocalDate.of(2024, 1, 14).atStartOfDay());
-    given(todoRepository.findRoutineTodosByDueDateRange(any(), any()))
+    given(todoRepository.findMotherRoutineTodosForRollover(any(), any()))
         .willReturn(List.of(yesterdayTodo));
     given(todoRepository.existsByRoutineAndDueDateBetween(any(), any(), any())).willReturn(true);
 

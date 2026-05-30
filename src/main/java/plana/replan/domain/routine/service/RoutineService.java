@@ -76,7 +76,7 @@ public class RoutineService {
                 .goal(goal)
                 .build());
 
-    createTodoFromRoutine(routine);
+    createTodoTreeFromMother(routine);
 
     return RoutineResponseDto.from(routine);
   }
@@ -87,33 +87,61 @@ public class RoutineService {
     LocalDateTime start = yesterday.atStartOfDay();
     LocalDateTime end = yesterday.atTime(23, 59, 59);
     todoRepository
-        .findRoutineTodosByDueDateRange(start, end)
-        .forEach(todo -> createTodoFromRoutine(todo.getRoutine()));
+        .findMotherRoutineTodosForRollover(start, end)
+        .forEach(todo -> createTodoTreeFromMother(todo.getRoutine()));
   }
 
-  public void createTodoFromRoutine(Routine routine) {
+  /**
+   * 엄마 루틴 1건으로 (1) 엄마 Todo와 (2) 모든 살아있는 하위 루틴의 Todo를 한꺼번에 생성한다. 스케줄러와 엄마 루틴 생성 API 양쪽에서 호출되는 단일
+   * 진입점이다. 하위 루틴은 routineType이 null이므로 nextOccurrence 호출 대상이 아니며, dueDate는 엄마 Todo의 dueDate를 그대로
+   * 상속한다.
+   */
+  public void createTodoTreeFromMother(Routine motherRoutine) {
+    if (motherRoutine.isChild()) {
+      throw new IllegalStateException("createTodoTreeFromMother는 엄마 루틴에만 호출 가능합니다.");
+    }
     LocalDate today = LocalDate.now(clock);
-    LocalDateTime dueDate = nextOccurrence(routine, today).atStartOfDay();
-    if (todoRepository.existsByRoutineAndDueDateBetween(routine, dueDate, dueDate.plusDays(1))) {
+    LocalDateTime dueDate = nextOccurrence(motherRoutine, today).atStartOfDay();
+
+    Todo motherTodo = saveRoutineTodo(motherRoutine, dueDate, null);
+    if (motherTodo == null) {
       return;
     }
+    motherRoutine.getChildren().forEach(child -> saveRoutineTodo(child, dueDate, motherTodo));
+  }
+
+  /** 기존 엄마 Todo에 하위 Todo 1개를 매단다. 하위 루틴 추가 API에서 호출. dueDate/tag/goal/user는 엄마 Todo에서 상속한다. */
+  public void attachChildTodoUnder(Todo motherTodo, Routine childRoutine) {
+    if (!childRoutine.isChild()) {
+      throw new IllegalStateException("attachChildTodoUnder는 하위 루틴에만 호출 가능합니다.");
+    }
+    saveRoutineTodo(childRoutine, motherTodo.getDueDate(), motherTodo);
+  }
+
+  private Todo saveRoutineTodo(Routine routine, LocalDateTime dueDate, Todo parentTodo) {
+    if (todoRepository.existsByRoutineAndDueDateBetween(routine, dueDate, dueDate.plusDays(1))) {
+      return null;
+    }
     try {
-      todoRepository.saveAndFlush(
+      Routine motherForInherit = routine.isChild() ? routine.getParent() : routine;
+      return todoRepository.saveAndFlush(
           Todo.builder()
               .title(routine.getTitle())
               .dueDate(dueDate)
               .isPinned(false)
-              .user(routine.getUser())
-              .tag(routine.getTag())
-              .goal(routine.getGoal())
+              .user(motherForInherit.getUser())
+              .tag(motherForInherit.getTag())
+              .goal(motherForInherit.getGoal())
               .routine(routine)
+              .parent(parentTodo)
               .build());
     } catch (DataIntegrityViolationException e) {
       String msg = e.getMostSpecificCause().getMessage();
       if (msg == null || !msg.contains("uq_todo_routine_duedate")) {
         throw e;
       }
-      // uq_todo_routine_duedate 충돌 — 동시 실행으로 이미 생성된 것으로 간주
+      // uq_todo_routine_duedate 충돌 — 동시 INSERT로 이미 생성된 것으로 간주
+      return null;
     }
   }
 
