@@ -117,6 +117,49 @@ public class RoutineService {
     return SubRoutineResponseDto.from(child);
   }
 
+  /** 엄마 루틴 전용 삭제. 하위 루틴 ID를 넘기면 400(ROUTINE_INVALID_TARGET). */
+  @Transactional
+  public void deleteMotherRoutine(Long userId, Long routineId) {
+    Routine routine = findOwnedRoutine(userId, routineId);
+    if (routine.isChild()) {
+      throw new CustomException(RoutineErrorCode.ROUTINE_INVALID_TARGET);
+    }
+    cascadeSoftDelete(routine);
+  }
+
+  /** 하위 루틴 전용 삭제. 엄마 루틴 ID를 넘기면 400(ROUTINE_INVALID_TARGET). */
+  @Transactional
+  public void deleteChildRoutine(Long userId, Long routineId) {
+    Routine routine = findOwnedRoutine(userId, routineId);
+    if (routine.isMother()) {
+      throw new CustomException(RoutineErrorCode.ROUTINE_INVALID_TARGET);
+    }
+    cascadeSoftDelete(routine);
+  }
+
+  private Routine findOwnedRoutine(Long userId, Long routineId) {
+    if (userId == null) {
+      throw new CustomException(UserErrorCode.USER_NOT_FOUND);
+    }
+    Routine routine =
+        routineRepository
+            .findById(routineId)
+            .orElseThrow(() -> new CustomException(RoutineErrorCode.ROUTINE_NOT_FOUND));
+    if (!routine.getUser().getId().equals(userId)) {
+      throw new CustomException(RoutineErrorCode.ROUTINE_NOT_FOUND);
+    }
+    return routine;
+  }
+
+  /**
+   * TodoService.handleRoutineUpdate처럼 권한 검증이 이미 끝난 cross-domain 호출용. children 일괄 softDelete + 자기
+   * softDelete 정책을 한 지점에 모으기 위한 헬퍼.
+   */
+  public void cascadeSoftDelete(Routine routine) {
+    routine.getChildren().forEach(c -> c.softDelete());
+    routine.softDelete();
+  }
+
   @Transactional
   public void generateDailyTodos() {
     LocalDate yesterday = LocalDate.now(clock).minusDays(1);

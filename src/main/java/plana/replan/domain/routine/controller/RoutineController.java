@@ -5,6 +5,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -40,5 +41,21 @@ public class RoutineController implements RoutineControllerDocs {
       @Valid @RequestBody SubRoutineCreateRequestDto request) {
     return ResponseEntity.status(HttpStatus.CREATED)
         .body(ApiResult.ok(routineService.createChildRoutine(userId, parentId, request)));
+  }
+
+  @Override
+  @DeleteMapping("/{id}")
+  public ResponseEntity<ApiResult<Void>> deleteMotherRoutine(
+      @AuthenticationPrincipal Long userId, @PathVariable Long id) {
+    routineService.deleteMotherRoutine(userId, id);
+    return ResponseEntity.ok(ApiResult.ok(null));
+  }
+
+  @Override
+  @DeleteMapping("/children/{id}")
+  public ResponseEntity<ApiResult<Void>> deleteChildRoutine(
+      @AuthenticationPrincipal Long userId, @PathVariable Long id) {
+    routineService.deleteChildRoutine(userId, id);
+    return ResponseEntity.ok(ApiResult.ok(null));
   }
 }

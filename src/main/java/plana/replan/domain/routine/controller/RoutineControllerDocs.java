@@ -408,4 +408,99 @@ public interface RoutineControllerDocs {
                               """)))
           @RequestBody
           SubRoutineCreateRequestDto request);
+
+  @Operation(
+      summary = "엄마 루틴 삭제",
+      description =
+          """
+          엄마 루틴을 삭제합니다 (soft delete). 매달려 있던 모든 하위 루틴도 함께 사라집니다.
+
+          - 이미 생성된 Todo는 정책상 함께 삭제되지 않습니다. 다음 스케줄러 사이클부터 새 Todo가 생성되지 않을 뿐입니다.
+          - 하위 루틴 ID를 넘기면 400(ROUTINE_INVALID_TARGET) — 하위 루틴은 `/children/{id}`로 삭제하세요.
+
+          ### Request Headers
+
+          | 헤더명 | 필수 여부 | 타입 | 설명 |
+          |--------|-----------|------|------|
+          | Authorization | ✅ 필수 | string | `Bearer {accessToken}` 형식의 JWT 액세스 토큰 |
+
+          ### Path Variable
+
+          | 파라미터명 | 필수 여부 | 타입 | 설명 | 예시 |
+          |-----------|-----------|------|------|------|
+          | id | ✅ 필수 | integer | 엄마 루틴 ID | `1` |
+          """,
+      security = @SecurityRequirement(name = "Bearer Authentication"))
+  @ApiResponses({
+    @ApiResponse(responseCode = "200", description = "삭제 성공"),
+    @ApiResponse(
+        responseCode = "400",
+        description = "하위 루틴 ID를 넘긴 경우",
+        content =
+            @Content(
+                examples =
+                    @ExampleObject(
+                        value =
+                            """
+                            {
+                              "status": 400,
+                              "success": false,
+                              "data": null,
+                              "error": {
+                                "code": "ROUTINE_INVALID_TARGET",
+                                "message": "이 API는 해당 루틴 종류(엄마/하위)에만 사용할 수 있습니다.",
+                                "detail": null
+                              }
+                            }
+                            """))),
+    @ApiResponse(responseCode = "401", description = "인증 실패"),
+    @ApiResponse(
+        responseCode = "404",
+        description = "루틴을 찾을 수 없거나 본인 소유가 아님",
+        content =
+            @Content(
+                examples =
+                    @ExampleObject(
+                        value =
+                            """
+                            {
+                              "status": 404,
+                              "success": false,
+                              "data": null,
+                              "error": {
+                                "code": "ROUTINE_NOT_FOUND",
+                                "message": "루틴을 찾을 수 없습니다.",
+                                "detail": null
+                              }
+                            }
+                            """)))
+  })
+  ResponseEntity<ApiResult<Void>> deleteMotherRoutine(
+      @AuthenticationPrincipal Long userId,
+      @Parameter(description = "엄마 루틴 ID", example = "1") @PathVariable Long id);
+
+  @Operation(
+      summary = "하위 루틴 삭제",
+      description =
+          """
+          하위 루틴 하나를 삭제합니다 (soft delete). 엄마 루틴은 영향 없습니다.
+
+          - 엄마 루틴 ID를 넘기면 400(ROUTINE_INVALID_TARGET) — 엄마 루틴은 `/{id}`로 삭제하세요.
+
+          ### Path Variable
+
+          | 파라미터명 | 필수 여부 | 타입 | 설명 | 예시 |
+          |-----------|-----------|------|------|------|
+          | id | ✅ 필수 | integer | 하위 루틴 ID | `11` |
+          """,
+      security = @SecurityRequirement(name = "Bearer Authentication"))
+  @ApiResponses({
+    @ApiResponse(responseCode = "200", description = "삭제 성공"),
+    @ApiResponse(responseCode = "400", description = "엄마 루틴 ID를 넘긴 경우"),
+    @ApiResponse(responseCode = "401", description = "인증 실패"),
+    @ApiResponse(responseCode = "404", description = "루틴을 찾을 수 없거나 본인 소유가 아님")
+  })
+  ResponseEntity<ApiResult<Void>> deleteChildRoutine(
+      @AuthenticationPrincipal Long userId,
+      @Parameter(description = "하위 루틴 ID", example = "11") @PathVariable Long id);
 }
