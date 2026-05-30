@@ -3,6 +3,7 @@ package plana.replan.domain.routine.service;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
@@ -12,6 +13,8 @@ import plana.replan.domain.goal.exception.GoalErrorCode;
 import plana.replan.domain.goal.repository.GoalRepository;
 import plana.replan.domain.routine.dto.RoutineCreateRequestDto;
 import plana.replan.domain.routine.dto.RoutineResponseDto;
+import plana.replan.domain.routine.dto.SubRoutineCreateRequestDto;
+import plana.replan.domain.routine.dto.SubRoutineResponseDto;
 import plana.replan.domain.routine.entity.Routine;
 import plana.replan.domain.routine.entity.RoutineType;
 import plana.replan.domain.routine.exception.RoutineErrorCode;
@@ -79,6 +82,39 @@ public class RoutineService {
     createTodoTreeFromMother(routine);
 
     return RoutineResponseDto.from(routine);
+  }
+
+  @Transactional
+  public SubRoutineResponseDto createChildRoutine(
+      Long userId, Long parentId, SubRoutineCreateRequestDto request) {
+    if (userId == null) {
+      throw new CustomException(UserErrorCode.USER_NOT_FOUND);
+    }
+
+    Routine parent =
+        routineRepository
+            .findById(parentId)
+            .orElseThrow(() -> new CustomException(RoutineErrorCode.ROUTINE_NOT_FOUND));
+
+    if (!parent.getUser().getId().equals(userId)) {
+      throw new CustomException(RoutineErrorCode.ROUTINE_NOT_FOUND);
+    }
+    if (parent.isChild()) {
+      // 2단계 중첩 금지 — 하위 루틴 ID를 parentId로 넘긴 경우
+      throw new CustomException(RoutineErrorCode.ROUTINE_NOT_FOUND);
+    }
+
+    Routine child =
+        routineRepository.save(
+            Routine.builder().title(request.title()).user(parent.getUser()).parent(parent).build());
+
+    // 엄마의 살아있는 다음 발생일 Todo가 있으면 즉시 매단다.
+    LocalDateTime todayStart = LocalDate.now(clock).atStartOfDay();
+    Optional<Todo> motherTodo =
+        todoRepository.findFirstUpcomingMotherTodoByRoutine(parent, todayStart);
+    motherTodo.ifPresent(mt -> attachChildTodoUnder(mt, child));
+
+    return SubRoutineResponseDto.from(child);
   }
 
   @Transactional

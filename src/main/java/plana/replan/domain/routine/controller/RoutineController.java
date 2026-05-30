@@ -5,12 +5,15 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import plana.replan.domain.routine.dto.RoutineCreateRequestDto;
 import plana.replan.domain.routine.dto.RoutineResponseDto;
+import plana.replan.domain.routine.dto.SubRoutineCreateRequestDto;
+import plana.replan.domain.routine.dto.SubRoutineResponseDto;
 import plana.replan.domain.routine.service.RoutineService;
 import plana.replan.global.common.ApiResult;
 
@@ -27,5 +30,15 @@ public class RoutineController implements RoutineControllerDocs {
       @AuthenticationPrincipal Long userId, @Valid @RequestBody RoutineCreateRequestDto request) {
     return ResponseEntity.status(HttpStatus.CREATED)
         .body(ApiResult.ok(routineService.createRoutine(userId, request)));
+  }
+
+  @Override
+  @PostMapping("/{parentId}/children")
+  public ResponseEntity<ApiResult<SubRoutineResponseDto>> createChildRoutine(
+      @AuthenticationPrincipal Long userId,
+      @PathVariable Long parentId,
+      @Valid @RequestBody SubRoutineCreateRequestDto request) {
+    return ResponseEntity.status(HttpStatus.CREATED)
+        .body(ApiResult.ok(routineService.createChildRoutine(userId, parentId, request)));
   }
 }

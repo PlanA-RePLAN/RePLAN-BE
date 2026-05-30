@@ -1,6 +1,7 @@
 package plana.replan.domain.routine.controller;
 
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.ExampleObject;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -9,9 +10,12 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
 import plana.replan.domain.routine.dto.RoutineCreateRequestDto;
 import plana.replan.domain.routine.dto.RoutineResponseDto;
+import plana.replan.domain.routine.dto.SubRoutineCreateRequestDto;
+import plana.replan.domain.routine.dto.SubRoutineResponseDto;
 import plana.replan.global.common.ApiResult;
 
 @Tag(name = "Routine", description = "루틴 관련 API. 모든 요청에 JWT 인증 필수.")
@@ -249,4 +253,159 @@ public interface RoutineControllerDocs {
                       }))
           @RequestBody
           RoutineCreateRequestDto request);
+
+  @Operation(
+      summary = "하위 루틴 추가",
+      description =
+          """
+          엄마 루틴 아래에 하위 루틴을 추가합니다.
+
+          ### 정책
+          - 하위 루틴은 `title`만 자체 값입니다. 스케줄(`routineType`/`routineDate`), `dueDate`, `tag`, `goal`, `user`는 모두 엄마 루틴을 따릅니다.
+          - 1단계 깊이만 허용합니다. 하위 루틴 ID를 `parentId`로 넘기면 404로 거부됩니다.
+          - 호출 시점에 엄마 루틴의 살아있는 다음 발생일 Todo가 있으면, 해당 엄마 Todo 아래에 하위 Todo가 즉시 매달립니다. 없으면 다음 스케줄러 사이클에서 함께 생성됩니다.
+
+          ---
+
+          ### Request Headers
+
+          | 헤더명 | 필수 여부 | 타입 | 설명 |
+          |--------|-----------|------|------|
+          | Authorization | ✅ 필수 | string | `Bearer {accessToken}` 형식의 JWT 액세스 토큰 |
+          | Content-Type | ✅ 필수 | string | `application/json` |
+
+          ---
+
+          ### Path Variable
+
+          | 파라미터명 | 필수 여부 | 타입 | 설명 | 예시 |
+          |-----------|-----------|------|------|------|
+          | parentId | ✅ 필수 | integer | 엄마 루틴 ID | `1` |
+
+          ---
+
+          ### Request Body
+
+          | 필드명 | 필수 여부 | 타입 | 설명 | 예시 |
+          |--------|-----------|------|------|------|
+          | title | ✅ 필수 | string | 하위 루틴 제목 | `"스트레칭"` |
+          """,
+      security = @SecurityRequirement(name = "Bearer Authentication"))
+  @ApiResponses({
+    @ApiResponse(
+        responseCode = "201",
+        description = "하위 루틴 생성 성공",
+        content =
+            @Content(
+                examples =
+                    @ExampleObject(
+                        value =
+                            """
+                            {
+                              "status": 200,
+                              "success": true,
+                              "data": {
+                                "routineId": 11,
+                                "title": "스트레칭",
+                                "parentId": 1
+                              },
+                              "error": null
+                            }
+                            """))),
+    @ApiResponse(
+        responseCode = "400",
+        description = "title 누락",
+        content =
+            @Content(
+                examples =
+                    @ExampleObject(
+                        value =
+                            """
+                            {
+                              "status": 400,
+                              "success": false,
+                              "data": null,
+                              "error": {
+                                "code": "INVALID_INPUT",
+                                "message": "제목은 필수입니다.",
+                                "detail": null
+                              }
+                            }
+                            """))),
+    @ApiResponse(
+        responseCode = "401",
+        description = "인증 실패 — 토큰 없음 또는 만료",
+        content =
+            @Content(
+                examples = {
+                  @ExampleObject(
+                      name = "토큰 없음",
+                      value =
+                          """
+                          {
+                            "status": 401,
+                            "success": false,
+                            "data": null,
+                            "error": {
+                              "code": "EMPTY_TOKEN",
+                              "message": "토큰이 없습니다.",
+                              "detail": null
+                            }
+                          }
+                          """),
+                  @ExampleObject(
+                      name = "만료된 토큰",
+                      value =
+                          """
+                          {
+                            "status": 401,
+                            "success": false,
+                            "data": null,
+                            "error": {
+                              "code": "EXPIRED_TOKEN",
+                              "message": "만료된 토큰입니다.",
+                              "detail": null
+                            }
+                          }
+                          """)
+                })),
+    @ApiResponse(
+        responseCode = "404",
+        description = "엄마 루틴을 찾을 수 없거나, 본인 소유가 아니거나, 하위 루틴 ID를 parentId로 넘긴 경우 (정책상 모두 동일 응답)",
+        content =
+            @Content(
+                examples =
+                    @ExampleObject(
+                        value =
+                            """
+                            {
+                              "status": 404,
+                              "success": false,
+                              "data": null,
+                              "error": {
+                                "code": "ROUTINE_NOT_FOUND",
+                                "message": "루틴을 찾을 수 없습니다.",
+                                "detail": null
+                              }
+                            }
+                            """)))
+  })
+  ResponseEntity<ApiResult<SubRoutineResponseDto>> createChildRoutine(
+      @AuthenticationPrincipal Long userId,
+      @Parameter(description = "엄마 루틴 ID", example = "1") @PathVariable Long parentId,
+      @io.swagger.v3.oas.annotations.parameters.RequestBody(
+              content =
+                  @Content(
+                      mediaType = "application/json",
+                      examples =
+                          @ExampleObject(
+                              name = "하위 루틴 생성",
+                              value =
+                                  """
+                              {
+                                "title": "스트레칭"
+                              }
+                              """)))
+          @RequestBody
+          SubRoutineCreateRequestDto request);
 }
