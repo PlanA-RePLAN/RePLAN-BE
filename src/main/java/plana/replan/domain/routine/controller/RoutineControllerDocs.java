@@ -16,6 +16,7 @@ import plana.replan.domain.routine.dto.RoutineCreateRequestDto;
 import plana.replan.domain.routine.dto.RoutineResponseDto;
 import plana.replan.domain.routine.dto.SubRoutineCreateRequestDto;
 import plana.replan.domain.routine.dto.SubRoutineResponseDto;
+import plana.replan.domain.routine.dto.SubRoutineUpdateRequestDto;
 import plana.replan.global.common.ApiResult;
 
 @Tag(name = "Routine", description = "루틴 관련 API. 모든 요청에 JWT 인증 필수.")
@@ -503,4 +504,50 @@ public interface RoutineControllerDocs {
   ResponseEntity<ApiResult<Void>> deleteChildRoutine(
       @AuthenticationPrincipal Long userId,
       @Parameter(description = "하위 루틴 ID", example = "11") @PathVariable Long id);
+
+  @Operation(
+      summary = "하위 루틴 수정",
+      description =
+          """
+          하위 루틴의 `title`만 수정합니다. 스케줄/태그/목표는 엄마를 따라가므로 수정 대상이 아닙니다.
+
+          - 엄마 루틴 ID를 넘기면 400(ROUTINE_INVALID_TARGET).
+
+          ### Path Variable
+
+          | 파라미터명 | 필수 여부 | 타입 | 설명 | 예시 |
+          |-----------|-----------|------|------|------|
+          | id | ✅ 필수 | integer | 하위 루틴 ID | `11` |
+
+          ### Request Body
+
+          | 필드명 | 필수 여부 | 타입 | 설명 | 예시 |
+          |--------|-----------|------|------|------|
+          | title | ✅ 필수 | string | 변경할 하위 루틴 제목 | `"유산소 30분"` |
+          """,
+      security = @SecurityRequirement(name = "Bearer Authentication"))
+  @ApiResponses({
+    @ApiResponse(responseCode = "200", description = "수정 성공"),
+    @ApiResponse(responseCode = "400", description = "title 누락 또는 엄마 루틴 ID 사용"),
+    @ApiResponse(responseCode = "401", description = "인증 실패"),
+    @ApiResponse(responseCode = "404", description = "루틴을 찾을 수 없거나 본인 소유가 아님")
+  })
+  ResponseEntity<ApiResult<SubRoutineResponseDto>> updateChildRoutine(
+      @AuthenticationPrincipal Long userId,
+      @Parameter(description = "하위 루틴 ID", example = "11") @PathVariable Long id,
+      @io.swagger.v3.oas.annotations.parameters.RequestBody(
+              content =
+                  @Content(
+                      mediaType = "application/json",
+                      examples =
+                          @ExampleObject(
+                              name = "title 수정",
+                              value =
+                                  """
+                              {
+                                "title": "유산소 30분"
+                              }
+                              """)))
+          @RequestBody
+          SubRoutineUpdateRequestDto request);
 }

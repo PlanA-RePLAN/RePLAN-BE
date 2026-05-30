@@ -15,6 +15,7 @@ import plana.replan.domain.routine.dto.RoutineCreateRequestDto;
 import plana.replan.domain.routine.dto.RoutineResponseDto;
 import plana.replan.domain.routine.dto.SubRoutineCreateRequestDto;
 import plana.replan.domain.routine.dto.SubRoutineResponseDto;
+import plana.replan.domain.routine.dto.SubRoutineUpdateRequestDto;
 import plana.replan.domain.routine.entity.Routine;
 import plana.replan.domain.routine.entity.RoutineType;
 import plana.replan.domain.routine.exception.RoutineErrorCode;
@@ -115,6 +116,18 @@ public class RoutineService {
     motherTodo.ifPresent(mt -> attachChildTodoUnder(mt, child));
 
     return SubRoutineResponseDto.from(child);
+  }
+
+  /** 하위 루틴 title 수정. 엄마 루틴 ID를 넘기면 400(ROUTINE_INVALID_TARGET). */
+  @Transactional
+  public SubRoutineResponseDto updateChildRoutine(
+      Long userId, Long routineId, SubRoutineUpdateRequestDto request) {
+    Routine routine = findOwnedRoutine(userId, routineId);
+    if (routine.isMother()) {
+      throw new CustomException(RoutineErrorCode.ROUTINE_INVALID_TARGET);
+    }
+    routine.updateTitle(request.title());
+    return SubRoutineResponseDto.from(routine);
   }
 
   /** 엄마 루틴 전용 삭제. 하위 루틴 ID를 넘기면 400(ROUTINE_INVALID_TARGET). */
