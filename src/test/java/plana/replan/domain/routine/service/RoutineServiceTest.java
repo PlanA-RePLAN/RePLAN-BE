@@ -435,7 +435,7 @@ class RoutineServiceTest {
   void 루틴_생성_오늘_이미_Todo_존재시_중복_생성_안됨() {
     given(userRepository.findById(1L)).willReturn(Optional.of(testUser()));
     given(routineRepository.save(any(Routine.class))).willAnswer(inv -> inv.getArgument(0));
-    given(todoRepository.existsByRoutineAndDueDateBetween(any(), any(), any())).willReturn(true);
+    given(todoRepository.existsByRoutineAndDueDate(any(), any())).willReturn(true);
 
     routineService.createRoutine(
         1L, new RoutineCreateRequestDto("아침 스트레칭", null, RoutineType.DAILY, null, null, null));
@@ -526,7 +526,7 @@ class RoutineServiceTest {
     Todo yesterdayTodo = buildTodoWithRoutine(routine, LocalDate.of(2024, 1, 14).atStartOfDay());
     given(todoRepository.findMotherRoutineTodosForRollover(any(), any()))
         .willReturn(List.of(yesterdayTodo));
-    given(todoRepository.existsByRoutineAndDueDateBetween(any(), any(), any())).willReturn(true);
+    given(todoRepository.existsByRoutineAndDueDate(any(), any())).willReturn(true);
 
     routineService.generateDailyTodos();
 

@@ -220,7 +220,7 @@ public class RoutineService {
   }
 
   private Todo saveRoutineTodo(Routine routine, LocalDateTime dueDate, Todo parentTodo) {
-    if (todoRepository.existsByRoutineAndDueDateBetween(routine, dueDate, dueDate.plusDays(1))) {
+    if (todoRepository.existsByRoutineAndDueDate(routine, dueDate)) {
       return null;
     }
     try {
