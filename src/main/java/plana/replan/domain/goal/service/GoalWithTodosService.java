@@ -15,6 +15,7 @@ import plana.replan.domain.goal.dto.create.GoalWithTodosCreateResponse;
 import plana.replan.domain.goal.dto.create.TodoItemRequest;
 import plana.replan.domain.goal.exception.GoalErrorCode;
 import plana.replan.domain.routine.dto.RoutineCreateRequestDto;
+import plana.replan.domain.routine.dto.SubRoutineCreateRequestDto;
 import plana.replan.domain.routine.entity.RoutineType;
 import plana.replan.domain.routine.service.RoutineService;
 import plana.replan.domain.todo.dto.SubTodoCreateRequestDto;
@@ -66,6 +67,9 @@ public class GoalWithTodosService {
   }
 
   private CreatedTodoItem createTodo(Long userId, Long goalId, TodoItemRequest item) {
+    if (item.subRoutines() != null && !item.subRoutines().isEmpty()) {
+      throw new CustomException(GoalErrorCode.TODO_SUB_ROUTINE_NOT_ALLOWED_FOR_ONE_TIME);
+    }
     if (item.subTodos() != null && !item.subTodos().isEmpty()) {
       validateSubTodos(item.subTodos());
     }
@@ -86,11 +90,24 @@ public class GoalWithTodosService {
     if (item.subTodos() != null && !item.subTodos().isEmpty()) {
       throw new CustomException(GoalErrorCode.TODO_SUB_TODO_NOT_ALLOWED_FOR_RECURRING);
     }
+    if (item.subRoutines() != null && !item.subRoutines().isEmpty()) {
+      validateSubRoutines(item.subRoutines());
+    }
 
     RoutineCreateRequestDto dto = buildRoutineCreateRequest(item, goalId);
     var routine = routineService.createRoutine(userId, dto);
 
-    return CreatedTodoItem.ofRoutine(routine.getRoutineId(), routine.getTitle());
+    List<Long> subRoutineIds = new ArrayList<>();
+    if (item.subRoutines() != null) {
+      for (String childTitle : item.subRoutines()) {
+        var child =
+            routineService.createChildRoutine(
+                userId, routine.getRoutineId(), new SubRoutineCreateRequestDto(childTitle));
+        subRoutineIds.add(child.routineId());
+      }
+    }
+
+    return CreatedTodoItem.ofRoutine(routine.getRoutineId(), routine.getTitle(), subRoutineIds);
   }
 
   private TodoCreateRequestDto buildTodoCreateRequest(TodoItemRequest item, Long goalId) {
@@ -113,6 +130,14 @@ public class GoalWithTodosService {
     for (String title : subTodos) {
       if (title == null || title.isBlank()) {
         throw new CustomException(GoalErrorCode.TODO_INVALID_TYPE);
+      }
+    }
+  }
+
+  private void validateSubRoutines(List<String> subRoutines) {
+    for (String title : subRoutines) {
+      if (title == null || title.isBlank()) {
+        throw new CustomException(GoalErrorCode.TODO_SUB_ROUTINE_INVALID_TITLE);
       }
     }
   }

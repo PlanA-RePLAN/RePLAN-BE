@@ -27,4 +27,6 @@ public record TodoItemRequest(
         Integer routineDate,
     @Schema(description = "태그 ID. 없으면 null.", example = "1") Long tagId,
     @Schema(description = "하위 투두 제목 목록. ONE_TIME만 사용 가능.", example = "[\"챕터 1\", \"챕터 2\"]")
-        List<String> subTodos) {}
+        List<String> subTodos,
+    @Schema(description = "하위 루틴 제목 목록. RECURRING만 사용 가능.", example = "[\"스트레칭\", \"유산소\"]")
+        List<String> subRoutines) {}
