@@ -68,9 +68,6 @@ public class Todo extends BaseTimeEntity {
   @OneToMany(mappedBy = "parent", fetch = FetchType.LAZY)
   private List<Todo> children = new ArrayList<>();
 
-  @OneToOne(mappedBy = "todo", fetch = FetchType.LAZY)
-  private FailureReason failureReason;
-
   public void updateTitle(String title) {
     this.title = Objects.requireNonNull(title, "제목은 필수입니다.");
   }
