@@ -11,6 +11,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.SQLRestriction;
 import plana.replan.domain.goal.entity.Goal;
+import plana.replan.domain.replan.entity.Replan;
 import plana.replan.domain.tag.entity.Tag;
 import plana.replan.domain.user.entity.User;
 import plana.replan.global.entity.BaseTimeEntity;
@@ -57,6 +58,21 @@ public class Routine extends BaseTimeEntity {
 
   @OneToMany(mappedBy = "parent", fetch = FetchType.LAZY)
   private List<Routine> children = new ArrayList<>();
+
+  @ManyToOne(fetch = FetchType.LAZY)
+  @JoinColumn(name = "replan_id")
+  private Replan replan;
+
+  @Column(name = "is_active", nullable = false)
+  private boolean isActive = true;
+
+  public void deactivate() {
+    this.isActive = false;
+  }
+
+  public void linkReplan(Replan replan) {
+    this.replan = replan;
+  }
 
   public void update(String title, RoutineType routineType, Integer routineDate, Tag tag) {
     this.title = requireNonBlank(title);
