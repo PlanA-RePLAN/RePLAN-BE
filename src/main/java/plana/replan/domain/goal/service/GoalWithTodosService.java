@@ -137,7 +137,7 @@ public class GoalWithTodosService {
   private void validateSubRoutines(List<String> subRoutines) {
     for (String title : subRoutines) {
       if (title == null || title.isBlank()) {
-        throw new CustomException(GoalErrorCode.TODO_INVALID_TYPE);
+        throw new CustomException(GoalErrorCode.TODO_SUB_ROUTINE_INVALID_TITLE);
       }
     }
   }
