@@ -11,6 +11,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.SQLRestriction;
 import plana.replan.domain.goal.entity.Goal;
+import plana.replan.domain.replan.entity.Replan;
 import plana.replan.domain.routine.entity.Routine;
 import plana.replan.domain.tag.entity.Tag;
 import plana.replan.domain.user.entity.User;
@@ -67,6 +68,21 @@ public class Todo extends BaseTimeEntity {
 
   @OneToMany(mappedBy = "parent", fetch = FetchType.LAZY)
   private List<Todo> children = new ArrayList<>();
+
+  @ManyToOne(fetch = FetchType.LAZY)
+  @JoinColumn(name = "replan_id")
+  private Replan replan;
+
+  @Column(name = "is_active", nullable = false)
+  private boolean isActive = true;
+
+  public void deactivate() {
+    this.isActive = false;
+  }
+
+  public void linkReplan(Replan replan) {
+    this.replan = replan;
+  }
 
   public void updateTitle(String title) {
     this.title = Objects.requireNonNull(title, "제목은 필수입니다.");
