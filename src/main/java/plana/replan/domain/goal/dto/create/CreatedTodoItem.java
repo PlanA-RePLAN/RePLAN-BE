@@ -12,7 +12,8 @@ public record CreatedTodoItem(
     @Schema(description = "생성된 루틴 ID. RECURRING만 해당. ONE_TIME이면 null.", example = "null")
         Long routineId,
     @Schema(
-            description = "생성된 하위 루틴 ID 목록. RECURRING + subRoutines가 있을 때만 채워짐.",
+            description =
+                "생성된 하위 루틴 ID 목록. 항상 배열로 직렬화되며 null이 아니다. ONE_TIME이거나 subRoutines가 비어있으면 빈 배열.",
             example = "[201, 202]")
         List<Long> subRoutineIds) {
 
