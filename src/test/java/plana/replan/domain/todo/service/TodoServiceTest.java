@@ -58,6 +58,7 @@ class TodoServiceTest {
   @Mock private UserRepository userRepository;
   @Mock private TagRepository tagRepository;
   @Mock private RoutineRepository routineRepository;
+  @Mock private plana.replan.domain.routine.service.RoutineService routineService;
 
   @InjectMocks private TodoService todoService;
 
@@ -1611,7 +1612,7 @@ class TodoServiceTest {
     TodoDetailResponseDto result =
         todoService.updateTodo(1L, 1L, updateTodoRequest("제목", null, null, null, null));
 
-    assertThat(ReflectionTestUtils.getField(routine, "deletedAt")).isNotNull();
+    verify(routineService).cascadeSoftDelete(routine);
     assertThat(result.getRoutineType()).isNull();
   }
 

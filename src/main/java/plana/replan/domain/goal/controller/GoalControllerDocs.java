@@ -244,6 +244,7 @@ public interface GoalControllerDocs {
           | todos[].routineDate | ❌ 선택 | integer | 반복 날짜. RECURRING만 사용. WEEKLY: 요일 bitmask, MONTHLY: 일자(1~31), DAILY: null | `null` |
           | todos[].tagId | ❌ 선택 | integer | 태그 ID | `1` |
           | todos[].subTodos | ❌ 선택 | array | 하위 투두 제목 목록. ONE_TIME만 사용 가능. | `["챕터 1"]` |
+          | todos[].subRoutines | ❌ 선택 | array | 하위 루틴 제목 목록. RECURRING만 사용 가능. | `["스트레칭", "유산소"]` |
 
           > ❌ 선택 필드는 생략하거나 null로 전달해도 동일하게 처리됩니다.
 
@@ -259,13 +260,14 @@ public interface GoalControllerDocs {
           | todos[].title | string | 투두 제목 |
           | todos[].todoId | integer | 생성된 투두 ID. ONE_TIME만 해당. RECURRING이면 null. |
           | todos[].routineId | integer | 생성된 루틴 ID. RECURRING만 해당. ONE_TIME이면 null. |
+          | todos[].subRoutineIds | array | 생성된 하위 루틴 ID 목록. RECURRING + subRoutines 사용 시. |
 
           ---
 
           ### 주의사항
           - 모든 생성은 단일 트랜잭션으로 처리됩니다. 하나라도 실패하면 전체 롤백됩니다.
-          - RECURRING 투두는 오늘 날짜가 반복 조건과 일치하면 자동으로 오늘의 투두가 생성됩니다.
-          - 하위투두는 ONE_TIME 투두에만 생성할 수 있습니다.
+          - RECURRING 투두는 다음 반복일에 해당하는 Todo가 즉시 생성됩니다.
+          - 하위투두는 ONE_TIME 투두에만, 하위루틴은 RECURRING 투두에만 추가할 수 있습니다. 교차 사용 시 400.
           """,
       security = @SecurityRequirement(name = "Bearer Authentication"))
   @ApiResponses({
@@ -284,8 +286,8 @@ public interface GoalControllerDocs {
                               "data": {
                                 "goalId": 10,
                                 "todos": [
-                                  { "type": "ONE_TIME", "title": "단어 암기", "todoId": 101, "routineId": null },
-                                  { "type": "RECURRING", "title": "리스닝 연습", "todoId": null, "routineId": 201 }
+                                  { "type": "ONE_TIME", "title": "단어 암기", "todoId": 101, "routineId": null, "subRoutineIds": [] },
+                                  { "type": "RECURRING", "title": "리스닝 연습", "todoId": null, "routineId": 201, "subRoutineIds": [301, 302] }
                                 ]
                               },
                               "error": null
@@ -396,7 +398,8 @@ public interface GoalControllerDocs {
                                       "routineType": "DAILY",
                                       "routineDate": null,
                                       "tagId": null,
-                                      "subTodos": []
+                                      "subTodos": [],
+                                      "subRoutines": ["받아쓰기", "쉐도잉"]
                                     }
                                   ]
                                 }

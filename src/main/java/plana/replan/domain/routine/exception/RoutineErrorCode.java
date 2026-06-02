@@ -7,7 +7,9 @@ import plana.replan.global.exception.ErrorCode;
 @Getter
 @RequiredArgsConstructor
 public enum RoutineErrorCode implements ErrorCode {
-  ROUTINE_INVALID_DATE(400, "유효하지 않은 반복 날짜입니다.");
+  ROUTINE_INVALID_DATE(400, "유효하지 않은 반복 날짜입니다."),
+  ROUTINE_NOT_FOUND(404, "루틴을 찾을 수 없습니다."),
+  ROUTINE_INVALID_TARGET(400, "이 API는 해당 루틴 종류(엄마/하위)에만 사용할 수 있습니다.");
 
   private final int status;
   private final String message;

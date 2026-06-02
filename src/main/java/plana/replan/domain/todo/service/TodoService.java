@@ -18,6 +18,7 @@ import plana.replan.domain.routine.entity.Routine;
 import plana.replan.domain.routine.entity.RoutineType;
 import plana.replan.domain.routine.exception.RoutineErrorCode;
 import plana.replan.domain.routine.repository.RoutineRepository;
+import plana.replan.domain.routine.service.RoutineService;
 import plana.replan.domain.tag.entity.Tag;
 import plana.replan.domain.tag.exception.TagErrorCode;
 import plana.replan.domain.tag.repository.TagRepository;
@@ -49,6 +50,7 @@ public class TodoService {
   private final UserRepository userRepository;
   private final TagRepository tagRepository;
   private final RoutineRepository routineRepository;
+  private final RoutineService routineService;
   private final GoalRepository goalRepository;
 
   @Transactional
@@ -282,7 +284,7 @@ public class TodoService {
 
     if (request.getRoutineType() == null) {
       if (existingRoutine != null) {
-        existingRoutine.softDelete();
+        routineService.cascadeSoftDelete(existingRoutine);
         todo.updateRoutine(null);
       }
       return;
