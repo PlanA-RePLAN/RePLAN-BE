@@ -3,7 +3,6 @@ package plana.replan.domain.routine.service;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
@@ -77,43 +76,32 @@ public class RoutineService {
                 .goal(goal)
                 .build());
 
-    if (isTodayMatch(routine)) {
-      createTodoFromRoutine(routine);
-    }
+    createTodoFromRoutine(routine);
 
     return RoutineResponseDto.from(routine);
   }
 
   @Transactional
   public void generateDailyTodos() {
-    List<Routine> routines = routineRepository.findAll();
-    routines.stream().filter(this::isTodayMatch).forEach(this::createTodoFromRoutine);
-  }
-
-  public boolean isTodayMatch(Routine routine) {
-    LocalDate today = LocalDate.now(clock);
-    return switch (routine.getRoutineType()) {
-      case DAILY -> true;
-      case WEEKLY -> {
-        int dayBit = 1 << (today.getDayOfWeek().getValue() - 1);
-        yield routine.getRoutineDate() != null && (routine.getRoutineDate() & dayBit) != 0;
-      }
-      case MONTHLY -> routine.getRoutineDate() != null
-          && routine.getRoutineDate() == today.getDayOfMonth();
-    };
+    LocalDate yesterday = LocalDate.now(clock).minusDays(1);
+    LocalDateTime start = yesterday.atStartOfDay();
+    LocalDateTime end = yesterday.atTime(23, 59, 59);
+    todoRepository
+        .findRoutineTodosByDueDateRange(start, end)
+        .forEach(todo -> createTodoFromRoutine(todo.getRoutine()));
   }
 
   public void createTodoFromRoutine(Routine routine) {
-    LocalDateTime todayStart = LocalDate.now(clock).atStartOfDay();
-    if (todoRepository.existsByRoutineAndDueDateBetween(
-        routine, todayStart, todayStart.plusDays(1))) {
+    LocalDate today = LocalDate.now(clock);
+    LocalDateTime dueDate = nextOccurrence(routine, today).atStartOfDay();
+    if (todoRepository.existsByRoutineAndDueDateBetween(routine, dueDate, dueDate.plusDays(1))) {
       return;
     }
     try {
       todoRepository.saveAndFlush(
           Todo.builder()
               .title(routine.getTitle())
-              .dueDate(todayStart)
+              .dueDate(dueDate)
               .isPinned(false)
               .user(routine.getUser())
               .tag(routine.getTag())
@@ -127,6 +115,36 @@ public class RoutineService {
       }
       // uq_todo_routine_duedate 충돌 — 동시 실행으로 이미 생성된 것으로 간주
     }
+  }
+
+  private LocalDate nextOccurrence(Routine routine, LocalDate today) {
+    return switch (routine.getRoutineType()) {
+      case DAILY -> today;
+      case WEEKLY -> {
+        int mask = routine.getRoutineDate();
+        for (int i = 0; i < 7; i++) {
+          LocalDate d = today.plusDays(i);
+          int bit = 1 << (d.getDayOfWeek().getValue() - 1);
+          if ((mask & bit) != 0) {
+            yield d;
+          }
+        }
+        yield today;
+      }
+      case MONTHLY -> {
+        int day = routine.getRoutineDate();
+        for (int k = 0; k < 12; k++) {
+          LocalDate firstOfMonth = today.withDayOfMonth(1).plusMonths(k);
+          if (firstOfMonth.lengthOfMonth() >= day) {
+            LocalDate candidate = firstOfMonth.withDayOfMonth(day);
+            if (!candidate.isBefore(today)) {
+              yield candidate;
+            }
+          }
+        }
+        yield today;
+      }
+    };
   }
 
   private void validateRoutineDate(RoutineType routineType, Integer routineDate) {
