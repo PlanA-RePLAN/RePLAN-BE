@@ -166,10 +166,17 @@ public class RoutineService {
 
   /**
    * TodoService.handleRoutineUpdate처럼 권한 검증이 이미 끝난 cross-domain 호출용. children 일괄 softDelete + 자기
-   * softDelete 정책을 한 지점에 모으기 위한 헬퍼.
+   * softDelete 정책을 한 지점에 모으기 위한 헬퍼. 해당 루틴들을 참조하는 살아있는 Todo는 routine 참조를 null로 끊는다
+   * — @SQLRestriction이 걸려있어 deleted routine을 lazy-load할 때 EntityNotFoundException이 터지기 때문 (목록 조회
+   * 500 방지).
    */
   public void cascadeSoftDelete(Routine routine) {
-    routine.getChildren().forEach(c -> c.softDelete());
+    routine.getChildren().forEach(this::detachAndSoftDelete);
+    detachAndSoftDelete(routine);
+  }
+
+  private void detachAndSoftDelete(Routine routine) {
+    todoRepository.findAllByRoutine(routine).forEach(t -> t.updateRoutine(null));
     routine.softDelete();
   }
 
