@@ -294,7 +294,8 @@ public class TodoService {
         request.getRoutineType() == RoutineType.DAILY ? null : request.getRoutineDate();
 
     if (existingRoutine != null) {
-      existingRoutine.update(todo.getTitle(), request.getRoutineType(), routineDate, tag);
+      existingRoutine.update(
+          todo.getTitle(), request.getRoutineType(), routineDate, request.getRoutineTime(), tag);
     } else {
       Routine newRoutine =
           routineRepository.save(
@@ -302,6 +303,7 @@ public class TodoService {
                   .title(todo.getTitle())
                   .routineType(request.getRoutineType())
                   .routineDate(routineDate)
+                  .routineTime(request.getRoutineTime())
                   .user(todo.getUser())
                   .tag(tag)
                   .build());

@@ -4,6 +4,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import plana.replan.domain.routine.entity.RoutineType;
 
 @Schema(description = "루틴 생성 요청")
@@ -14,8 +15,12 @@ public record RoutineCreateRequestDto(
             requiredMode = Schema.RequiredMode.REQUIRED)
         @NotBlank(message = "제목은 필수입니다.")
         String title,
-    @Schema(description = "반복 마감일 (ISO 8601 형식)", example = "2025-12-31T00:00:00")
+    @Schema(description = "반복 종료 마감일 (ISO 8601 형식). 이 날짜 이후로는 반복 생성 안 됨", example = "2025-12-31T00:00:00")
         LocalDateTime dueDate,
+    @Schema(
+            description = "반복 시각 (HH:mm:ss). 반복되는 날의 마감 시각. 생략 시 23:59:59로 처리",
+            example = "09:00:00")
+        LocalTime routineTime,
     @Schema(
             description = "반복 유형 (DAILY / WEEKLY / MONTHLY)",
             example = "WEEKLY",

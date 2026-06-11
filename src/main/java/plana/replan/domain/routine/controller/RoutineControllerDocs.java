@@ -45,7 +45,8 @@ public interface RoutineControllerDocs {
           |--------|-----------|------|------|------|
           | title | ✅ 필수 | string | 루틴 제목 | `"영어 단어 외우기"` |
           | routineType | ✅ 필수 | string | 반복 유형 (`DAILY` / `WEEKLY` / `MONTHLY`) | `"WEEKLY"` |
-          | dueDate | ❌ 선택 | string | 반복 마감일 (ISO 8601 형식). 이 날짜까지 반복 | `"2025-12-31T00:00:00"` |
+          | dueDate | ❌ 선택 | string | 반복 종료 마감일 (ISO 8601 형식). 이 날짜 이후로는 반복 생성 안 됨 | `"2025-12-31T00:00:00"` |
+          | routineTime | ❌ 선택 | string | 반복되는 날의 마감 시각 (HH:mm:ss 형식). 생략 시 23:59:59 | `"09:00:00"` |
           | routineDate | ❌ 선택 | integer | 반복 날짜. WEEKLY: 요일 bitmask (월=1, 화=2, 수=4, 목=8, 금=16, 토=32, 일=64). MONTHLY: 일자 (1~31). DAILY: 불필요 | `21` |
           | tagId | ❌ 선택 | integer | 태그 ID | `1` |
           | goalId | ❌ 선택 | integer | 목표 ID | `2` |
@@ -90,6 +91,7 @@ public interface RoutineControllerDocs {
                                 "routineId": 1,
                                 "title": "영어 단어 외우기",
                                 "dueDate": "2025-12-31T00:00:00",
+                                "routineTime": "09:00:00",
                                 "routineType": "WEEKLY",
                                 "routineDate": 21,
                                 "tagId": 1,
@@ -224,6 +226,7 @@ public interface RoutineControllerDocs {
                                 {
                                   "title": "영어 단어 외우기",
                                   "dueDate": "2025-12-31T00:00:00",
+                                  "routineTime": "09:00:00",
                                   "routineType": "WEEKLY",
                                   "routineDate": 21,
                                   "tagId": 1,

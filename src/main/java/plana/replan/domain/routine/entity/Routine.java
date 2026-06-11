@@ -2,6 +2,7 @@ package plana.replan.domain.routine.entity;
 
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -32,6 +33,9 @@ public class Routine extends BaseTimeEntity {
 
   @Column(name = "due_date")
   private LocalDateTime dueDate;
+
+  @Column(name = "routine_time")
+  private LocalTime routineTime;
 
   @Enumerated(EnumType.STRING)
   @Column(name = "routine_type")
@@ -74,10 +78,12 @@ public class Routine extends BaseTimeEntity {
     this.replan = replan;
   }
 
-  public void update(String title, RoutineType routineType, Integer routineDate, Tag tag) {
+  public void update(
+      String title, RoutineType routineType, Integer routineDate, LocalTime routineTime, Tag tag) {
     this.title = requireNonBlank(title);
     this.routineType = routineType;
     this.routineDate = routineDate;
+    this.routineTime = routineTime;
     this.tag = tag;
   }
 
@@ -97,6 +103,7 @@ public class Routine extends BaseTimeEntity {
   public Routine(
       String title,
       LocalDateTime dueDate,
+      LocalTime routineTime,
       RoutineType routineType,
       Integer routineDate,
       User user,
@@ -112,12 +119,14 @@ public class Routine extends BaseTimeEntity {
       this.parent = parent;
       // 하위 루틴은 모든 필드를 부모에 의존. title과 user만 자기 것.
       this.dueDate = null;
+      this.routineTime = null;
       this.routineType = null;
       this.routineDate = null;
       this.tag = null;
       this.goal = null;
     } else {
       this.dueDate = dueDate;
+      this.routineTime = routineTime;
       this.routineType = routineType;
       this.routineDate = routineDate;
       this.tag = tag;
