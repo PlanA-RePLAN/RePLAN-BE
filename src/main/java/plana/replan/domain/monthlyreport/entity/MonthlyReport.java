@@ -51,11 +51,11 @@ public class MonthlyReport extends BaseTimeEntity {
   private BigDecimal replanAchievementEffect;
 
   @JdbcTypeCode(SqlTypes.JSON)
-  @Column(name = "analysis_data", columnDefinition = "jsonb")
+  @Column(name = "analysis_data")
   private AnalysisData analysisData;
 
   @JdbcTypeCode(SqlTypes.JSON)
-  @Column(name = "ai_insight", columnDefinition = "jsonb")
+  @Column(name = "ai_insight")
   private AiInsight aiInsight;
 
   @Builder
