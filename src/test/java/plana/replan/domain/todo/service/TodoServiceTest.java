@@ -607,28 +607,32 @@ class TodoServiceTest {
   }
 
   @Test
-  @DisplayName("getTodos - week 필터: 완료 투두 조회 미호출")
-  void getTodos_week_completedTodosNotQueried() {
+  @DisplayName("getTodos - week 필터: 해당 주 월~일 범위의 완료/미완료 모두 조회")
+  void getTodos_week_allTodosInWeekRange() {
     User user = testUser();
     given(userRepository.findById(1L)).willReturn(Optional.of(user));
-    given(todoRepository.findActiveTodosByDueDateRange(any(), any(), any()))
+    given(todoRepository.findAllTodosByDueDateRange(any(), any(), any()))
         .willReturn(List.of(activeTodo(1L, user)));
 
     todoService.getTodos(1L, "week", "priority", null);
 
+    verify(todoRepository).findAllTodosByDueDateRange(any(), any(), any());
+    verify(todoRepository, never()).findActiveTodosByDueDateRange(any(), any(), any());
     verify(todoRepository, never()).findCompletedTodosByCompletedTimeRange(any(), any(), any());
   }
 
   @Test
-  @DisplayName("getTodos - month 필터: 완료 투두 조회 미호출")
-  void getTodos_month_completedTodosNotQueried() {
+  @DisplayName("getTodos - month 필터: 해당 달 1일~말일 범위의 완료/미완료 모두 조회")
+  void getTodos_month_allTodosInMonthRange() {
     User user = testUser();
     given(userRepository.findById(1L)).willReturn(Optional.of(user));
-    given(todoRepository.findActiveTodosByDueDateRange(any(), any(), any()))
+    given(todoRepository.findAllTodosByDueDateRange(any(), any(), any()))
         .willReturn(List.of(activeTodo(1L, user)));
 
     todoService.getTodos(1L, "month", "priority", null);
 
+    verify(todoRepository).findAllTodosByDueDateRange(any(), any(), any());
+    verify(todoRepository, never()).findActiveTodosByDueDateRange(any(), any(), any());
     verify(todoRepository, never()).findCompletedTodosByCompletedTimeRange(any(), any(), any());
   }
 
@@ -868,7 +872,7 @@ class TodoServiceTest {
 
     assertThat(result.getTagId()).isEqualTo(5L);
     assertThat(result.getTagTitle()).isEqualTo("업무");
-    assertThat(result.getTagColor()).isEqualTo("BLUE");
+    assertThat(result.getTagColor()).isEqualTo("#3B82F6");
     assertThat(result.getRoutineType()).isEqualTo("DAILY");
     assertThat(result.getSubTodos()).hasSize(1);
     assertThat(result.getSubTodos().get(0).getTodoId()).isEqualTo(10L);

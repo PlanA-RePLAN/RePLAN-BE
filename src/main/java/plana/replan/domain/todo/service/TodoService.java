@@ -1,9 +1,11 @@
 package plana.replan.domain.todo.service;
 
 import java.time.Clock;
+import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.time.temporal.TemporalAdjusters;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -206,18 +208,22 @@ public class TodoService {
         todos.sort(Comparator.comparing(Todo::isCompleted).thenComparing(sortComparator));
       }
       case "week" -> {
+        LocalDate monday = today.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
+        LocalDate sunday = monday.plusDays(6);
         todos =
             new ArrayList<>(
-                todoRepository.findActiveTodosByDueDateRange(
-                    user, startOfDay, startOfDay.plusDays(7)));
-        todos.sort(sortComparator);
+                todoRepository.findAllTodosByDueDateRange(
+                    user, monday.atStartOfDay(), sunday.atTime(LocalTime.MAX)));
+        todos.sort(Comparator.comparing(Todo::isCompleted).thenComparing(sortComparator));
       }
       case "month" -> {
+        LocalDate firstDay = today.withDayOfMonth(1);
+        LocalDate lastDay = today.withDayOfMonth(today.lengthOfMonth());
         todos =
             new ArrayList<>(
-                todoRepository.findActiveTodosByDueDateRange(
-                    user, startOfDay, startOfDay.plusMonths(1)));
-        todos.sort(sortComparator);
+                todoRepository.findAllTodosByDueDateRange(
+                    user, firstDay.atStartOfDay(), lastDay.atTime(LocalTime.MAX)));
+        todos.sort(Comparator.comparing(Todo::isCompleted).thenComparing(sortComparator));
       }
       default -> throw new CustomException(TodoErrorCode.INVALID_FILTER);
     }
