@@ -32,7 +32,6 @@ import plana.replan.domain.routine.entity.RoutineType;
 import plana.replan.domain.routine.exception.RoutineErrorCode;
 import plana.replan.domain.routine.repository.RoutineRepository;
 import plana.replan.domain.tag.entity.Tag;
-import plana.replan.domain.tag.entity.TagColor;
 import plana.replan.domain.tag.exception.TagErrorCode;
 import plana.replan.domain.tag.repository.TagRepository;
 import plana.replan.domain.todo.entity.Todo;
@@ -80,7 +79,7 @@ class RoutineServiceTest {
   }
 
   private Tag testTag(Long id) {
-    Tag tag = Tag.builder().title("업무").color(TagColor.BLUE).user(testUser()).build();
+    Tag tag = Tag.builder().title("업무").color("#3B82F6").user(testUser()).build();
     ReflectionTestUtils.setField(tag, "id", id);
     return tag;
   }

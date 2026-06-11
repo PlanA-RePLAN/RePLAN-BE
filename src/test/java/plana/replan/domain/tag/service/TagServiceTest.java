@@ -21,7 +21,6 @@ import plana.replan.domain.tag.dto.TagCreateRequestDto;
 import plana.replan.domain.tag.dto.TagResponseDto;
 import plana.replan.domain.tag.dto.TagUpdateRequestDto;
 import plana.replan.domain.tag.entity.Tag;
-import plana.replan.domain.tag.entity.TagColor;
 import plana.replan.domain.tag.exception.TagErrorCode;
 import plana.replan.domain.tag.repository.TagRepository;
 import plana.replan.domain.todo.repository.TodoRepository;
@@ -56,19 +55,19 @@ class TagServiceTest {
   }
 
   private Tag testTag(Long id, User user) {
-    Tag tag = Tag.builder().title("영어").color(TagColor.BLUE).user(user).build();
+    Tag tag = Tag.builder().title("영어").color("#3B82F6").user(user).build();
     ReflectionTestUtils.setField(tag, "id", id);
     return tag;
   }
 
-  private TagCreateRequestDto createRequest(String title, TagColor color) {
+  private TagCreateRequestDto createRequest(String title, String color) {
     TagCreateRequestDto dto = new TagCreateRequestDto();
     ReflectionTestUtils.setField(dto, "title", title);
     ReflectionTestUtils.setField(dto, "color", color);
     return dto;
   }
 
-  private TagUpdateRequestDto updateRequest(String title, TagColor color) {
+  private TagUpdateRequestDto updateRequest(String title, String color) {
     TagUpdateRequestDto dto = new TagUpdateRequestDto();
     ReflectionTestUtils.setField(dto, "title", title);
     ReflectionTestUtils.setField(dto, "color", color);
@@ -80,7 +79,7 @@ class TagServiceTest {
   @Test
   @DisplayName("createTag - userId null: USER_NOT_FOUND 예외")
   void createTag_nullUserId_throws() {
-    assertThatThrownBy(() -> tagService.createTag(null, createRequest("영어", TagColor.BLUE)))
+    assertThatThrownBy(() -> tagService.createTag(null, createRequest("영어", "#3B82F6")))
         .isInstanceOf(CustomException.class)
         .satisfies(
             e ->
@@ -95,7 +94,7 @@ class TagServiceTest {
   void createTag_userNotFound_throws() {
     given(userRepository.findById(1L)).willReturn(Optional.empty());
 
-    assertThatThrownBy(() -> tagService.createTag(1L, createRequest("영어", TagColor.BLUE)))
+    assertThatThrownBy(() -> tagService.createTag(1L, createRequest("영어", "#3B82F6")))
         .isInstanceOf(CustomException.class)
         .satisfies(
             e ->
@@ -112,10 +111,10 @@ class TagServiceTest {
     given(userRepository.findById(1L)).willReturn(Optional.of(user));
     given(tagRepository.save(any(Tag.class))).willAnswer(inv -> inv.getArgument(0));
 
-    TagResponseDto result = tagService.createTag(1L, createRequest("영어", TagColor.BLUE));
+    TagResponseDto result = tagService.createTag(1L, createRequest("영어", "#3B82F6"));
 
     assertThat(result.getTitle()).isEqualTo("영어");
-    assertThat(result.getColor()).isEqualTo("BLUE");
+    assertThat(result.getColor()).isEqualTo("#3B82F6");
   }
 
   @Test
@@ -138,12 +137,26 @@ class TagServiceTest {
     given(userRepository.findById(1L)).willReturn(Optional.of(user));
     given(tagRepository.save(any(Tag.class))).willAnswer(inv -> inv.getArgument(0));
 
-    tagService.createTag(1L, createRequest("영어", TagColor.GREEN));
+    tagService.createTag(1L, createRequest("영어", "#22C55E"));
 
     ArgumentCaptor<Tag> captor = ArgumentCaptor.forClass(Tag.class);
     verify(tagRepository).save(captor.capture());
     assertThat(captor.getValue().getTitle()).isEqualTo("영어");
-    assertThat(captor.getValue().getColor()).isEqualTo(TagColor.GREEN);
+    assertThat(captor.getValue().getColor()).isEqualTo("#22C55E");
+  }
+
+  @Test
+  @DisplayName("createTag - 잘못된 hex 색상: INVALID_INPUT 예외")
+  void createTag_invalidColor_throws() {
+    User user = testUser();
+    given(userRepository.findById(1L)).willReturn(Optional.of(user));
+
+    assertThatThrownBy(() -> tagService.createTag(1L, createRequest("영어", "BLUE")))
+        .isInstanceOf(CustomException.class)
+        .satisfies(
+            e ->
+                assertThat(((CustomException) e).getErrorCode())
+                    .isEqualTo(GlobalErrorCode.INVALID_INPUT));
   }
 
   // ── updateTag ──────────────────────────────────────────────────────────────
@@ -151,7 +164,7 @@ class TagServiceTest {
   @Test
   @DisplayName("updateTag - userId null: USER_NOT_FOUND 예외")
   void updateTag_nullUserId_throws() {
-    assertThatThrownBy(() -> tagService.updateTag(null, 1L, updateRequest("업무", TagColor.RED)))
+    assertThatThrownBy(() -> tagService.updateTag(null, 1L, updateRequest("업무", "#EF4444")))
         .isInstanceOf(CustomException.class)
         .satisfies(
             e ->
@@ -164,7 +177,7 @@ class TagServiceTest {
   void updateTag_tagNotFound_throws() {
     given(tagRepository.findById(99L)).willReturn(Optional.empty());
 
-    assertThatThrownBy(() -> tagService.updateTag(1L, 99L, updateRequest("업무", TagColor.RED)))
+    assertThatThrownBy(() -> tagService.updateTag(1L, 99L, updateRequest("업무", "#EF4444")))
         .isInstanceOf(CustomException.class)
         .satisfies(
             e ->
@@ -186,7 +199,7 @@ class TagServiceTest {
 
     given(tagRepository.findById(1L)).willReturn(Optional.of(testTag(1L, otherUser)));
 
-    assertThatThrownBy(() -> tagService.updateTag(1L, 1L, updateRequest("업무", TagColor.RED)))
+    assertThatThrownBy(() -> tagService.updateTag(1L, 1L, updateRequest("업무", "#EF4444")))
         .isInstanceOf(CustomException.class)
         .satisfies(
             e ->
@@ -200,7 +213,21 @@ class TagServiceTest {
     User user = testUser();
     given(tagRepository.findById(1L)).willReturn(Optional.of(testTag(1L, user)));
 
-    assertThatThrownBy(() -> tagService.updateTag(1L, 1L, updateRequest("", TagColor.RED)))
+    assertThatThrownBy(() -> tagService.updateTag(1L, 1L, updateRequest("", "#EF4444")))
+        .isInstanceOf(CustomException.class)
+        .satisfies(
+            e ->
+                assertThat(((CustomException) e).getErrorCode())
+                    .isEqualTo(GlobalErrorCode.INVALID_INPUT));
+  }
+
+  @Test
+  @DisplayName("updateTag - 잘못된 hex 색상: INVALID_INPUT 예외")
+  void updateTag_invalidColor_throws() {
+    User user = testUser();
+    given(tagRepository.findById(1L)).willReturn(Optional.of(testTag(1L, user)));
+
+    assertThatThrownBy(() -> tagService.updateTag(1L, 1L, updateRequest("업무", "RED")))
         .isInstanceOf(CustomException.class)
         .satisfies(
             e ->
@@ -214,10 +241,10 @@ class TagServiceTest {
     User user = testUser();
     given(tagRepository.findById(1L)).willReturn(Optional.of(testTag(1L, user)));
 
-    TagResponseDto result = tagService.updateTag(1L, 1L, updateRequest("업무", TagColor.RED));
+    TagResponseDto result = tagService.updateTag(1L, 1L, updateRequest("업무", "#EF4444"));
 
     assertThat(result.getTitle()).isEqualTo("업무");
-    assertThat(result.getColor()).isEqualTo("RED");
+    assertThat(result.getColor()).isEqualTo("#EF4444");
   }
 
   @Test
@@ -226,10 +253,10 @@ class TagServiceTest {
     User user = testUser();
     given(tagRepository.findById(1L)).willReturn(Optional.of(testTag(1L, user)));
 
-    TagResponseDto result = tagService.updateTag(1L, 1L, updateRequest(null, TagColor.RED));
+    TagResponseDto result = tagService.updateTag(1L, 1L, updateRequest(null, "#EF4444"));
 
     assertThat(result.getTitle()).isEqualTo("영어");
-    assertThat(result.getColor()).isEqualTo("RED");
+    assertThat(result.getColor()).isEqualTo("#EF4444");
   }
 
   @Test

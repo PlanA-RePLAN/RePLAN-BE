@@ -26,7 +26,6 @@ import plana.replan.domain.routine.entity.RoutineType;
 import plana.replan.domain.routine.exception.RoutineErrorCode;
 import plana.replan.domain.routine.repository.RoutineRepository;
 import plana.replan.domain.tag.entity.Tag;
-import plana.replan.domain.tag.entity.TagColor;
 import plana.replan.domain.tag.exception.TagErrorCode;
 import plana.replan.domain.tag.repository.TagRepository;
 import plana.replan.domain.todo.dto.SubTodoCreateRequestDto;
@@ -75,7 +74,7 @@ class TodoServiceTest {
   }
 
   private Tag testTag(Long id) {
-    Tag tag = Tag.builder().title("업무").color(TagColor.BLUE).user(testUser()).build();
+    Tag tag = Tag.builder().title("업무").color("#3B82F6").user(testUser()).build();
     ReflectionTestUtils.setField(tag, "id", id);
     return tag;
   }
@@ -786,7 +785,7 @@ class TodoServiceTest {
 
     assertThat(dto.getTagId()).isEqualTo(5L);
     assertThat(dto.getTagTitle()).isEqualTo("업무");
-    assertThat(dto.getTagColor()).isEqualTo("BLUE");
+    assertThat(dto.getTagColor()).isEqualTo("#3B82F6");
     assertThat(dto.getRoutineType()).isEqualTo("WEEKLY");
   }
 
