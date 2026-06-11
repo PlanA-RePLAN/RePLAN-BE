@@ -71,7 +71,7 @@ public class MonthlyReport extends BaseTimeEntity {
       AnalysisData analysisData,
       AiInsight aiInsight) {
     this.user = Objects.requireNonNull(user, "유저는 필수입니다.");
-    this.reportMonth = Objects.requireNonNull(reportMonth, "리포트 월은 필수입니다.");
+    this.reportMonth = Objects.requireNonNull(reportMonth, "리포트 월은 필수입니다.").withDayOfMonth(1);
     this.totalTodos = totalTodos;
     this.completedTodos = completedTodos;
     this.achievementRate = achievementRate;
