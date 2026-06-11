@@ -46,6 +46,7 @@ docker-compose.yml
 # 클로드 (rules, settings.json만 추적, 나머지는 무시)
 .claude/commands
 .claude/settings.local*
+CLAUDE.md
 
 #로컬 DB및 레디스
 postgres_data/
