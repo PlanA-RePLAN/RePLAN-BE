@@ -13,5 +13,6 @@ CREATE TABLE monthly_report
     ai_insight                JSONB,
     created_at                TIMESTAMP,
     updated_at                TIMESTAMP,
+    deleted_at                TIMESTAMP,
     UNIQUE (user_id, report_month)
 );
