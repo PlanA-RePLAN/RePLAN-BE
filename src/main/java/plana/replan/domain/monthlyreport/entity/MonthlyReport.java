@@ -9,6 +9,7 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.annotations.SQLRestriction;
 import org.hibernate.type.SqlTypes;
 import plana.replan.domain.user.entity.User;
 import plana.replan.global.entity.BaseTimeEntity;
@@ -17,6 +18,7 @@ import plana.replan.global.entity.BaseTimeEntity;
 @Table(name = "monthly_report")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
+@SQLRestriction("deleted_at IS NULL")
 public class MonthlyReport extends BaseTimeEntity {
 
   @Id
