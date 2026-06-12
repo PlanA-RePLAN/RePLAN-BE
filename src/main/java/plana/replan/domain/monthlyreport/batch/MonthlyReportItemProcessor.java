@@ -1,0 +1,51 @@
+package plana.replan.domain.monthlyreport.batch;
+
+import java.time.YearMonth;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.batch.core.annotation.BeforeStep;
+import org.springframework.batch.core.step.StepExecution;
+import org.springframework.batch.infrastructure.item.ItemProcessor;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Component;
+import plana.replan.domain.monthlyreport.entity.AiInsight;
+import plana.replan.domain.monthlyreport.service.CalculatedStats;
+import plana.replan.domain.monthlyreport.service.MonthlyReportAiService;
+import plana.replan.domain.monthlyreport.service.MonthlyReportCalculator;
+import plana.replan.domain.user.entity.User;
+
+@Slf4j
+@Component
+@RequiredArgsConstructor
+public class MonthlyReportItemProcessor implements ItemProcessor<User, MonthlyReportData> {
+
+  private final MonthlyReportCalculator calculator;
+  private final MonthlyReportAiService aiService;
+
+  @Value("${statistics.batch.gemini-call-delay-ms:2500}")
+  private long geminiCallDelayMs;
+
+  private YearMonth targetMonth;
+
+  @BeforeStep
+  public void beforeStep(StepExecution stepExecution) {
+    targetMonth = YearMonth.parse(stepExecution.getJobParameters().getString("targetMonth"));
+  }
+
+  @Override
+  public MonthlyReportData process(User user) throws Exception {
+    log.debug("통계 처리 중 - userId={}, targetMonth={}", user.getId(), targetMonth);
+
+    CalculatedStats stats = calculator.calculate(user, targetMonth);
+
+    if (!stats.hasActivity()) {
+      log.debug("활동 데이터 부족으로 리포트 건너뜀 - userId={}", user.getId());
+      return null; // null 반환 시 Spring Batch가 writer 호출 생략
+    }
+
+    AiInsight aiInsight = aiService.generateInsight(stats, targetMonth);
+    Thread.sleep(geminiCallDelayMs);
+
+    return new MonthlyReportData(user, targetMonth.atDay(1), stats, aiInsight);
+  }
+}

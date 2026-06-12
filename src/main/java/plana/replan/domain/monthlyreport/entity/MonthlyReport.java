@@ -58,6 +58,25 @@ public class MonthlyReport extends BaseTimeEntity {
   @Column(name = "ai_insight")
   private AiInsight aiInsight;
 
+  public void update(
+      Integer totalTodos,
+      Integer completedTodos,
+      BigDecimal achievementRate,
+      BigDecimal prevMonthDiff,
+      Integer replanCount,
+      BigDecimal replanAchievementEffect,
+      AnalysisData analysisData,
+      AiInsight aiInsight) {
+    this.totalTodos = totalTodos;
+    this.completedTodos = completedTodos;
+    this.achievementRate = achievementRate;
+    this.prevMonthDiff = prevMonthDiff;
+    this.replanCount = replanCount;
+    this.replanAchievementEffect = replanAchievementEffect;
+    this.analysisData = analysisData;
+    this.aiInsight = aiInsight;
+  }
+
   @Builder
   public MonthlyReport(
       User user,
