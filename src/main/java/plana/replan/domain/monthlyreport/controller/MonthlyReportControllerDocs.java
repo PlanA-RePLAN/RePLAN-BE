@@ -63,7 +63,8 @@ public interface MonthlyReportControllerDocs {
                         value =
                             """
                             {
-                              "code": 200,
+                              "status": 200,
+                              "success": true,
                               "data": {
                                 "year": 2025,
                                 "month": 5,
@@ -93,7 +94,8 @@ public interface MonthlyReportControllerDocs {
                                   ],
                                   "writingTip": "월요일에는 가벼운 투두 위주로 구성하면 달성률이 높아집니다."
                                 }
-                              }
+                              },
+                              "error": null
                             }
                             """))),
     @ApiResponse(
@@ -107,13 +109,13 @@ public interface MonthlyReportControllerDocs {
                       name = "토큰 없음",
                       value =
                           """
-                          {"code":401,"message":"EMPTY_TOKEN","data":null}
+                          {"status":401,"success":false,"data":null,"error":{"code":"EMPTY_TOKEN","message":"토큰이 없습니다."}}
                           """),
                   @ExampleObject(
                       name = "만료된 토큰",
                       value =
                           """
-                          {"code":401,"message":"EXPIRED_TOKEN","data":null}
+                          {"status":401,"success":false,"data":null,"error":{"code":"EXPIRED_TOKEN","message":"만료된 토큰입니다."}}
                           """)
                 })),
     @ApiResponse(
@@ -126,17 +128,11 @@ public interface MonthlyReportControllerDocs {
                     @ExampleObject(
                         value =
                             """
-                            {"code":404,"message":"해당 월의 통계 리포트가 없습니다.","data":null}
+                            {"status":404,"success":false,"data":null,"error":{"code":"REPORT_NOT_FOUND","message":"해당 월의 통계 리포트가 없습니다."}}
                             """)))
   })
   ResponseEntity<ApiResult<MonthlyReportResponse>> getReport(
       @AuthenticationPrincipal Long userId,
       @Parameter(description = "조회 연도", example = "2025") @RequestParam int year,
       @Parameter(description = "조회 월 (1~12)", example = "5") @RequestParam int month);
-
-  @Operation(summary = "[dev] 월간 통계 수동 생성", description = "배치 없이 월간 통계를 즉시 계산·저장합니다. 개발/테스트 전용.")
-  ResponseEntity<ApiResult<MonthlyReportResponse>> generateReport(
-      @AuthenticationPrincipal Long userId,
-      @Parameter(description = "연도", example = "2026") @RequestParam int year,
-      @Parameter(description = "월 (1~12)", example = "5") @RequestParam int month);
 }

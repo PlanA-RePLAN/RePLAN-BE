@@ -5,14 +5,18 @@ import java.math.RoundingMode;
 import java.time.DayOfWeek;
 import java.time.LocalDateTime;
 import java.time.YearMonth;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -75,6 +79,19 @@ public class MonthlyReportCalculator {
 
     AnalysisData analysisData = buildAnalysisData(todos, replans);
 
+    boolean hasActivity = false;
+    if (totalTodos > 0) {
+      // 첫 투두 생성일이 대상 월 말일 기준 14일 이상 이전이어야 의미 있는 통계로 인정
+      LocalDateTime endOfMonth = targetMonth.atEndOfMonth().atTime(23, 59, 59);
+      hasActivity =
+          todos.stream()
+              .map(t -> t.getCreatedAt())
+              .filter(Objects::nonNull)
+              .min(Comparator.naturalOrder())
+              .map(first -> ChronoUnit.DAYS.between(first, endOfMonth) >= 14)
+              .orElse(false);
+    }
+
     return new CalculatedStats(
         totalTodos,
         completedTodos,
@@ -83,7 +100,7 @@ public class MonthlyReportCalculator {
         replanCount,
         replanAchievementEffect,
         analysisData,
-        totalTodos > 0);
+        hasActivity);
   }
 
   private BigDecimal calcPrevMonthDiff(
@@ -216,14 +233,19 @@ public class MonthlyReportCalculator {
     Map<String, Integer> dayReasonCount = new HashMap<>();
 
     for (Replan r : replans) {
-      String reason = toDepth1Label(r.getFailureReason1());
       Todo todo = r.getTodo();
       String tagName = todo.getTag() != null ? todo.getTag().getTitle() : null;
       String dayName =
           todo.getDueDate() != null ? DAY_NAMES.get(todo.getDueDate().getDayOfWeek()) : null;
 
-      if (tagName != null) tagReasonCount.merge(reason + "||" + tagName, 1, Integer::sum);
-      if (dayName != null) dayReasonCount.merge(reason + "||" + dayName, 1, Integer::sum);
+      Stream.of(r.getFailureReason1(), r.getFailureReason2(), r.getFailureReason3())
+          .filter(Objects::nonNull)
+          .map(this::toDepth1Label)
+          .forEach(
+              reason -> {
+                if (tagName != null) tagReasonCount.merge(reason + "||" + tagName, 1, Integer::sum);
+                if (dayName != null) dayReasonCount.merge(reason + "||" + dayName, 1, Integer::sum);
+              });
     }
 
     List<AnalysisData.PatternCombination> result = new ArrayList<>();

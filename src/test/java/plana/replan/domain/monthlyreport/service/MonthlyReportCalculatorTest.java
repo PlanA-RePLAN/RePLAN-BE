@@ -60,6 +60,8 @@ class MonthlyReportCalculatorTest {
     Todo t =
         Todo.builder().title("투두").user(user).tag(tag).dueDate(dueDate).isPinned(false).build();
     ReflectionTestUtils.setField(t, "isCompleted", completed);
+    // 14일 조건 충족: 대상 월 1일에 생성된 것으로 설정 (월말 기준 30일+ 이전)
+    ReflectionTestUtils.setField(t, "createdAt", TARGET.atDay(1).atStartOfDay());
     return t;
   }
 

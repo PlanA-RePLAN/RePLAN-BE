@@ -46,7 +46,13 @@ public class ReportSkipListener implements SkipListener<User, MonthlyReportData>
     try {
       String truncated =
           message != null && message.length() > 500 ? message.substring(0, 500) : message;
-      failureRepository.save(ReportGenerationFailure.of(user, targetMonth.atDay(1), truncated));
+      failureRepository
+          .findByUserAndTargetMonth(user, targetMonth.atDay(1))
+          .ifPresentOrElse(
+              f -> f.incrementRetry(truncated),
+              () ->
+                  failureRepository.save(
+                      ReportGenerationFailure.of(user, targetMonth.atDay(1), truncated)));
     } catch (Exception ex) {
       log.error("실패 기록 저장 오류 - userId={}", user.getId(), ex);
     }

@@ -144,7 +144,8 @@ public class MonthlyReportAiService {
       String response =
           geminiRestClient
               .post()
-              .uri(GEMINI_URL + "?key=" + apiKey)
+              .uri(GEMINI_URL)
+              .header("x-goog-api-key", apiKey)
               .contentType(MediaType.APPLICATION_JSON)
               .body(body)
               .retrieve()

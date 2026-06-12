@@ -38,11 +38,13 @@ public class MonthlyReportItemProcessor implements ItemProcessor<User, MonthlyRe
 
     CalculatedStats stats = calculator.calculate(user, targetMonth);
 
-    AiInsight aiInsight = null;
-    if (stats.hasActivity()) {
-      aiInsight = aiService.generateInsight(stats, targetMonth);
-      Thread.sleep(geminiCallDelayMs);
+    if (!stats.hasActivity()) {
+      log.debug("활동 데이터 부족으로 리포트 건너뜀 - userId={}", user.getId());
+      return null; // null 반환 시 Spring Batch가 writer 호출 생략
     }
+
+    AiInsight aiInsight = aiService.generateInsight(stats, targetMonth);
+    Thread.sleep(geminiCallDelayMs);
 
     return new MonthlyReportData(user, targetMonth.atDay(1), stats, aiInsight);
   }

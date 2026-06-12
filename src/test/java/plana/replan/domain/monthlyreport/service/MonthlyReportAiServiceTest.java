@@ -41,6 +41,7 @@ class MonthlyReportAiServiceTest {
 
     given(geminiRestClient.post()).willReturn(uriSpec);
     given(uriSpec.uri(anyString())).willReturn(bodySpec);
+    given(bodySpec.header(anyString(), any(String[].class))).willReturn(bodySpec);
     given(bodySpec.contentType(any(MediaType.class))).willReturn(bodySpec);
     given(bodySpec.body(any(Object.class))).willReturn(bodySpec);
     given(bodySpec.retrieve()).willReturn(responseSpec);

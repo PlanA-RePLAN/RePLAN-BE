@@ -10,6 +10,7 @@ import org.springframework.batch.core.step.Step;
 import org.springframework.batch.core.step.builder.StepBuilder;
 import org.springframework.batch.infrastructure.item.database.JpaCursorItemReader;
 import org.springframework.batch.infrastructure.item.database.builder.JpaCursorItemReaderBuilder;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -27,6 +28,9 @@ public class MonthlyReportJobConfig {
   private final MonthlyReportItemWriter writer;
   private final ReportSkipListener reportSkipListener;
 
+  @Value("${statistics.batch.skip-limit:100}")
+  private int skipLimit;
+
   @Bean
   public Job monthlyReportJob(Step monthlyReportStep) {
     return new JobBuilder("monthlyReportJob", jobRepository).start(monthlyReportStep).build();
@@ -41,8 +45,14 @@ public class MonthlyReportJobConfig {
         .processor(processor)
         .writer(writer)
         .faultTolerant()
-        .skip(Exception.class)
-        .skipLimit(Integer.MAX_VALUE)
+        .skipPolicy(
+            (t, skipCount) -> {
+              // NPE·IllegalStateException은 버그 지표이므로 스킵 금지
+              if (t instanceof NullPointerException || t instanceof IllegalStateException) {
+                return false;
+              }
+              return t instanceof RuntimeException && skipCount < skipLimit;
+            })
         .listener(reportSkipListener)
         .build();
   }

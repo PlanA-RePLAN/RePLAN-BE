@@ -6,14 +6,17 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import plana.replan.domain.monthlyreport.dto.MonthlyReportResponse;
 import plana.replan.domain.monthlyreport.entity.AiInsight;
 import plana.replan.domain.monthlyreport.entity.AnalysisData;
 import plana.replan.domain.monthlyreport.entity.MonthlyReport;
+import plana.replan.domain.monthlyreport.entity.ReportGenerationFailure;
 import plana.replan.domain.monthlyreport.exception.MonthlyReportErrorCode;
 import plana.replan.domain.monthlyreport.repository.MonthlyReportRepository;
+import plana.replan.domain.monthlyreport.repository.ReportGenerationFailureRepository;
 import plana.replan.domain.tag.entity.Tag;
 import plana.replan.domain.tag.repository.TagRepository;
 import plana.replan.domain.user.entity.User;
@@ -21,12 +24,14 @@ import plana.replan.domain.user.repository.UserRepository;
 import plana.replan.global.exception.CustomException;
 import plana.replan.global.exception.GlobalErrorCode;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class MonthlyReportService {
 
   private final UserRepository userRepository;
   private final MonthlyReportRepository monthlyReportRepository;
+  private final ReportGenerationFailureRepository failureRepository;
   private final TagRepository tagRepository;
   private final MonthlyReportCalculator calculator;
   private final MonthlyReportAiService aiService;
@@ -40,7 +45,6 @@ public class MonthlyReportService {
 
     YearMonth targetMonth = YearMonth.of(year, month);
     CalculatedStats stats = calculator.calculate(user, targetMonth);
-
     final AiInsight aiInsight =
         stats.hasActivity() ? aiService.generateInsight(stats, targetMonth) : null;
 
@@ -48,6 +52,19 @@ public class MonthlyReportService {
     MonthlyReport report =
         monthlyReportRepository
             .findByUserAndReportMonth(user, reportMonth)
+            .map(
+                existing -> {
+                  existing.update(
+                      stats.totalTodos(),
+                      stats.completedTodos(),
+                      stats.achievementRate(),
+                      stats.prevMonthDiff(),
+                      stats.replanCount(),
+                      stats.replanAchievementEffect(),
+                      stats.analysisData(),
+                      aiInsight);
+                  return existing;
+                })
             .orElseGet(
                 () ->
                     monthlyReportRepository.save(
@@ -63,16 +80,6 @@ public class MonthlyReportService {
                             .analysisData(stats.analysisData())
                             .aiInsight(aiInsight)
                             .build()));
-
-    report.update(
-        stats.totalTodos(),
-        stats.completedTodos(),
-        stats.achievementRate(),
-        stats.prevMonthDiff(),
-        stats.replanCount(),
-        stats.replanAchievementEffect(),
-        stats.analysisData(),
-        aiInsight);
 
     List<Tag> userTags = tagRepository.findAllByUserOrderByCreatedAtDescIdDesc(user);
     Map<String, String> tagColorMap =
@@ -106,6 +113,64 @@ public class MonthlyReportService {
                     Tag::getTitle, t -> t.getColor() != null ? t.getColor() : "", (a, b) -> a));
 
     return toResponse(report, tagColorMap);
+  }
+
+  /**
+   * 실패 리포트 1건을 재처리한다. 성공 시 soft delete, 실패 시 retryCount 증가. Gemini 호출 여부(= hasActivity)를 반환해 호출자가
+   * sleep을 제어하게 한다.
+   */
+  @Transactional
+  public boolean retryOneFailure(Long failureId) {
+    ReportGenerationFailure failure =
+        failureRepository.findById(failureId).orElseThrow(RuntimeException::new);
+    User user = failure.getUser();
+    YearMonth targetMonth = YearMonth.from(failure.getTargetMonth());
+
+    try {
+      CalculatedStats stats = calculator.calculate(user, targetMonth);
+      AiInsight aiInsight =
+          stats.hasActivity() ? aiService.generateInsight(stats, targetMonth) : null;
+      upsertReport(user, failure.getTargetMonth(), stats, aiInsight);
+      failure.softDelete();
+      log.info("재처리 성공 - userId={}", user.getId());
+      return stats.hasActivity();
+    } catch (Exception e) {
+      log.error("재처리 실패 - userId={}", user.getId(), e);
+      String msg = e.getMessage();
+      failure.incrementRetry(msg != null && msg.length() > 500 ? msg.substring(0, 500) : msg);
+      return false;
+    }
+  }
+
+  public void upsertReport(
+      User user, LocalDate reportMonth, CalculatedStats stats, AiInsight aiInsight) {
+    monthlyReportRepository
+        .findByUserAndReportMonth(user, reportMonth)
+        .ifPresentOrElse(
+            report ->
+                report.update(
+                    stats.totalTodos(),
+                    stats.completedTodos(),
+                    stats.achievementRate(),
+                    stats.prevMonthDiff(),
+                    stats.replanCount(),
+                    stats.replanAchievementEffect(),
+                    stats.analysisData(),
+                    aiInsight),
+            () ->
+                monthlyReportRepository.save(
+                    MonthlyReport.builder()
+                        .user(user)
+                        .reportMonth(reportMonth)
+                        .totalTodos(stats.totalTodos())
+                        .completedTodos(stats.completedTodos())
+                        .achievementRate(stats.achievementRate())
+                        .prevMonthDiff(stats.prevMonthDiff())
+                        .replanCount(stats.replanCount())
+                        .replanAchievementEffect(stats.replanAchievementEffect())
+                        .analysisData(stats.analysisData())
+                        .aiInsight(aiInsight)
+                        .build()));
   }
 
   private MonthlyReportResponse toResponse(MonthlyReport report, Map<String, String> tagColorMap) {
