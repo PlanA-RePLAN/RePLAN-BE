@@ -59,7 +59,7 @@ class TodoControllerTest {
   void createTodo_unauthenticated() throws Exception {
     mockMvc
         .perform(
-            post("/api/todos/create")
+            post("/api/todos")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
                     { "title": "테스트 투두" }
@@ -78,7 +78,7 @@ class TodoControllerTest {
 
     mockMvc
         .perform(
-            post("/api/todos/create")
+            post("/api/todos")
                 .with(authentication(authToken(1L)))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
@@ -102,7 +102,7 @@ class TodoControllerTest {
 
     mockMvc
         .perform(
-            post("/api/todos/create")
+            post("/api/todos")
                 .with(authentication(authToken(1L)))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(
@@ -121,7 +121,7 @@ class TodoControllerTest {
   void createTodo_missingTitle() throws Exception {
     mockMvc
         .perform(
-            post("/api/todos/create")
+            post("/api/todos")
                 .with(authentication(authToken(1L)))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{}"))
@@ -137,7 +137,7 @@ class TodoControllerTest {
   void createTodo_blankTitle() throws Exception {
     mockMvc
         .perform(
-            post("/api/todos/create")
+            post("/api/todos")
                 .with(authentication(authToken(1L)))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
@@ -159,7 +159,7 @@ class TodoControllerTest {
 
     mockMvc
         .perform(
-            post("/api/todos/create")
+            post("/api/todos")
                 .with(authentication(authToken(1L)))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(
@@ -182,7 +182,7 @@ class TodoControllerTest {
 
     mockMvc
         .perform(
-            post("/api/todos/create")
+            post("/api/todos")
                 .with(authentication(authToken(999L)))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""

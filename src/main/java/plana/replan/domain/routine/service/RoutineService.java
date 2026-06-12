@@ -3,6 +3,7 @@ package plana.replan.domain.routine.service;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -73,6 +74,7 @@ public class RoutineService {
             Routine.builder()
                 .title(request.title())
                 .dueDate(request.dueDate())
+                .routineTime(request.routineTime())
                 .routineType(request.routineType())
                 .routineDate(routineDate)
                 .user(user)
@@ -202,7 +204,11 @@ public class RoutineService {
       throw new IllegalStateException("createTodoTreeFromMother는 엄마 루틴에만 호출 가능합니다.");
     }
     LocalDate today = LocalDate.now(clock);
-    LocalDateTime dueDate = nextOccurrence(motherRoutine, today).atStartOfDay();
+    LocalTime time =
+        motherRoutine.getRoutineTime() != null
+            ? motherRoutine.getRoutineTime()
+            : LocalTime.of(23, 59, 59);
+    LocalDateTime dueDate = nextOccurrence(motherRoutine, today).atTime(time);
 
     Todo motherTodo = saveRoutineTodo(motherRoutine, dueDate, null);
     if (motherTodo == null) {

@@ -984,7 +984,7 @@ public interface GoalControllerDocs {
           ---
 
           ### 주의사항
-          - 추천 결과는 실제 투두 생성이 아닙니다. 클라이언트가 `POST /api/todos/create` 또는 루틴 생성 API를 별도 호출해야 합니다.
+          - 추천 결과는 실제 투두 생성이 아닙니다. 클라이언트가 `POST /api/todos` 또는 루틴 생성 API를 별도 호출해야 합니다.
           - 교재·강의가 포함된 경우 Google Search로 목차·분량을 검색하여 투두를 세분화합니다.
           - 응답 시간이 일반 API보다 길 수 있습니다 (최대 30초).
           """,

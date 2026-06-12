@@ -43,7 +43,7 @@ public interface TagControllerDocs {
           |--------|------|------|
           | tagId | integer | 태그 ID |
           | title | string | 태그 이름 |
-          | color | string | 태그 색상 (RED/ORANGE/YELLOW/GREEN/BLUE/PURPLE/PINK/GRAY). 색상이 지정되지 않은 경우 null |
+          | color | string | 태그 색상 (hex 코드, e.g. `#3B82F6`). 색상이 지정되지 않은 경우 null |
           """,
       security = @SecurityRequirement(name = "Bearer Authentication"))
   @ApiResponses({
@@ -64,7 +64,7 @@ public interface TagControllerDocs {
                               {
                                 "tagId": 3,
                                 "title": "업무",
-                                "color": "RED"
+                                "color": "#EF4444"
                               },
                               {
                                 "tagId": 2,
@@ -74,7 +74,7 @@ public interface TagControllerDocs {
                               {
                                 "tagId": 1,
                                 "title": "영어",
-                                "color": "BLUE"
+                                "color": "#3B82F6"
                               }
                             ],
                             "error": null
@@ -153,7 +153,7 @@ public interface TagControllerDocs {
           | 필드명 | 필수 여부 | 타입 | 설명 | 예시 |
           |--------|-----------|------|------|------|
           | title | ✅ 필수 | string | 태그 이름 | `"영어"` |
-          | color | ❌ 선택 | string | 태그 색상 (RED/ORANGE/YELLOW/GREEN/BLUE/PURPLE/PINK/GRAY) | `"BLUE"` |
+          | color | ❌ 선택 | string | 태그 색상 (hex 코드, e.g. `#3B82F6`). 잘못된 형식이면 400 | `"#3B82F6"` |
 
           ❌ 선택 필드는 생략하거나 null로 전달해도 동일하게 처리됩니다.
           """,
@@ -176,7 +176,7 @@ public interface TagControllerDocs {
                             "data": {
                               "tagId": 1,
                               "title": "영어",
-                              "color": "BLUE"
+                              "color": "#3B82F6"
                             },
                             "error": null
                           }
@@ -264,7 +264,7 @@ public interface TagControllerDocs {
                     name = "색상 포함",
                     value =
                         """
-                        {"title": "영어", "color": "BLUE"}
+                        {"title": "영어", "color": "#3B82F6"}
                         """),
                 @ExampleObject(
                     name = "색상 생략",
@@ -302,7 +302,7 @@ public interface TagControllerDocs {
           | 필드명 | 필수 여부 | 타입 | 설명 | 예시 |
           |--------|-----------|------|------|------|
           | title | ❌ 선택 | string | 태그 이름. null이면 변경하지 않음. 빈 문자열은 허용하지 않음 | `"업무"` |
-          | color | ❌ 선택 | string | 태그 색상. null이면 색상 제거 | `"RED"` |
+          | color | ❌ 선택 | string | 태그 색상 (hex 코드). null이면 색상 제거. 잘못된 형식이면 400 | `"#EF4444"` |
 
           ❌ 선택 필드는 생략하거나 null로 전달해도 동일하게 처리됩니다.
           """,
@@ -323,7 +323,7 @@ public interface TagControllerDocs {
                               "data": {
                                 "tagId": 1,
                                 "title": "업무",
-                                "color": "RED"
+                                "color": "#EF4444"
                               },
                               "error": null
                             }
@@ -415,7 +415,7 @@ public interface TagControllerDocs {
                     name = "전체 필드 포함",
                     value =
                         """
-                        {"title": "업무", "color": "RED"}
+                        {"title": "업무", "color": "#EF4444"}
                         """),
                 @ExampleObject(
                     name = "title만 수정",

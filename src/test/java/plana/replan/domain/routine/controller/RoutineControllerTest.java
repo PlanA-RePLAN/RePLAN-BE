@@ -69,7 +69,7 @@ class RoutineControllerTest {
   void createRoutine_daily_success() throws Exception {
     given(routineService.createRoutine(any(), any()))
         .willReturn(
-            new RoutineResponseDto(1L, "아침 스트레칭", null, RoutineType.DAILY, null, null, null));
+            new RoutineResponseDto(1L, "아침 스트레칭", null, null, RoutineType.DAILY, null, null, null));
 
     mockMvc
         .perform(
@@ -96,7 +96,8 @@ class RoutineControllerTest {
   void createRoutine_weekly_success_fullFields() throws Exception {
     LocalDateTime dueDate = LocalDateTime.of(2025, 12, 31, 0, 0);
     given(routineService.createRoutine(any(), any()))
-        .willReturn(new RoutineResponseDto(2L, "영어 단어", dueDate, RoutineType.WEEKLY, 21, 5L, 2L));
+        .willReturn(
+            new RoutineResponseDto(2L, "영어 단어", dueDate, null, RoutineType.WEEKLY, 21, 5L, 2L));
 
     mockMvc
         .perform(
@@ -128,7 +129,8 @@ class RoutineControllerTest {
   @DisplayName("MONTHLY 루틴 생성 성공: routineDate=15")
   void createRoutine_monthly_success() throws Exception {
     given(routineService.createRoutine(any(), any()))
-        .willReturn(new RoutineResponseDto(3L, "월간 회고", null, RoutineType.MONTHLY, 15, null, null));
+        .willReturn(
+            new RoutineResponseDto(3L, "월간 회고", null, null, RoutineType.MONTHLY, 15, null, null));
 
     mockMvc
         .perform(

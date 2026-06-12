@@ -65,7 +65,7 @@ class TagControllerTest {
   @Test
   @DisplayName("태그 생성 성공 (색상 포함): status=201, data 필드 검증")
   void createTag_success_withColor() throws Exception {
-    given(tagService.createTag(any(), any())).willReturn(new TagResponseDto(1L, "영어", "BLUE"));
+    given(tagService.createTag(any(), any())).willReturn(new TagResponseDto(1L, "영어", "#3B82F6"));
 
     mockMvc
         .perform(
@@ -74,13 +74,13 @@ class TagControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(
                     """
-                    { "title": "영어", "color": "BLUE" }
+                    { "title": "영어", "color": "#3B82F6" }
                     """))
         .andExpect(status().isCreated())
         .andExpect(jsonPath("$.success").value(true))
         .andExpect(jsonPath("$.data.tagId").value(1))
         .andExpect(jsonPath("$.data.title").value("영어"))
-        .andExpect(jsonPath("$.data.color").value("BLUE"))
+        .andExpect(jsonPath("$.data.color").value("#3B82F6"))
         .andExpect(jsonPath("$.error").value(nullValue()));
   }
 
@@ -170,7 +170,7 @@ class TagControllerTest {
   @DisplayName("태그 수정 성공: status=200, 수정된 필드 반환")
   void updateTag_success() throws Exception {
     given(tagService.updateTag(any(), any(), any()))
-        .willReturn(new TagResponseDto(1L, "업무", "RED"));
+        .willReturn(new TagResponseDto(1L, "업무", "#EF4444"));
 
     mockMvc
         .perform(
@@ -179,13 +179,13 @@ class TagControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(
                     """
-                    { "title": "업무", "color": "RED" }
+                    { "title": "업무", "color": "#EF4444" }
                     """))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.success").value(true))
         .andExpect(jsonPath("$.data.tagId").value(1))
         .andExpect(jsonPath("$.data.title").value("업무"))
-        .andExpect(jsonPath("$.data.color").value("RED"))
+        .andExpect(jsonPath("$.data.color").value("#EF4444"))
         .andExpect(jsonPath("$.error").value(nullValue()));
   }
 
@@ -193,7 +193,7 @@ class TagControllerTest {
   @DisplayName("title 생략: status=200 (title은 선택 필드)")
   void updateTag_omitTitle_ok() throws Exception {
     given(tagService.updateTag(any(), any(), any()))
-        .willReturn(new TagResponseDto(1L, "영어", "RED"));
+        .willReturn(new TagResponseDto(1L, "영어", "#EF4444"));
 
     mockMvc
         .perform(
@@ -201,7 +201,7 @@ class TagControllerTest {
                 .with(authentication(authToken(1L)))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
-                    { "color": "RED" }
+                    { "color": "#EF4444" }
                     """))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.title").value("영어"));

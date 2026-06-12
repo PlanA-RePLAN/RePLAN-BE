@@ -1,6 +1,7 @@
 package plana.replan.domain.tag.service;
 
 import java.util.List;
+import java.util.regex.Pattern;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -21,6 +22,8 @@ import plana.replan.global.exception.GlobalErrorCode;
 @Service
 @RequiredArgsConstructor
 public class TagService {
+
+  private static final Pattern HEX_COLOR = Pattern.compile("^#[0-9A-Fa-f]{6}$");
 
   private final TagRepository tagRepository;
   private final UserRepository userRepository;
@@ -55,6 +58,7 @@ public class TagService {
     if (request.getTitle() == null || request.getTitle().isBlank()) {
       throw new CustomException(GlobalErrorCode.INVALID_INPUT);
     }
+    validateColor(request.getColor());
 
     Tag tag = Tag.builder().title(request.getTitle()).color(request.getColor()).user(user).build();
     tagRepository.save(tag);
@@ -78,9 +82,16 @@ public class TagService {
     if (request.getTitle() != null && request.getTitle().isBlank()) {
       throw new CustomException(GlobalErrorCode.INVALID_INPUT);
     }
+    validateColor(request.getColor());
 
     tag.update(request.getTitle(), request.getColor());
     return TagResponseDto.from(tag);
+  }
+
+  private void validateColor(String color) {
+    if (color != null && !HEX_COLOR.matcher(color).matches()) {
+      throw new CustomException(GlobalErrorCode.INVALID_INPUT);
+    }
   }
 
   @Transactional
