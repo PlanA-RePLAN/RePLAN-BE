@@ -59,3 +59,4 @@ gemini:
 statistics:
   batch:
     gemini-call-delay-ms: 2500
+    max-retry-count: 3

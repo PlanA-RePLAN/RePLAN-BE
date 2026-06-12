@@ -85,7 +85,7 @@ public class MonthlyReportCalculator {
       LocalDateTime endOfMonth = targetMonth.atEndOfMonth().atTime(23, 59, 59);
       hasActivity =
           todos.stream()
-              .map(t -> t.getCreatedAt())
+              .map(Todo::getCreatedAt)
               .filter(Objects::nonNull)
               .min(Comparator.naturalOrder())
               .map(first -> ChronoUnit.DAYS.between(first, endOfMonth) >= 14)

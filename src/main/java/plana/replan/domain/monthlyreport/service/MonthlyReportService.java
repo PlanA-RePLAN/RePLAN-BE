@@ -142,6 +142,7 @@ public class MonthlyReportService {
     }
   }
 
+  @Transactional
   public void upsertReport(
       User user, LocalDate reportMonth, CalculatedStats stats, AiInsight aiInsight) {
     monthlyReportRepository

@@ -1,8 +1,11 @@
 package plana.replan.domain.monthlyreport.controller;
 
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -14,6 +17,7 @@ import plana.replan.global.common.ApiResult;
 @RestController
 @RequestMapping("/api/monthly-reports")
 @RequiredArgsConstructor
+@Validated
 public class MonthlyReportController implements MonthlyReportControllerDocs {
 
   private final MonthlyReportService monthlyReportService;
@@ -21,7 +25,9 @@ public class MonthlyReportController implements MonthlyReportControllerDocs {
   @Override
   @GetMapping
   public ResponseEntity<ApiResult<MonthlyReportResponse>> getReport(
-      @AuthenticationPrincipal Long userId, @RequestParam int year, @RequestParam int month) {
+      @AuthenticationPrincipal Long userId,
+      @RequestParam @Min(1) int year,
+      @RequestParam @Min(1) @Max(12) int month) {
     return ResponseEntity.ok(ApiResult.ok(monthlyReportService.getReport(userId, year, month)));
   }
 }
