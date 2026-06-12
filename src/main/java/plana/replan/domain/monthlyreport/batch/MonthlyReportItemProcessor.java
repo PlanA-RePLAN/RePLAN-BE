@@ -21,9 +21,7 @@ public class MonthlyReportItemProcessor implements ItemProcessor<User, MonthlyRe
 
   private final MonthlyReportCalculator calculator;
   private final MonthlyReportAiService aiService;
-
-  @Value("${statistics.batch.gemini-call-delay-ms:2500}")
-  private long geminiCallDelayMs;
+  private final GeminiThrottleChunkListener throttleListener;
 
   @Value("#{T(java.time.YearMonth).parse(jobParameters['targetMonth'])}")
   private YearMonth targetMonth;
@@ -40,7 +38,7 @@ public class MonthlyReportItemProcessor implements ItemProcessor<User, MonthlyRe
     }
 
     AiInsight aiInsight = aiService.generateInsight(stats, targetMonth);
-    Thread.sleep(geminiCallDelayMs);
+    throttleListener.markAiCalled(); // sleep은 트랜잭션 밖 afterChunk()에서 실행
 
     return new MonthlyReportData(user, targetMonth.atDay(1), stats, aiInsight);
   }

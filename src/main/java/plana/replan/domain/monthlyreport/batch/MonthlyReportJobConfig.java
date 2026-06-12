@@ -3,6 +3,7 @@ package plana.replan.domain.monthlyreport.batch;
 import jakarta.persistence.EntityManagerFactory;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.batch.core.configuration.annotation.StepScope;
 import org.springframework.batch.core.job.Job;
 import org.springframework.batch.core.job.builder.JobBuilder;
 import org.springframework.batch.core.repository.JobRepository;
@@ -27,6 +28,7 @@ public class MonthlyReportJobConfig {
   private final MonthlyReportItemProcessor processor;
   private final MonthlyReportItemWriter writer;
   private final ReportSkipListener reportSkipListener;
+  private final GeminiThrottleChunkListener throttleListener;
 
   @Value("${statistics.batch.skip-limit:100}")
   private int skipLimit;
@@ -54,10 +56,12 @@ public class MonthlyReportJobConfig {
               return t instanceof RuntimeException && skipCount < skipLimit;
             })
         .listener(reportSkipListener)
+        .listener(throttleListener)
         .build();
   }
 
   @Bean
+  @StepScope
   public JpaCursorItemReader<User> userItemReader() {
     return new JpaCursorItemReaderBuilder<User>()
         .name("userItemReader")

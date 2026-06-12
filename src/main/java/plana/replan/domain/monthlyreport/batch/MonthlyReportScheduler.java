@@ -28,6 +28,9 @@ public class MonthlyReportScheduler {
   @Value("${statistics.batch.gemini-call-delay-ms:2500}")
   private long geminiCallDelayMs;
 
+  @Value("${statistics.batch.max-retry-count:3}")
+  private int maxRetryCount;
+
   @Scheduled(cron = "0 0 0 1 * *")
   public void runMonthlyReportBatch() {
     YearMonth targetMonth = YearMonth.now().minusMonths(1);
@@ -41,7 +44,11 @@ public class MonthlyReportScheduler {
 
     try {
       var execution = jobOperator.start(monthlyReportJob, params);
-      log.info("월간 리포트 배치 완료 - status={}", execution.getStatus());
+      if (execution.getStatus().isUnsuccessful()) {
+        log.error("월간 리포트 배치 실패 - status={}", execution.getStatus());
+      } else {
+        log.info("월간 리포트 배치 완료 - status={}", execution.getStatus());
+      }
     } catch (Exception e) {
       log.error("월간 리포트 배치 실행 실패", e);
     }
@@ -50,7 +57,9 @@ public class MonthlyReportScheduler {
   @Scheduled(cron = "0 0 3 * * *")
   public void retryFailedReports() {
     List<Long> failureIds =
-        failureRepository.findByRetryCountLessThan(3).stream().map(f -> f.getId()).toList();
+        failureRepository.findByRetryCountLessThan(maxRetryCount).stream()
+            .map(f -> f.getId())
+            .toList();
 
     if (failureIds.isEmpty()) return;
     log.info("실패 리포트 재처리 시작 - count={}", failureIds.size());
@@ -64,6 +73,8 @@ public class MonthlyReportScheduler {
         Thread.currentThread().interrupt();
         log.warn("재처리 인터럽트 - 종료");
         break;
+      } catch (Exception e) {
+        log.error("재처리 중 예외 발생 - failureId={}", failureId, e);
       }
     }
   }
