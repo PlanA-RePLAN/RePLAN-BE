@@ -20,6 +20,12 @@ spring:
     redis:
       host: ${REDIS_HOST}
       port: ${REDIS_PORT}
+  batch:
+    jdbc:
+      initialize-schema: never
+    job:
+      enabled: false
+
 management:
   endpoints:
     web:
@@ -38,7 +44,6 @@ google:
   client-ids:
     web: ${GOOGLE_WEB_CLIENT_ID}
 
-
 cloud:
   aws:
     region:
@@ -50,3 +55,7 @@ cloud:
 
 gemini:
   api-key: ${GEMINI_API_KEY}
+
+statistics:
+  batch:
+    gemini-call-delay-ms: 2500
