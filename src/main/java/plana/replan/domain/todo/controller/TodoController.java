@@ -106,7 +106,7 @@ public class TodoController implements TodoControllerDocs {
   }
 
   @Override
-  @PostMapping("/create")
+  @PostMapping
   public ResponseEntity<ApiResult<TodoResponseDto>> createTodo(
       @AuthenticationPrincipal Long userId, @Valid @RequestBody TodoCreateRequestDto request) {
     return ResponseEntity.status(HttpStatus.CREATED)
