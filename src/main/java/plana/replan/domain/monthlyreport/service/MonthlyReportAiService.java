@@ -1,7 +1,5 @@
 package plana.replan.domain.monthlyreport.service;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.YearMonth;
 import java.util.ArrayList;
 import java.util.List;
@@ -14,6 +12,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
 import plana.replan.domain.monthlyreport.entity.AiInsight;
 import plana.replan.domain.monthlyreport.entity.AnalysisData;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 
 @Slf4j
 @Service
@@ -24,7 +25,7 @@ public class MonthlyReportAiService {
       "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent";
 
   private final RestClient geminiRestClient;
-  private final ObjectMapper objectMapper = new ObjectMapper();
+  private final ObjectMapper objectMapper = JsonMapper.builder().build();
 
   @Value("${gemini.api-key}")
   private String apiKey;
@@ -131,7 +132,7 @@ public class MonthlyReportAiService {
       String writingTip = root.path("writing_tip").asText(null);
       return new AiInsight(insights, writingTip);
     } catch (Exception e) {
-      log.error("통계 AI 응답 파싱 실패: {}", raw, e);
+      log.error("통계 AI 응답 파싱 실패 (length={})", raw == null ? 0 : raw.length(), e);
       return new AiInsight(List.of(), null);
     }
   }

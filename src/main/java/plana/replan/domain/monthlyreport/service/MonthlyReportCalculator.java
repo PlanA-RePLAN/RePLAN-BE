@@ -51,7 +51,7 @@ public class MonthlyReportCalculator {
   @Transactional(readOnly = true)
   public CalculatedStats calculate(User user, YearMonth targetMonth) {
     LocalDateTime start = targetMonth.atDay(1).atStartOfDay();
-    LocalDateTime end = targetMonth.atEndOfMonth().atTime(23, 59, 59);
+    LocalDateTime end = targetMonth.plusMonths(1).atDay(1).atStartOfDay();
 
     List<Todo> todos = todoRepository.findMonthlyTodos(user, start, end);
     int totalTodos = todos.size();
@@ -114,7 +114,7 @@ public class MonthlyReportCalculator {
     }
 
     LocalDateTime prevStart = prevMonth.atDay(1).atStartOfDay();
-    LocalDateTime prevEnd = prevMonth.atEndOfMonth().atTime(23, 59, 59);
+    LocalDateTime prevEnd = targetMonth.atDay(1).atStartOfDay();
     List<Todo> prevTodos = todoRepository.findMonthlyTodos(user, prevStart, prevEnd);
 
     if (prevTodos.isEmpty()) return null;

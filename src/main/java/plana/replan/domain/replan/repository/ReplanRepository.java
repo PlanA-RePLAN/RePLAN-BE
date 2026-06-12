@@ -12,7 +12,7 @@ public interface ReplanRepository extends JpaRepository<Replan, Long> {
 
   @Query(
       "SELECT r FROM Replan r WHERE r.todo.user = :user"
-          + " AND r.createdAt BETWEEN :start AND :end")
+          + " AND r.createdAt >= :start AND r.createdAt < :end")
   List<Replan> findByUserAndCreatedAtBetween(
       @Param("user") User user,
       @Param("start") LocalDateTime start,

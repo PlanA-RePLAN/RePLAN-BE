@@ -15,7 +15,7 @@ import plana.replan.global.common.ApiResult;
 @RestController
 @RequestMapping("/api/monthly-reports")
 @RequiredArgsConstructor
-@Profile("!prod")
+@Profile("local")
 public class DevMonthlyReportController {
 
   private final MonthlyReportService monthlyReportService;
