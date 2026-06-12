@@ -28,6 +28,61 @@ public class MonthlyReportService {
   private final UserRepository userRepository;
   private final MonthlyReportRepository monthlyReportRepository;
   private final TagRepository tagRepository;
+  private final MonthlyReportCalculator calculator;
+  private final MonthlyReportAiService aiService;
+
+  @Transactional
+  public MonthlyReportResponse generateReport(Long userId, int year, int month) {
+    User user =
+        userRepository
+            .findById(userId)
+            .orElseThrow(() -> new CustomException(GlobalErrorCode.NOT_FOUND));
+
+    YearMonth targetMonth = YearMonth.of(year, month);
+    CalculatedStats stats = calculator.calculate(user, targetMonth);
+
+    final AiInsight aiInsight =
+        stats.hasActivity() ? aiService.generateInsight(stats, targetMonth) : null;
+
+    LocalDate reportMonth = targetMonth.atDay(1);
+    MonthlyReport report =
+        monthlyReportRepository
+            .findByUserAndReportMonth(user, reportMonth)
+            .orElseGet(
+                () ->
+                    monthlyReportRepository.save(
+                        MonthlyReport.builder()
+                            .user(user)
+                            .reportMonth(reportMonth)
+                            .totalTodos(stats.totalTodos())
+                            .completedTodos(stats.completedTodos())
+                            .achievementRate(stats.achievementRate())
+                            .prevMonthDiff(stats.prevMonthDiff())
+                            .replanCount(stats.replanCount())
+                            .replanAchievementEffect(stats.replanAchievementEffect())
+                            .analysisData(stats.analysisData())
+                            .aiInsight(aiInsight)
+                            .build()));
+
+    report.update(
+        stats.totalTodos(),
+        stats.completedTodos(),
+        stats.achievementRate(),
+        stats.prevMonthDiff(),
+        stats.replanCount(),
+        stats.replanAchievementEffect(),
+        stats.analysisData(),
+        aiInsight);
+
+    List<Tag> userTags = tagRepository.findAllByUserOrderByCreatedAtDescIdDesc(user);
+    Map<String, String> tagColorMap =
+        userTags.stream()
+            .collect(
+                Collectors.toMap(
+                    Tag::getTitle, t -> t.getColor() != null ? t.getColor() : "", (a, b) -> a));
+
+    return toResponse(report, tagColorMap);
+  }
 
   @Transactional(readOnly = true)
   public MonthlyReportResponse getReport(Long userId, int year, int month) {

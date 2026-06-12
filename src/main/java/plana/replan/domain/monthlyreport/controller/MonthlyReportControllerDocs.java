@@ -133,4 +133,10 @@ public interface MonthlyReportControllerDocs {
       @AuthenticationPrincipal Long userId,
       @Parameter(description = "조회 연도", example = "2025") @RequestParam int year,
       @Parameter(description = "조회 월 (1~12)", example = "5") @RequestParam int month);
+
+  @Operation(summary = "[dev] 월간 통계 수동 생성", description = "배치 없이 월간 통계를 즉시 계산·저장합니다. 개발/테스트 전용.")
+  ResponseEntity<ApiResult<MonthlyReportResponse>> generateReport(
+      @AuthenticationPrincipal Long userId,
+      @Parameter(description = "연도", example = "2026") @RequestParam int year,
+      @Parameter(description = "월 (1~12)", example = "5") @RequestParam int month);
 }
