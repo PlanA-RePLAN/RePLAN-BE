@@ -100,7 +100,8 @@ class RoutineServiceTest {
             () ->
                 routineService.createRoutine(
                     999L,
-                    new RoutineCreateRequestDto("루틴", null, null, RoutineType.DAILY, null, null, null)))
+                    new RoutineCreateRequestDto(
+                        "루틴", null, null, RoutineType.DAILY, null, null, null)))
         .isInstanceOf(CustomException.class)
         .satisfies(
             e ->
@@ -119,7 +120,9 @@ class RoutineServiceTest {
 
     RoutineResponseDto result =
         routineService.createRoutine(
-            1L, new RoutineCreateRequestDto("아침 스트레칭", null, null, RoutineType.DAILY, null, null, null));
+            1L,
+            new RoutineCreateRequestDto(
+                "아침 스트레칭", null, null, RoutineType.DAILY, null, null, null));
 
     assertThat(result.getTitle()).isEqualTo("아침 스트레칭");
     assertThat(result.getRoutineType()).isEqualTo(RoutineType.DAILY);
@@ -155,7 +158,8 @@ class RoutineServiceTest {
 
     RoutineResponseDto result =
         routineService.createRoutine(
-            1L, new RoutineCreateRequestDto("영어 단어", dueDate, null, RoutineType.WEEKLY, 21, 5L, 2L));
+            1L,
+            new RoutineCreateRequestDto("영어 단어", dueDate, null, RoutineType.WEEKLY, 21, 5L, 2L));
 
     assertThat(result.getTitle()).isEqualTo("영어 단어");
     assertThat(result.getRoutineType()).isEqualTo(RoutineType.WEEKLY);
@@ -197,7 +201,8 @@ class RoutineServiceTest {
             () ->
                 routineService.createRoutine(
                     1L,
-                    new RoutineCreateRequestDto("루틴", null, null, RoutineType.WEEKLY, null, null, null)))
+                    new RoutineCreateRequestDto(
+                        "루틴", null, null, RoutineType.WEEKLY, null, null, null)))
         .isInstanceOf(CustomException.class)
         .satisfies(
             e ->
@@ -214,7 +219,9 @@ class RoutineServiceTest {
     assertThatThrownBy(
             () ->
                 routineService.createRoutine(
-                    1L, new RoutineCreateRequestDto("루틴", null, null, RoutineType.WEEKLY, 0, null, null)))
+                    1L,
+                    new RoutineCreateRequestDto(
+                        "루틴", null, null, RoutineType.WEEKLY, 0, null, null)))
         .isInstanceOf(CustomException.class)
         .satisfies(
             e ->
@@ -230,7 +237,8 @@ class RoutineServiceTest {
             () ->
                 routineService.createRoutine(
                     1L,
-                    new RoutineCreateRequestDto("루틴", null, null, RoutineType.WEEKLY, 128, null, null)))
+                    new RoutineCreateRequestDto(
+                        "루틴", null, null, RoutineType.WEEKLY, 128, null, null)))
         .isInstanceOf(CustomException.class)
         .satisfies(
             e ->
@@ -247,7 +255,8 @@ class RoutineServiceTest {
 
     RoutineResponseDto result =
         routineService.createRoutine(
-            1L, new RoutineCreateRequestDto("월간 회고", null, null, RoutineType.MONTHLY, 15, null, null));
+            1L,
+            new RoutineCreateRequestDto("월간 회고", null, null, RoutineType.MONTHLY, 15, null, null));
 
     assertThat(result.getRoutineType()).isEqualTo(RoutineType.MONTHLY);
     assertThat(result.getRoutineDate()).isEqualTo(15);
@@ -285,7 +294,8 @@ class RoutineServiceTest {
             () ->
                 routineService.createRoutine(
                     1L,
-                    new RoutineCreateRequestDto("루틴", null, null, RoutineType.MONTHLY, null, null, null)))
+                    new RoutineCreateRequestDto(
+                        "루틴", null, null, RoutineType.MONTHLY, null, null, null)))
         .isInstanceOf(CustomException.class)
         .satisfies(
             e ->
@@ -301,7 +311,8 @@ class RoutineServiceTest {
             () ->
                 routineService.createRoutine(
                     1L,
-                    new RoutineCreateRequestDto("루틴", null, null, RoutineType.MONTHLY, 0, null, null)))
+                    new RoutineCreateRequestDto(
+                        "루틴", null, null, RoutineType.MONTHLY, 0, null, null)))
         .isInstanceOf(CustomException.class)
         .satisfies(
             e ->
@@ -317,7 +328,8 @@ class RoutineServiceTest {
             () ->
                 routineService.createRoutine(
                     1L,
-                    new RoutineCreateRequestDto("루틴", null, null, RoutineType.MONTHLY, 32, null, null)))
+                    new RoutineCreateRequestDto(
+                        "루틴", null, null, RoutineType.MONTHLY, 32, null, null)))
         .isInstanceOf(CustomException.class)
         .satisfies(
             e ->
@@ -336,7 +348,8 @@ class RoutineServiceTest {
             () ->
                 routineService.createRoutine(
                     1L,
-                    new RoutineCreateRequestDto("루틴", null, null, RoutineType.DAILY, null, 999L, null)))
+                    new RoutineCreateRequestDto(
+                        "루틴", null, null, RoutineType.DAILY, null, 999L, null)))
         .isInstanceOf(CustomException.class)
         .satisfies(
             e ->
@@ -355,7 +368,8 @@ class RoutineServiceTest {
             () ->
                 routineService.createRoutine(
                     1L,
-                    new RoutineCreateRequestDto("루틴", null, null, RoutineType.DAILY, null, null, 999L)))
+                    new RoutineCreateRequestDto(
+                        "루틴", null, null, RoutineType.DAILY, null, null, 999L)))
         .isInstanceOf(CustomException.class)
         .satisfies(
             e ->
@@ -373,7 +387,8 @@ class RoutineServiceTest {
     given(routineRepository.save(any(Routine.class))).willAnswer(inv -> inv.getArgument(0));
 
     routineService.createRoutine(
-        1L, new RoutineCreateRequestDto("아침 스트레칭", null, null, RoutineType.DAILY, null, null, null));
+        1L,
+        new RoutineCreateRequestDto("아침 스트레칭", null, null, RoutineType.DAILY, null, null, null));
 
     verify(todoRepository).saveAndFlush(any(Todo.class));
   }
@@ -401,7 +416,8 @@ class RoutineServiceTest {
 
     ArgumentCaptor<Todo> captor = ArgumentCaptor.forClass(Todo.class);
     verify(todoRepository).saveAndFlush(captor.capture());
-    assertThat(captor.getValue().getDueDate()).isEqualTo(LocalDate.of(2024, 1, 16).atTime(23, 59, 59));
+    assertThat(captor.getValue().getDueDate())
+        .isEqualTo(LocalDate.of(2024, 1, 16).atTime(23, 59, 59));
   }
 
   @Test
@@ -427,7 +443,8 @@ class RoutineServiceTest {
 
     ArgumentCaptor<Todo> captor = ArgumentCaptor.forClass(Todo.class);
     verify(todoRepository).saveAndFlush(captor.capture());
-    assertThat(captor.getValue().getDueDate()).isEqualTo(LocalDate.of(2024, 1, 16).atTime(23, 59, 59));
+    assertThat(captor.getValue().getDueDate())
+        .isEqualTo(LocalDate.of(2024, 1, 16).atTime(23, 59, 59));
   }
 
   @Test
@@ -437,7 +454,8 @@ class RoutineServiceTest {
     given(todoRepository.existsByRoutineAndDueDate(any(), any())).willReturn(true);
 
     routineService.createRoutine(
-        1L, new RoutineCreateRequestDto("아침 스트레칭", null, null, RoutineType.DAILY, null, null, null));
+        1L,
+        new RoutineCreateRequestDto("아침 스트레칭", null, null, RoutineType.DAILY, null, null, null));
 
     verify(todoRepository, never()).saveAndFlush(any(Todo.class));
   }
@@ -478,7 +496,8 @@ class RoutineServiceTest {
   void generateDailyTodos_DAILY_어제_마감_반복Todo_있으면_오늘_dueDate로_생성됨() {
     // 어제(2024-01-14) dueDate DAILY 반복 Todo → nextOccurrence(오늘=2024-01-15) = 2024-01-15
     Routine routine = buildRoutine(RoutineType.DAILY, null);
-    Todo yesterdayTodo = buildTodoWithRoutine(routine, LocalDate.of(2024, 1, 14).atTime(23, 59, 59));
+    Todo yesterdayTodo =
+        buildTodoWithRoutine(routine, LocalDate.of(2024, 1, 14).atTime(23, 59, 59));
     given(todoRepository.findMotherRoutineTodosForRollover(any(), any()))
         .willReturn(List.of(yesterdayTodo));
 
@@ -486,14 +505,16 @@ class RoutineServiceTest {
 
     ArgumentCaptor<Todo> captor = ArgumentCaptor.forClass(Todo.class);
     verify(todoRepository).saveAndFlush(captor.capture());
-    assertThat(captor.getValue().getDueDate()).isEqualTo(LocalDate.of(2024, 1, 15).atTime(23, 59, 59));
+    assertThat(captor.getValue().getDueDate())
+        .isEqualTo(LocalDate.of(2024, 1, 15).atTime(23, 59, 59));
   }
 
   @Test
   void generateDailyTodos_WEEKLY_어제_마감_반복Todo_있으면_다음_반복일_dueDate로_생성됨() {
     // 어제(2024-01-14, 일) dueDate WEEKLY(화=2) → nextOccurrence(오늘=월) = 2024-01-16(화)
     Routine routine = buildRoutine(RoutineType.WEEKLY, 2);
-    Todo yesterdayTodo = buildTodoWithRoutine(routine, LocalDate.of(2024, 1, 14).atTime(23, 59, 59));
+    Todo yesterdayTodo =
+        buildTodoWithRoutine(routine, LocalDate.of(2024, 1, 14).atTime(23, 59, 59));
     given(todoRepository.findMotherRoutineTodosForRollover(any(), any()))
         .willReturn(List.of(yesterdayTodo));
 
@@ -501,14 +522,16 @@ class RoutineServiceTest {
 
     ArgumentCaptor<Todo> captor = ArgumentCaptor.forClass(Todo.class);
     verify(todoRepository).saveAndFlush(captor.capture());
-    assertThat(captor.getValue().getDueDate()).isEqualTo(LocalDate.of(2024, 1, 16).atTime(23, 59, 59));
+    assertThat(captor.getValue().getDueDate())
+        .isEqualTo(LocalDate.of(2024, 1, 16).atTime(23, 59, 59));
   }
 
   @Test
   void generateDailyTodos_MONTHLY_어제_마감_반복Todo_있으면_다음_반복일_dueDate로_생성됨() {
     // 어제(2024-01-14) dueDate MONTHLY(16일) → nextOccurrence(오늘=15일) = 2024-01-16
     Routine routine = buildRoutine(RoutineType.MONTHLY, 16);
-    Todo yesterdayTodo = buildTodoWithRoutine(routine, LocalDate.of(2024, 1, 14).atTime(23, 59, 59));
+    Todo yesterdayTodo =
+        buildTodoWithRoutine(routine, LocalDate.of(2024, 1, 14).atTime(23, 59, 59));
     given(todoRepository.findMotherRoutineTodosForRollover(any(), any()))
         .willReturn(List.of(yesterdayTodo));
 
@@ -516,13 +539,15 @@ class RoutineServiceTest {
 
     ArgumentCaptor<Todo> captor = ArgumentCaptor.forClass(Todo.class);
     verify(todoRepository).saveAndFlush(captor.capture());
-    assertThat(captor.getValue().getDueDate()).isEqualTo(LocalDate.of(2024, 1, 16).atTime(23, 59, 59));
+    assertThat(captor.getValue().getDueDate())
+        .isEqualTo(LocalDate.of(2024, 1, 16).atTime(23, 59, 59));
   }
 
   @Test
   void generateDailyTodos_다음_반복일_Todo_이미_존재시_중복_생성_안됨() {
     Routine routine = buildRoutine(RoutineType.DAILY, null);
-    Todo yesterdayTodo = buildTodoWithRoutine(routine, LocalDate.of(2024, 1, 14).atTime(23, 59, 59));
+    Todo yesterdayTodo =
+        buildTodoWithRoutine(routine, LocalDate.of(2024, 1, 14).atTime(23, 59, 59));
     given(todoRepository.findMotherRoutineTodosForRollover(any(), any()))
         .willReturn(List.of(yesterdayTodo));
     given(todoRepository.existsByRoutineAndDueDate(any(), any())).willReturn(true);
