@@ -3,6 +3,8 @@ package plana.replan.domain.monthlyreport.batch;
 import java.time.YearMonth;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.batch.core.annotation.BeforeStep;
+import org.springframework.batch.core.step.StepExecution;
 import org.springframework.batch.infrastructure.item.ItemProcessor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -23,9 +25,15 @@ public class MonthlyReportItemProcessor implements ItemProcessor<User, MonthlyRe
   @Value("${statistics.batch.gemini-call-delay-ms:2500}")
   private long geminiCallDelayMs;
 
+  private YearMonth targetMonth;
+
+  @BeforeStep
+  public void beforeStep(StepExecution stepExecution) {
+    targetMonth = YearMonth.parse(stepExecution.getJobParameters().getString("targetMonth"));
+  }
+
   @Override
   public MonthlyReportData process(User user) throws Exception {
-    YearMonth targetMonth = YearMonth.now().minusMonths(1);
     log.debug("통계 처리 중 - userId={}, targetMonth={}", user.getId(), targetMonth);
 
     CalculatedStats stats = calculator.calculate(user, targetMonth);

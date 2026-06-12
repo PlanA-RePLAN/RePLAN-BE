@@ -41,10 +41,14 @@ public class MonthlyReportScheduler {
 
   @Scheduled(cron = "0 0 0 1 * *")
   public void runMonthlyReportBatch() {
-    log.info("월간 리포트 배치 시작 - targetMonth={}", YearMonth.now().minusMonths(1));
+    YearMonth targetMonth = YearMonth.now().minusMonths(1);
+    log.info("월간 리포트 배치 시작 - targetMonth={}", targetMonth);
 
     JobParameters params =
-        new JobParametersBuilder().addLocalDateTime("runAt", LocalDateTime.now()).toJobParameters();
+        new JobParametersBuilder()
+            .addLocalDateTime("runAt", LocalDateTime.now())
+            .addString("targetMonth", targetMonth.toString())
+            .toJobParameters();
 
     try {
       var execution = jobOperator.start(monthlyReportJob, params);
