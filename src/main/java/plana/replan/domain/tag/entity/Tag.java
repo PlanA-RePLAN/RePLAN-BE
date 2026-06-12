@@ -32,8 +32,7 @@ public class Tag extends BaseTimeEntity {
   @Column(nullable = false)
   private String title;
 
-  @Column
-  private String color;
+  @Column private String color;
 
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "user_id", nullable = false)
