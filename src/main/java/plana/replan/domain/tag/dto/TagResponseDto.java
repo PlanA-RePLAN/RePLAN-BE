@@ -20,7 +20,6 @@ public class TagResponseDto {
   private String color;
 
   public static TagResponseDto from(Tag tag) {
-    return new TagResponseDto(
-        tag.getId(), tag.getTitle(), tag.getColor() != null ? tag.getColor().name() : null);
+    return new TagResponseDto(tag.getId(), tag.getTitle(), tag.getColor());
   }
 }

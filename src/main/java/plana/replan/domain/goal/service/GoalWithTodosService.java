@@ -120,6 +120,7 @@ public class GoalWithTodosService {
     return new RoutineCreateRequestDto(
         item.title(),
         parseDateTime(item.dueDate(), item.dueTime()),
+        null,
         item.routineType(),
         routineDate,
         item.tagId(),

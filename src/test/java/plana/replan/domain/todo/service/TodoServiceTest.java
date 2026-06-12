@@ -26,7 +26,6 @@ import plana.replan.domain.routine.entity.RoutineType;
 import plana.replan.domain.routine.exception.RoutineErrorCode;
 import plana.replan.domain.routine.repository.RoutineRepository;
 import plana.replan.domain.tag.entity.Tag;
-import plana.replan.domain.tag.entity.TagColor;
 import plana.replan.domain.tag.exception.TagErrorCode;
 import plana.replan.domain.tag.repository.TagRepository;
 import plana.replan.domain.todo.dto.SubTodoCreateRequestDto;
@@ -75,7 +74,7 @@ class TodoServiceTest {
   }
 
   private Tag testTag(Long id) {
-    Tag tag = Tag.builder().title("업무").color(TagColor.BLUE).user(testUser()).build();
+    Tag tag = Tag.builder().title("업무").color("#3B82F6").user(testUser()).build();
     ReflectionTestUtils.setField(tag, "id", id);
     return tag;
   }
@@ -608,28 +607,32 @@ class TodoServiceTest {
   }
 
   @Test
-  @DisplayName("getTodos - week 필터: 완료 투두 조회 미호출")
-  void getTodos_week_completedTodosNotQueried() {
+  @DisplayName("getTodos - week 필터: 해당 주 월~일 범위의 완료/미완료 모두 조회")
+  void getTodos_week_allTodosInWeekRange() {
     User user = testUser();
     given(userRepository.findById(1L)).willReturn(Optional.of(user));
-    given(todoRepository.findActiveTodosByDueDateRange(any(), any(), any()))
+    given(todoRepository.findAllTodosByDueDateRange(any(), any(), any()))
         .willReturn(List.of(activeTodo(1L, user)));
 
     todoService.getTodos(1L, "week", "priority", null);
 
+    verify(todoRepository).findAllTodosByDueDateRange(any(), any(), any());
+    verify(todoRepository, never()).findActiveTodosByDueDateRange(any(), any(), any());
     verify(todoRepository, never()).findCompletedTodosByCompletedTimeRange(any(), any(), any());
   }
 
   @Test
-  @DisplayName("getTodos - month 필터: 완료 투두 조회 미호출")
-  void getTodos_month_completedTodosNotQueried() {
+  @DisplayName("getTodos - month 필터: 해당 달 1일~말일 범위의 완료/미완료 모두 조회")
+  void getTodos_month_allTodosInMonthRange() {
     User user = testUser();
     given(userRepository.findById(1L)).willReturn(Optional.of(user));
-    given(todoRepository.findActiveTodosByDueDateRange(any(), any(), any()))
+    given(todoRepository.findAllTodosByDueDateRange(any(), any(), any()))
         .willReturn(List.of(activeTodo(1L, user)));
 
     todoService.getTodos(1L, "month", "priority", null);
 
+    verify(todoRepository).findAllTodosByDueDateRange(any(), any(), any());
+    verify(todoRepository, never()).findActiveTodosByDueDateRange(any(), any(), any());
     verify(todoRepository, never()).findCompletedTodosByCompletedTimeRange(any(), any(), any());
   }
 
@@ -786,7 +789,7 @@ class TodoServiceTest {
 
     assertThat(dto.getTagId()).isEqualTo(5L);
     assertThat(dto.getTagTitle()).isEqualTo("업무");
-    assertThat(dto.getTagColor()).isEqualTo("BLUE");
+    assertThat(dto.getTagColor()).isEqualTo("#3B82F6");
     assertThat(dto.getRoutineType()).isEqualTo("WEEKLY");
   }
 
@@ -869,7 +872,7 @@ class TodoServiceTest {
 
     assertThat(result.getTagId()).isEqualTo(5L);
     assertThat(result.getTagTitle()).isEqualTo("업무");
-    assertThat(result.getTagColor()).isEqualTo("BLUE");
+    assertThat(result.getTagColor()).isEqualTo("#3B82F6");
     assertThat(result.getRoutineType()).isEqualTo("DAILY");
     assertThat(result.getSubTodos()).hasSize(1);
     assertThat(result.getSubTodos().get(0).getTodoId()).isEqualTo(10L);

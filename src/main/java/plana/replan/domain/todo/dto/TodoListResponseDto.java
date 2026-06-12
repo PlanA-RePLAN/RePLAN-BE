@@ -67,7 +67,7 @@ public class TodoListResponseDto {
         todo.isCompleted(),
         tag != null ? tag.getId() : null,
         tag != null ? tag.getTitle() : null,
-        tag != null && tag.getColor() != null ? tag.getColor().name() : null,
+        tag != null ? tag.getColor() : null,
         routine != null && routine.getRoutineType() != null
             ? routine.getRoutineType().name()
             : null,
