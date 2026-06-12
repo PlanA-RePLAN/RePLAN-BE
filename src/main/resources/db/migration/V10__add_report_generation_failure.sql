@@ -2,7 +2,7 @@ CREATE TABLE report_generation_failure
 (
     id            BIGSERIAL PRIMARY KEY,
     user_id       BIGINT  NOT NULL REFERENCES users (id),
-    target_month  DATE    NOT NULL,
+    target_month  DATE    NOT NULL CHECK (EXTRACT(DAY FROM target_month) = 1),
     retry_count   INTEGER NOT NULL DEFAULT 0,
     error_message TEXT,
     created_at    TIMESTAMP(6),

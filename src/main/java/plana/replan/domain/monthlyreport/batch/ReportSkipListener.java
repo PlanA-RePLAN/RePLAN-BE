@@ -3,9 +3,9 @@ package plana.replan.domain.monthlyreport.batch;
 import java.time.YearMonth;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.batch.core.annotation.BeforeStep;
+import org.springframework.batch.core.configuration.annotation.StepScope;
 import org.springframework.batch.core.listener.SkipListener;
-import org.springframework.batch.core.step.StepExecution;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import plana.replan.domain.monthlyreport.entity.ReportGenerationFailure;
 import plana.replan.domain.monthlyreport.repository.ReportGenerationFailureRepository;
@@ -13,17 +13,14 @@ import plana.replan.domain.user.entity.User;
 
 @Slf4j
 @Component
+@StepScope
 @RequiredArgsConstructor
 public class ReportSkipListener implements SkipListener<User, MonthlyReportData> {
 
   private final ReportGenerationFailureRepository failureRepository;
 
+  @Value("#{T(java.time.YearMonth).parse(jobParameters['targetMonth'])}")
   private YearMonth targetMonth;
-
-  @BeforeStep
-  public void beforeStep(StepExecution stepExecution) {
-    targetMonth = YearMonth.parse(stepExecution.getJobParameters().getString("targetMonth"));
-  }
 
   @Override
   public void onSkipInProcess(User user, Throwable t) {
