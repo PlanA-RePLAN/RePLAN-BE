@@ -80,4 +80,22 @@ public interface TodoRepository extends JpaRepository<Todo, Long> {
       @Param("user") User user,
       @Param("start") LocalDateTime start,
       @Param("end") LocalDateTime end);
+
+  @Query(
+      "SELECT t FROM Todo t WHERE t.user = :user AND t.parent IS NULL"
+          + " AND ((t.dueDate >= :start AND t.dueDate < :end)"
+          + " OR (t.dueDate IS NULL AND t.completedTime >= :start AND t.completedTime < :end))")
+  List<Todo> findMonthlyTodos(
+      @Param("user") User user,
+      @Param("start") LocalDateTime start,
+      @Param("end") LocalDateTime end);
+
+  @Query(
+      "SELECT t FROM Todo t WHERE t.user = :user AND t.parent IS NULL AND t.replan IS NOT NULL"
+          + " AND ((t.dueDate >= :start AND t.dueDate < :end)"
+          + " OR (t.dueDate IS NULL AND t.completedTime >= :start AND t.completedTime < :end))")
+  List<Todo> findReplanDerivedMonthlyTodos(
+      @Param("user") User user,
+      @Param("start") LocalDateTime start,
+      @Param("end") LocalDateTime end);
 }

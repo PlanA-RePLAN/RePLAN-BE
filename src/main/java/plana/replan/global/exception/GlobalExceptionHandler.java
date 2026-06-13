@@ -1,5 +1,6 @@
 package plana.replan.global.exception;
 
+import jakarta.validation.ConstraintViolationException;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
@@ -35,6 +36,18 @@ public class GlobalExceptionHandler {
             .map(error -> error.getField() + ": " + error.getDefaultMessage())
             .orElse(e.getMessage());
     log.error("ValidationException: {}", detail);
+    return ResponseEntity.badRequest()
+        .body(ApiResult.error(400, ErrorDetail.of(GlobalErrorCode.INVALID_INPUT, detail)));
+  }
+
+  @ExceptionHandler(ConstraintViolationException.class)
+  public ResponseEntity<ApiResult<?>> handleConstraintViolation(ConstraintViolationException e) {
+    String detail =
+        e.getConstraintViolations().stream()
+            .findFirst()
+            .map(v -> v.getPropertyPath() + ": " + v.getMessage())
+            .orElse(e.getMessage());
+    log.error("ConstraintViolationException: {}", detail);
     return ResponseEntity.badRequest()
         .body(ApiResult.error(400, ErrorDetail.of(GlobalErrorCode.INVALID_INPUT, detail)));
   }

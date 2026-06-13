@@ -10,6 +10,11 @@ spring:
     properties:
       hibernate:
         dialect: org.hibernate.dialect.H2Dialect
+  batch:
+    jdbc:
+      initialize-schema: always
+    job:
+      enabled: false
 
 jwt:
   secret: testSecretKeyForTestingPurposeOnly1234
