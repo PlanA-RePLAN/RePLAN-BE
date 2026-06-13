@@ -39,6 +39,6 @@ public class GeminiThrottleChunkListener implements ChunkListener {
 
   @Override
   public void afterChunkError(ChunkContext context) {
-    aiCalled = false;
+    // Gemini 호출 후 실패한 경우에도 throttle이 작동해야 429 연쇄를 막을 수 있으므로 리셋하지 않음
   }
 }
