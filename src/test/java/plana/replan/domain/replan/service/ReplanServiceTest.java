@@ -4,6 +4,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.BDDMockito.then;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -13,11 +16,16 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import plana.replan.domain.replan.dto.ReplanAction;
+import plana.replan.domain.replan.dto.ReplanOperation;
 import plana.replan.domain.replan.dto.ReplanQuestion;
 import plana.replan.domain.replan.dto.ReplanQuestionsRequest;
 import plana.replan.domain.replan.dto.ReplanRecommendRequest;
 import plana.replan.domain.replan.dto.ReplanRecommendResponse;
+import plana.replan.domain.replan.dto.ReplanSaveRequest;
+import plana.replan.domain.replan.entity.Replan;
 import plana.replan.domain.replan.repository.ReplanRepository;
+import plana.replan.domain.tag.repository.TagRepository;
 import plana.replan.domain.tag.entity.Tag;
 import plana.replan.domain.todo.entity.Todo;
 import plana.replan.domain.todo.repository.TodoRepository;
@@ -30,6 +38,7 @@ class ReplanServiceTest {
   @Mock private TodoRepository todoRepository;
   @Mock private ReplanRepository replanRepository;
   @Mock private ReplanAiService aiService;
+  @Mock private TagRepository tagRepository;
 
   @InjectMocks private ReplanService replanService;
 
@@ -84,5 +93,38 @@ class ReplanServiceTest {
     ReplanRecommendResponse res = replanService.recommend(1L, req);
 
     assertThat(res.summary()).isEqualTo("요약");
+  }
+
+  @Test
+  void 추가없이_끝내기여도_실패사유는_저장된다() {
+    Todo todo = ownedTodo(42L, 1L);
+    given(todoRepository.findById(42L)).willReturn(Optional.of(todo));
+
+    ReplanSaveRequest req =
+        new ReplanSaveRequest(42L, List.of("GOAL_NO_PRIORITY"), List.of());
+
+    replanService.save(1L, req);
+
+    then(replanRepository).should(times(1)).save(any(Replan.class));
+    then(todoRepository).should(never()).save(any(Todo.class));
+  }
+
+  @Test
+  void ADD작업은_새_투두를_만든다() {
+    Todo todo = ownedTodo(42L, 1L);
+    given(todoRepository.findById(42L)).willReturn(Optional.of(todo));
+    given(replanRepository.save(any(Replan.class)))
+        .willAnswer(inv -> inv.getArgument(0));
+
+    ReplanOperation add =
+        new ReplanOperation(
+            ReplanAction.ADD, null, "데이터 분석 3~4강", "2026-06-09", "23:59",
+            null, null, null, List.of());
+    ReplanSaveRequest req =
+        new ReplanSaveRequest(42L, List.of("GOAL_NO_PRIORITY"), List.of(add));
+
+    replanService.save(1L, req);
+
+    then(todoRepository).should(times(1)).save(any(Todo.class));
   }
 }
