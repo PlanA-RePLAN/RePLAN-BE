@@ -8,12 +8,15 @@ import static org.mockito.BDDMockito.then;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 
+import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Optional;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import plana.replan.domain.replan.dto.ReplanAction;
@@ -40,7 +43,16 @@ class ReplanServiceTest {
   @Mock private ReplanAiService aiService;
   @Mock private TagRepository tagRepository;
 
-  @InjectMocks private ReplanService replanService;
+  private final Clock clock =
+      Clock.fixed(Instant.parse("2026-06-18T00:00:00Z"), ZoneId.of("UTC"));
+
+  private ReplanService replanService;
+
+  @BeforeEach
+  void setUp() {
+    replanService =
+        new ReplanService(todoRepository, replanRepository, aiService, tagRepository, clock);
+  }
 
   private Todo ownedTodo(Long todoId, Long userId) {
     User user = org.mockito.Mockito.mock(User.class);
@@ -126,5 +138,45 @@ class ReplanServiceTest {
     replanService.save(1L, req);
 
     then(todoRepository).should(times(1)).save(any(Todo.class));
+  }
+
+  @Test
+  void MODIFY_TODO는_기존_투두를_제자리_수정한다() {
+    Todo todo = ownedTodo(42L, 1L);
+    given(todoRepository.findById(42L)).willReturn(Optional.of(todo));
+    given(replanRepository.save(any(Replan.class))).willAnswer(inv -> inv.getArgument(0));
+
+    ReplanOperation modify =
+        new ReplanOperation(
+            ReplanAction.MODIFY_TODO, 42L, "데이터 분석 1~2강", "2026-06-20", "23:59",
+            null, null, null, List.of());
+    ReplanSaveRequest req =
+        new ReplanSaveRequest(42L, List.of("GOAL_NO_PRIORITY"), List.of(modify));
+
+    replanService.save(1L, req);
+
+    then(todo).should().updateTitle("데이터 분석 1~2강");
+    then(todo).should().linkReplan(any(Replan.class));
+    then(todoRepository).should(never()).save(any(Todo.class));
+  }
+
+  @Test
+  void 마감_지난_일반투두를_ADD로_대체하면_원본을_숨긴다() {
+    Todo todo = ownedTodo(42L, 1L);
+    given(todo.getRoutine()).willReturn(null);
+    given(todo.getDueDate()).willReturn(LocalDateTime.of(2026, 6, 1, 10, 0)); // 과거
+    given(todoRepository.findById(42L)).willReturn(Optional.of(todo));
+    given(replanRepository.save(any(Replan.class))).willAnswer(inv -> inv.getArgument(0));
+
+    ReplanOperation add =
+        new ReplanOperation(
+            ReplanAction.ADD, null, "데이터 분석 3~4강", "2026-06-20", "23:59",
+            null, null, null, List.of());
+    ReplanSaveRequest req =
+        new ReplanSaveRequest(42L, List.of("GOAL_NO_PRIORITY"), List.of(add));
+
+    replanService.save(1L, req);
+
+    then(todo).should().deactivate();
   }
 }

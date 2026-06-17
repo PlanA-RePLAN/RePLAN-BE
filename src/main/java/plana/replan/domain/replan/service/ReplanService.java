@@ -1,5 +1,6 @@
 package plana.replan.domain.replan.service;
 
+import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
@@ -37,6 +38,7 @@ public class ReplanService {
   private final ReplanRepository replanRepository;
   private final ReplanAiService aiService;
   private final TagRepository tagRepository;
+  private final Clock clock;
 
   public List<ReplanQuestion> getQuestions(Long userId, ReplanQuestionsRequest req) {
     Todo anchor = findOwnedTodo(userId, req.anchorTodoId());
@@ -104,9 +106,13 @@ public class ReplanService {
     }
     for (ReplanOperation op : req.acceptedOperations()) {
       switch (op.action()) {
-        case ADD -> applyAdd(op, anchor, replan);
+        case ADD -> {
+          applyAdd(op, anchor, replan);
+          deactivateIfReplacedOriginal(anchor);
+        }
+        case MODIFY_TODO -> applyModifyTodo(op, anchor, replan);
         default -> {
-          /* MODIFY_TODO / MODIFY_ROUTINE / CREATE_ROUTINE 는 Task 5,6 에서 구현 */
+          /* MODIFY_ROUTINE / CREATE_ROUTINE 는 Task 6 에서 구현 */
         }
       }
     }
@@ -138,6 +144,36 @@ public class ReplanService {
             .build();
     created.linkReplan(replan);
     todoRepository.save(created);
+  }
+
+  private void applyModifyTodo(ReplanOperation op, Todo anchor, Replan replan) {
+    Todo target =
+        todoRepository
+            .findById(op.targetTodoId())
+            .orElseThrow(() -> new CustomException(ReplanErrorCode.REPLAN_TODO_NOT_FOUND));
+    // 우선순위 등으로 앵커 외 다른 투두를 수정할 수 있으나, 반드시 같은 사용자 소유여야 한다
+    if (!target.getUser().getId().equals(anchor.getUser().getId())) {
+      throw new CustomException(ReplanErrorCode.REPLAN_TODO_NOT_FOUND);
+    }
+    if (op.title() != null) {
+      target.updateTitle(op.title());
+    }
+    target.updateDueDate(combineDueDate(op.dueDate(), op.dueTime()));
+    if (op.tagId() != null) {
+      target.updateTag(resolveTag(op.tagId(), target.getUser().getId()));
+    }
+    target.linkReplan(replan);
+  }
+
+  /** 마감 지난 일반 투두(앵커)를 ADD로 대체한 경우, 원본은 통계엔 남기되 목록에서만 숨긴다. */
+  private void deactivateIfReplacedOriginal(Todo anchor) {
+    boolean basic = anchor.getRoutine() == null;
+    boolean overdue =
+        anchor.getDueDate() != null
+            && anchor.getDueDate().isBefore(LocalDateTime.now(clock));
+    if (basic && overdue) {
+      anchor.deactivate();
+    }
   }
 
   private Tag resolveTag(Long tagId, Long userId) {
