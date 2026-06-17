@@ -147,7 +147,7 @@ public class RoutineService {
     int dayOfMonth = date.getDayOfMonth();
 
     return routineRepository.findMotherRoutinesByDate(userId, dayBit, dayOfMonth).stream()
-        .map(RoutineResponseDto::from)
+        .map(p -> RoutineResponseDto.from(p))
         .collect(Collectors.toList());
   }
 

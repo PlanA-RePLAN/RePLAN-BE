@@ -35,4 +35,18 @@ public class RoutineResponseDto {
         routine.getTag() != null ? routine.getTag().getColor() : null,
         routine.getGoal() != null ? routine.getGoal().getId() : null);
   }
+
+  public static RoutineResponseDto from(RoutineDateProjection p) {
+    return new RoutineResponseDto(
+        p.getRoutineId(),
+        p.getTitle(),
+        p.getDueDate(),
+        p.getRoutineTime(),
+        p.getRoutineType() != null ? RoutineType.valueOf(p.getRoutineType()) : null,
+        p.getRoutineDate(),
+        p.getTagId(),
+        p.getTagTitle(),
+        p.getTagColor(),
+        p.getGoalId());
+  }
 }
