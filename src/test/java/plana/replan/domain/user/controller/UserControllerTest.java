@@ -22,6 +22,7 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import plana.replan.domain.auth.dto.PresignedUrlResponseDto;
 import plana.replan.domain.user.dto.UserResponseDto;
 import plana.replan.domain.user.entity.Provider;
 import plana.replan.domain.user.entity.Role;
@@ -179,5 +180,36 @@ class UserControllerTest {
         .andExpect(jsonPath("$.status").value(200))
         .andExpect(jsonPath("$.success").value(true))
         .andExpect(jsonPath("$.data").doesNotExist());
+  }
+
+  @Test
+  @DisplayName("인증 없이 프로필 이미지 presigned URL 호출: 401 반환")
+  void getProfileImagePresignedUrl_unauthenticated() throws Exception {
+    mockMvc
+        .perform(
+            get("/api/users/profile/image/presigned-url")
+                .param("filename", "avatar.png")
+                .param("contentType", "image/png"))
+        .andExpect(status().isUnauthorized())
+        .andExpect(jsonPath("$.error.code").value("EMPTY_TOKEN"));
+  }
+
+  @Test
+  @DisplayName("인증 후 프로필 이미지 presigned URL 발급 성공")
+  void getProfileImagePresignedUrl_success() throws Exception {
+    given(userService.createProfileImagePresignedUrl(any(), any(), any()))
+        .willReturn(
+            new PresignedUrlResponseDto("https://s3/presigned", "profiles/temp/uuid_avatar.png"));
+
+    mockMvc
+        .perform(
+            get("/api/users/profile/image/presigned-url")
+                .with(authentication(authToken(1L)))
+                .param("filename", "avatar.png")
+                .param("contentType", "image/png"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.status").value(200))
+        .andExpect(jsonPath("$.data.s3Key").value("profiles/temp/uuid_avatar.png"))
+        .andExpect(jsonPath("$.data.presignedUrl").value("https://s3/presigned"));
   }
 }

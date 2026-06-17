@@ -1,6 +1,7 @@
 package plana.replan.domain.user.controller;
 
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.ExampleObject;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -10,6 +11,7 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import plana.replan.domain.auth.dto.PresignedUrlResponseDto;
 import plana.replan.domain.user.dto.ProfileUpdateRequestDto;
 import plana.replan.domain.user.dto.UserResponseDto;
 import plana.replan.global.common.ApiResult;
@@ -360,4 +362,154 @@ public interface UserControllerDocs {
                             """)))
   })
   ResponseEntity<ApiResult<Void>> deleteMyAccount(@AuthenticationPrincipal Long userId);
+
+  @Operation(
+      summary = "프로필 이미지 업로드용 Presigned URL 발급 (로그인 유저)",
+      description =
+          """
+          로그인한 유저가 프로필 이미지를 변경하기 위해 S3 임시 경로(`profiles/temp/...`)에 직접 업로드할
+          presigned URL을 발급받습니다.
+
+          **사용 흐름**
+          1. 이 API로 presignedUrl과 s3Key를 발급받는다.
+          2. presignedUrl로 이미지 파일을 직접 PUT 업로드한다 (Content-Type 헤더 필수).
+          3. 발급받은 s3Key를 `PATCH /api/users/profile`의 `profileImageKey`로 전달한다.
+
+          ---
+
+          ### Request Headers
+
+          | 헤더명 | 필수 여부 | 타입 | 설명 |
+          |--------|-----------|------|------|
+          | Authorization | ✅ 필수 | string | `Bearer {accessToken}` 형식의 JWT 액세스 토큰 |
+
+          ---
+
+          ### Query Parameters
+
+          | 파라미터명 | 필수 여부 | 타입 | 기본값 | 설명 | 예시 |
+          |-----------|-----------|------|--------|------|------|
+          | filename | ✅ 필수 | string | 없음 | 업로드할 파일명. `/`, `..` 포함 불가 | `avatar.png` |
+          | contentType | ✅ 필수 | string | 없음 | 이미지 MIME 타입 (jpeg/png/webp/gif) | `image/png` |
+
+          ---
+
+          ### Response Elements
+
+          | 필드명 | 타입 | 설명 |
+          |--------|------|------|
+          | presignedUrl | string | 이미지 PUT 업로드용 presigned URL (10분 유효) |
+          | s3Key | string | 업로드 경로 key. PATCH 프로필 수정 시 profileImageKey로 사용 |
+          """,
+      security = @SecurityRequirement(name = "Bearer Authentication"))
+  @ApiResponses({
+    @ApiResponse(
+        responseCode = "200",
+        description = "Presigned URL 발급 성공",
+        content =
+            @Content(
+                schema = @Schema(implementation = PresignedUrlResponseDto.class),
+                examples =
+                    @ExampleObject(
+                        value =
+                            """
+                            {
+                              "status": 200,
+                              "success": true,
+                              "data": {
+                                "presignedUrl": "https://bucket.s3.amazonaws.com/profiles/temp/uuid_avatar.png?...",
+                                "s3Key": "profiles/temp/uuid_avatar.png"
+                              },
+                              "error": null
+                            }
+                            """))),
+    @ApiResponse(
+        responseCode = "400",
+        description = "잘못된 파일명 또는 지원하지 않는 이미지 형식",
+        content =
+            @Content(
+                examples = {
+                  @ExampleObject(
+                      name = "잘못된 파일명",
+                      value =
+                          """
+                          {
+                            "status": 400,
+                            "success": false,
+                            "data": null,
+                            "error": { "code": "INVALID_FILENAME", "message": "유효하지 않은 파일명입니다.", "detail": null }
+                          }
+                          """),
+                  @ExampleObject(
+                      name = "지원하지 않는 형식",
+                      value =
+                          """
+                          {
+                            "status": 400,
+                            "success": false,
+                            "data": null,
+                            "error": { "code": "UNSUPPORTED_CONTENT_TYPE", "message": "지원하지 않는 파일 형식입니다.", "detail": null }
+                          }
+                          """)
+                })),
+    @ApiResponse(
+        responseCode = "401",
+        description = "인증 실패 — 토큰 없음 또는 만료",
+        content =
+            @Content(
+                examples = {
+                  @ExampleObject(
+                      name = "토큰 없음",
+                      value =
+                          """
+                          {
+                            "status": 401,
+                            "success": false,
+                            "data": null,
+                            "error": { "code": "EMPTY_TOKEN", "message": "토큰이 없습니다.", "detail": null }
+                          }
+                          """),
+                  @ExampleObject(
+                      name = "만료된 토큰",
+                      value =
+                          """
+                          {
+                            "status": 401,
+                            "success": false,
+                            "data": null,
+                            "error": { "code": "EXPIRED_TOKEN", "message": "만료된 토큰입니다.", "detail": null }
+                          }
+                          """)
+                })),
+    @ApiResponse(
+        responseCode = "404",
+        description = "토큰은 유효하나 해당 유저가 DB에 없는 경우",
+        content =
+            @Content(
+                examples =
+                    @ExampleObject(
+                        value =
+                            """
+                            {
+                              "status": 404,
+                              "success": false,
+                              "data": null,
+                              "error": { "code": "USER_NOT_FOUND", "message": "유저를 찾을 수 없습니다.", "detail": null }
+                            }
+                            """)))
+  })
+  ResponseEntity<ApiResult<PresignedUrlResponseDto>> getProfileImagePresignedUrl(
+      @AuthenticationPrincipal Long userId,
+      @Parameter(
+              name = "filename",
+              description = "업로드할 파일명",
+              example = "avatar.png",
+              required = true)
+          String filename,
+      @Parameter(
+              name = "contentType",
+              description = "이미지 MIME 타입",
+              example = "image/png",
+              required = true)
+          String contentType);
 }

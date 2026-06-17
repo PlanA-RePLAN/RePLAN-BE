@@ -8,7 +8,9 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import plana.replan.domain.auth.dto.PresignedUrlResponseDto;
 import plana.replan.domain.user.dto.ProfileUpdateRequestDto;
 import plana.replan.domain.user.dto.UserResponseDto;
 import plana.replan.domain.user.service.UserService;
@@ -40,5 +42,15 @@ public class UserController implements UserControllerDocs {
   public ResponseEntity<ApiResult<Void>> deleteMyAccount(@AuthenticationPrincipal Long userId) {
     userService.deleteAccount(userId);
     return ResponseEntity.ok(ApiResult.ok());
+  }
+
+  @Override
+  @GetMapping("/profile/image/presigned-url")
+  public ResponseEntity<ApiResult<PresignedUrlResponseDto>> getProfileImagePresignedUrl(
+      @AuthenticationPrincipal Long userId,
+      @RequestParam String filename,
+      @RequestParam String contentType) {
+    return ResponseEntity.ok(
+        ApiResult.ok(userService.createProfileImagePresignedUrl(userId, filename, contentType)));
   }
 }

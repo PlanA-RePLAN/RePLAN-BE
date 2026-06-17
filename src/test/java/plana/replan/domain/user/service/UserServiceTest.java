@@ -15,6 +15,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.test.util.ReflectionTestUtils;
+import plana.replan.domain.auth.dto.PresignedUrlResponseDto;
 import plana.replan.domain.user.dto.ProfileUpdateRequestDto;
 import plana.replan.domain.user.dto.UserResponseDto;
 import plana.replan.domain.user.entity.Provider;
@@ -162,6 +163,35 @@ class UserServiceTest {
             () -> userService.updateProfile(999L, new ProfileUpdateRequestDto("새닉네임", null)))
         .isInstanceOf(CustomException.class)
         .hasFieldOrPropertyWithValue("errorCode", UserErrorCode.USER_NOT_FOUND);
+  }
+
+  @Test
+  @DisplayName("프로필 이미지 presigned URL: 유저 확인 후 S3 발급 결과를 반환한다")
+  void createProfileImagePresignedUrl_success() {
+    given(userRepository.findById(1L)).willReturn(Optional.of(testUser()));
+    PresignedUrlResponseDto dto =
+        new PresignedUrlResponseDto("https://s3/presigned", "profiles/temp/uuid_avatar.png");
+    given(s3Service.generatePresignedUrlForUser("avatar.png", "image/png")).willReturn(dto);
+
+    PresignedUrlResponseDto result =
+        userService.createProfileImagePresignedUrl(1L, "avatar.png", "image/png");
+
+    assertThat(result.getS3Key()).isEqualTo("profiles/temp/uuid_avatar.png");
+  }
+
+  @Test
+  @DisplayName("프로필 이미지 presigned URL: 유저가 없으면 USER_NOT_FOUND")
+  void createProfileImagePresignedUrl_userNotFound() {
+    given(userRepository.findById(999L)).willReturn(Optional.empty());
+
+    assertThatThrownBy(
+            () -> userService.createProfileImagePresignedUrl(999L, "avatar.png", "image/png"))
+        .isInstanceOf(CustomException.class)
+        .hasFieldOrPropertyWithValue("errorCode", UserErrorCode.USER_NOT_FOUND);
+
+    verify(s3Service, never())
+        .generatePresignedUrlForUser(
+            org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyString());
   }
 
   @Test

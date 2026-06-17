@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import plana.replan.domain.auth.dto.PresignedUrlResponseDto;
 import plana.replan.domain.user.dto.ProfileUpdateRequestDto;
 import plana.replan.domain.user.dto.UserResponseDto;
 import plana.replan.domain.user.entity.User;
@@ -44,6 +45,13 @@ public class UserService {
     }
 
     return UserResponseDto.from(user);
+  }
+
+  @Transactional(readOnly = true)
+  public PresignedUrlResponseDto createProfileImagePresignedUrl(
+      Long userId, String filename, String contentType) {
+    findUser(userId);
+    return s3Service.generatePresignedUrlForUser(filename, contentType);
   }
 
   @Transactional
