@@ -20,10 +20,7 @@ public class User extends BaseTimeEntity {
   @GeneratedValue(strategy = GenerationType.IDENTITY)
   private Long id;
 
-  // 이메일 유니크 제약은 마이그레이션의 부분 유니크 인덱스(uq_users_email_active,
-  // deleted_at IS NULL 행만 대상)로 관리한다. 엔티티에 unique=true를 두면 "전역 유니크"처럼
-  // 읽혀 마이그레이션 정책과 어긋나므로 두지 않는다.
-  @Column(nullable = false)
+  @Column(nullable = false, unique = true)
   private String email;
 
   @Column private String password;
@@ -64,5 +61,17 @@ public class User extends BaseTimeEntity {
 
   public void updateProfileImage(String profileImage) {
     this.profileImage = profileImage;
+  }
+
+  /**
+   * 회원 탈퇴 처리. 개인정보(이메일·닉네임·비밀번호·프로필이미지)를 파기하고 soft delete 한다. 이메일/닉네임은 다른 회원과 겹치지 않도록 id를 붙인 익명값으로
+   * 바꾼다. (id가 유일하므로 전역 유니크 제약과도 충돌하지 않는다.)
+   */
+  public void withdraw() {
+    this.email = "deleted_" + this.id + "@deleted.local";
+    this.nickname = "deleted_" + this.id;
+    this.password = null;
+    this.profileImage = null;
+    softDelete();
   }
 }

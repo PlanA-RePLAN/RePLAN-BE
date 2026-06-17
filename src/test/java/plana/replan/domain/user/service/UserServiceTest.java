@@ -6,6 +6,7 @@ import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
+import java.time.LocalDateTime;
 import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -16,6 +17,10 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.test.util.ReflectionTestUtils;
 import plana.replan.domain.auth.dto.PresignedUrlResponseDto;
+import plana.replan.domain.goal.repository.GoalRepository;
+import plana.replan.domain.routine.repository.RoutineRepository;
+import plana.replan.domain.tag.repository.TagRepository;
+import plana.replan.domain.todo.repository.TodoRepository;
 import plana.replan.domain.user.dto.ProfileUpdateRequestDto;
 import plana.replan.domain.user.dto.UserResponseDto;
 import plana.replan.domain.user.entity.Provider;
@@ -30,6 +35,10 @@ import plana.replan.global.s3.S3Service;
 class UserServiceTest {
 
   @Mock private UserRepository userRepository;
+  @Mock private TodoRepository todoRepository;
+  @Mock private GoalRepository goalRepository;
+  @Mock private RoutineRepository routineRepository;
+  @Mock private TagRepository tagRepository;
   @Mock private S3Service s3Service;
   @Mock private StringRedisTemplate redisTemplate;
 
@@ -210,14 +219,39 @@ class UserServiceTest {
   }
 
   @Test
-  @DisplayName("계정 삭제: soft delete 처리하고 refresh token을 삭제한다")
+  @DisplayName("계정 삭제: 개인정보 익명화 + 본인 데이터 삭제 + refresh token 삭제")
   void deleteAccount_success() {
     User user = testUser();
     given(userRepository.findById(1L)).willReturn(Optional.of(user));
 
     userService.deleteAccount(1L);
 
+    // 개인정보 익명화 + soft delete
     assertThat(user.getDeletedAt()).isNotNull();
+    assertThat(user.getEmail()).isEqualTo("deleted_1@deleted.local");
+    assertThat(user.getNickname()).isEqualTo("deleted_1");
+    assertThat(user.getPassword()).isNull();
+    assertThat(user.getProfileImage()).isNull();
+
+    // 본인이 만든 데이터 일괄 soft delete 호출
+    verify(todoRepository)
+        .softDeleteAllByUserId(
+            org.mockito.ArgumentMatchers.eq(1L),
+            org.mockito.ArgumentMatchers.any(LocalDateTime.class));
+    verify(goalRepository)
+        .softDeleteAllByUserId(
+            org.mockito.ArgumentMatchers.eq(1L),
+            org.mockito.ArgumentMatchers.any(LocalDateTime.class));
+    verify(routineRepository)
+        .softDeleteAllByUserId(
+            org.mockito.ArgumentMatchers.eq(1L),
+            org.mockito.ArgumentMatchers.any(LocalDateTime.class));
+    verify(tagRepository)
+        .softDeleteAllByUserId(
+            org.mockito.ArgumentMatchers.eq(1L),
+            org.mockito.ArgumentMatchers.any(LocalDateTime.class));
+
+    // refresh token은 익명화 전 "원래 이메일" 키로 삭제되어야 한다
     verify(redisTemplate).delete("refresh:test@test.com");
   }
 

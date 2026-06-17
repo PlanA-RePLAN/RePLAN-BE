@@ -20,6 +20,10 @@ public interface TodoRepository extends JpaRepository<Todo, Long> {
   @Query("UPDATE Todo t SET t.tag = null WHERE t.tag = :tag AND t.deletedAt IS NULL")
   void clearTagFromTodos(@Param("tag") Tag tag);
 
+  @Modifying
+  @Query("UPDATE Todo t SET t.deletedAt = :now WHERE t.user.id = :userId AND t.deletedAt IS NULL")
+  void softDeleteAllByUserId(@Param("userId") Long userId, @Param("now") LocalDateTime now);
+
   boolean existsByRoutineAndDueDate(Routine routine, LocalDateTime dueDate);
 
   List<Todo> findAllByRoutine(Routine routine);

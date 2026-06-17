@@ -1,7 +1,9 @@
 package plana.replan.domain.goal.repository;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import plana.replan.domain.goal.entity.Goal;
@@ -10,6 +12,10 @@ import plana.replan.domain.user.entity.User;
 public interface GoalRepository extends JpaRepository<Goal, Long> {
 
   List<Goal> findByUserOrderByCreatedAtDescIdAsc(User user);
+
+  @Modifying
+  @Query("UPDATE Goal g SET g.deletedAt = :now WHERE g.user.id = :userId AND g.deletedAt IS NULL")
+  void softDeleteAllByUserId(@Param("userId") Long userId, @Param("now") LocalDateTime now);
 
   @Query(
       "SELECT g FROM Goal g WHERE g.user = :user AND EXTRACT(YEAR FROM g.createdAt) = :year ORDER BY g.createdAt DESC, g.id ASC")

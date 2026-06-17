@@ -1,10 +1,15 @@
 package plana.replan.domain.user.service;
 
+import java.time.LocalDateTime;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import plana.replan.domain.auth.dto.PresignedUrlResponseDto;
+import plana.replan.domain.goal.repository.GoalRepository;
+import plana.replan.domain.routine.repository.RoutineRepository;
+import plana.replan.domain.tag.repository.TagRepository;
+import plana.replan.domain.todo.repository.TodoRepository;
 import plana.replan.domain.user.dto.ProfileUpdateRequestDto;
 import plana.replan.domain.user.dto.UserResponseDto;
 import plana.replan.domain.user.entity.User;
@@ -19,6 +24,10 @@ import plana.replan.global.s3.S3Service;
 public class UserService {
 
   private final UserRepository userRepository;
+  private final TodoRepository todoRepository;
+  private final GoalRepository goalRepository;
+  private final RoutineRepository routineRepository;
+  private final TagRepository tagRepository;
   private final S3Service s3Service;
   private final StringRedisTemplate redisTemplate;
 
@@ -63,8 +72,22 @@ public class UserService {
   @Transactional
   public void deleteAccount(Long userId) {
     User user = findUser(userId);
-    user.softDelete();
-    redisTemplate.delete("refresh:" + user.getEmail());
+
+    // refresh token 키는 원래 이메일 기준이므로 익명화 전에 미리 확보한다.
+    String originalEmail = user.getEmail();
+
+    // 1) 회원이 만든 데이터(투두·목표·루틴·태그)를 함께 soft delete 한다.
+    LocalDateTime now = LocalDateTime.now();
+    todoRepository.softDeleteAllByUserId(userId, now);
+    goalRepository.softDeleteAllByUserId(userId, now);
+    routineRepository.softDeleteAllByUserId(userId, now);
+    tagRepository.softDeleteAllByUserId(userId, now);
+
+    // 2) 개인정보 익명화 + 회원 soft delete
+    user.withdraw();
+
+    // 3) 로그인 유지용 refresh token 무효화
+    redisTemplate.delete("refresh:" + originalEmail);
   }
 
   private User findUser(Long userId) {
