@@ -152,8 +152,9 @@ public interface UserControllerDocs {
           ---
 
           ### 주의사항
+          - `nickname`이 공백(빈 문자열/스페이스만)이면 400(INVALID_INPUT) 반환
           - `nickname`이 이미 사용 중인 닉네임이면 409 반환 (단, 본인의 현재 닉네임과 같으면 통과)
-          - `profileImageKey`가 `profiles/temp/`로 시작하지 않으면 400 반환
+          - `profileImageKey`가 `profiles/temp/`로 시작하지 않으면 400(INVALID_S3_KEY) 반환
           """,
       security = @SecurityRequirement(name = "Bearer Authentication"))
   @ApiResponses({
@@ -183,20 +184,33 @@ public interface UserControllerDocs {
                             """))),
     @ApiResponse(
         responseCode = "400",
-        description = "유효하지 않은 S3 key",
+        description = "잘못된 입력값 (유효하지 않은 S3 key 또는 공백 닉네임)",
         content =
             @Content(
-                examples =
-                    @ExampleObject(
-                        value =
-                            """
-                            {
-                              "status": 400,
-                              "success": false,
-                              "data": null,
-                              "error": { "code": "INVALID_S3_KEY", "message": "유효하지 않은 S3 키입니다.", "detail": null }
-                            }
-                            """))),
+                examples = {
+                  @ExampleObject(
+                      name = "유효하지 않은 S3 key",
+                      value =
+                          """
+                          {
+                            "status": 400,
+                            "success": false,
+                            "data": null,
+                            "error": { "code": "INVALID_S3_KEY", "message": "유효하지 않은 S3 키입니다.", "detail": null }
+                          }
+                          """),
+                  @ExampleObject(
+                      name = "공백 닉네임",
+                      value =
+                          """
+                          {
+                            "status": 400,
+                            "success": false,
+                            "data": null,
+                            "error": { "code": "INVALID_INPUT", "message": "잘못된 입력입니다.", "detail": null }
+                          }
+                          """)
+                })),
     @ApiResponse(
         responseCode = "401",
         description = "인증 실패 — 토큰 없음 또는 만료",
