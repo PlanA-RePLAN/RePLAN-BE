@@ -43,10 +43,10 @@ class UserControllerTest {
   }
 
   @Test
-  @DisplayName("인증 없이 /me 호출: Security가 차단, 401 반환")
-  void getMyInfo_unauthenticated() throws Exception {
+  @DisplayName("인증 없이 /profile 호출: Security가 차단, 401 반환")
+  void getMyProfile_unauthenticated() throws Exception {
     mockMvc
-        .perform(get("/api/users/me"))
+        .perform(get("/api/users/profile"))
         .andExpect(status().isUnauthorized())
         .andExpect(jsonPath("$.status").value(401))
         .andExpect(jsonPath("$.success").value(false))
@@ -54,14 +54,20 @@ class UserControllerTest {
   }
 
   @Test
-  @DisplayName("인증 후 /me 호출 성공: status=200, success=true, data 필드 검증, error 필드 없음")
-  void getMyInfo_success() throws Exception {
+  @DisplayName("인증 후 /profile 호출 성공: status=200, success=true, data 필드 검증, error 필드 없음")
+  void getMyProfile_success() throws Exception {
     UserResponseDto mockUser =
-        new UserResponseDto(1L, "test@test.com", "테스트", Role.ROLE_USER, Provider.LOCAL);
+        new UserResponseDto(
+            1L,
+            "test@test.com",
+            "테스트",
+            Role.ROLE_USER,
+            Provider.LOCAL,
+            "https://cdn.example.com/profiles/confirmed/abc.png");
     given(userService.getMyInfo(1L)).willReturn(mockUser);
 
     mockMvc
-        .perform(get("/api/users/me").with(authentication(authToken(1L))))
+        .perform(get("/api/users/profile").with(authentication(authToken(1L))))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.status").value(200))
         .andExpect(jsonPath("$.success").value(true))
@@ -70,18 +76,21 @@ class UserControllerTest {
         .andExpect(jsonPath("$.data.nickname").value("테스트"))
         .andExpect(jsonPath("$.data.role").value("ROLE_USER"))
         .andExpect(jsonPath("$.data.provider").value("LOCAL"))
+        .andExpect(
+            jsonPath("$.data.profileImage")
+                .value("https://cdn.example.com/profiles/confirmed/abc.png"))
         .andExpect(jsonPath("$.error").doesNotExist());
   }
 
   @Test
   @DisplayName("userId가 DB에 없는 경우: USER_NOT_FOUND 예외 발생, status=404 반환")
-  void getMyInfo_userNotFound() throws Exception {
+  void getMyProfile_userNotFound() throws Exception {
     willThrow(new CustomException(UserErrorCode.USER_NOT_FOUND))
         .given(userService)
         .getMyInfo(any());
 
     mockMvc
-        .perform(get("/api/users/me").with(authentication(authToken(999L))))
+        .perform(get("/api/users/profile").with(authentication(authToken(999L))))
         .andExpect(status().isNotFound())
         .andExpect(jsonPath("$.status").value(404))
         .andExpect(jsonPath("$.success").value(false))
