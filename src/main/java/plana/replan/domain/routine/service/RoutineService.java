@@ -4,6 +4,7 @@ import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.util.List;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -12,6 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 import plana.replan.domain.goal.entity.Goal;
 import plana.replan.domain.goal.exception.GoalErrorCode;
 import plana.replan.domain.goal.repository.GoalRepository;
+import java.util.stream.Collectors;
 import plana.replan.domain.routine.dto.RoutineCreateRequestDto;
 import plana.replan.domain.routine.dto.RoutineResponseDto;
 import plana.replan.domain.routine.dto.SubRoutineCreateRequestDto;
@@ -130,6 +132,23 @@ public class RoutineService {
     }
     routine.updateTitle(request.title());
     return SubRoutineResponseDto.from(routine);
+  }
+
+  @Transactional(readOnly = true)
+  public List<RoutineResponseDto> getRoutinesByDate(Long userId, LocalDate date) {
+    if (userId == null) {
+      throw new CustomException(UserErrorCode.USER_NOT_FOUND);
+    }
+    userRepository
+        .findById(userId)
+        .orElseThrow(() -> new CustomException(UserErrorCode.USER_NOT_FOUND));
+
+    int dayBit = 1 << (date.getDayOfWeek().getValue() - 1);
+    int dayOfMonth = date.getDayOfMonth();
+
+    return routineRepository.findMotherRoutinesByDate(userId, dayBit, dayOfMonth).stream()
+        .map(RoutineResponseDto::from)
+        .collect(Collectors.toList());
   }
 
   /** 엄마 루틴 전용 삭제. 하위 루틴 ID를 넘기면 400(ROUTINE_INVALID_TARGET). */

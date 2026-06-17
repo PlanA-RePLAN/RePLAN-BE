@@ -1,6 +1,7 @@
 package plana.replan.domain.routine.repository;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -23,4 +24,23 @@ public interface RoutineRepository extends JpaRepository<Routine, Long> {
 
   @EntityGraph(attributePaths = "children")
   Optional<Routine> findWithChildrenById(Long id);
+
+  @Query(
+      nativeQuery = true,
+      value =
+          """
+          SELECT r.* FROM routine r
+          WHERE r.user_id = :userId
+            AND r.deleted_at IS NULL
+            AND r.parent_id IS NULL
+            AND (
+              r.routine_type = 'DAILY'
+              OR (r.routine_type = 'WEEKLY'  AND (r.routine_date & :dayBit) != 0)
+              OR (r.routine_type = 'MONTHLY' AND  r.routine_date = :dayOfMonth)
+            )
+          """)
+  List<Routine> findMotherRoutinesByDate(
+      @Param("userId") Long userId,
+      @Param("dayBit") int dayBit,
+      @Param("dayOfMonth") int dayOfMonth);
 }
