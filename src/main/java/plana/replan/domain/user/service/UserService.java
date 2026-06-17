@@ -11,6 +11,7 @@ import plana.replan.domain.user.entity.User;
 import plana.replan.domain.user.exception.UserErrorCode;
 import plana.replan.domain.user.repository.UserRepository;
 import plana.replan.global.exception.CustomException;
+import plana.replan.global.exception.GlobalErrorCode;
 import plana.replan.global.s3.S3Service;
 
 @Service
@@ -31,11 +32,16 @@ public class UserService {
     User user = findUser(userId);
 
     String nickname = request.nickname();
-    if (nickname != null && !nickname.equals(user.getNickname())) {
-      if (userRepository.existsByNickname(nickname)) {
-        throw new CustomException(UserErrorCode.DUPLICATE_NICKNAME);
+    if (nickname != null) {
+      if (nickname.isBlank()) {
+        throw new CustomException(GlobalErrorCode.INVALID_INPUT);
       }
-      user.updateNickname(nickname);
+      if (!nickname.equals(user.getNickname())) {
+        if (userRepository.existsByNickname(nickname)) {
+          throw new CustomException(UserErrorCode.DUPLICATE_NICKNAME);
+        }
+        user.updateNickname(nickname);
+      }
     }
 
     String profileImageKey = request.profileImageKey();

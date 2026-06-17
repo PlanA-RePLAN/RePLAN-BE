@@ -155,6 +155,21 @@ class UserServiceTest {
   }
 
   @Test
+  @DisplayName("프로필 수정: 닉네임이 공백이면 INVALID_INPUT")
+  void updateProfile_blankNickname() {
+    User user = testUser();
+    given(userRepository.findById(1L)).willReturn(Optional.of(user));
+
+    assertThatThrownBy(() -> userService.updateProfile(1L, new ProfileUpdateRequestDto("  ", null)))
+        .isInstanceOf(CustomException.class)
+        .hasFieldOrPropertyWithValue(
+            "errorCode", plana.replan.global.exception.GlobalErrorCode.INVALID_INPUT);
+
+    assertThat(user.getNickname()).isEqualTo("기존닉네임");
+    verify(userRepository, never()).existsByNickname(org.mockito.ArgumentMatchers.anyString());
+  }
+
+  @Test
   @DisplayName("프로필 수정: 유저가 없으면 USER_NOT_FOUND")
   void updateProfile_userNotFound() {
     given(userRepository.findById(999L)).willReturn(Optional.empty());
