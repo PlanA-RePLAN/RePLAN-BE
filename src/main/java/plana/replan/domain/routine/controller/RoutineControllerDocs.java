@@ -173,8 +173,7 @@ public interface RoutineControllerDocs {
   })
   ResponseEntity<ApiResult<List<RoutineResponseDto>>> getRoutinesByDate(
       @AuthenticationPrincipal Long userId,
-      @Parameter(description = "조회할 날짜 (yyyy-MM-dd)", example = "2025-06-20")
-          @RequestParam
+      @Parameter(description = "조회할 날짜 (yyyy-MM-dd)", example = "2025-06-20") @RequestParam
           LocalDate date);
 
   @Operation(
