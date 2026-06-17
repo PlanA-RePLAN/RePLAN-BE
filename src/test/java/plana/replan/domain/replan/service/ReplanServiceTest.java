@@ -161,6 +161,53 @@ class ReplanServiceTest {
   }
 
   @Test
+  void 우선순위_다른_투두도_같은_사용자면_수정된다() {
+    Todo anchor = ownedTodo(42L, 1L);
+    given(todoRepository.findById(42L)).willReturn(Optional.of(anchor));
+
+    User sameUser = org.mockito.Mockito.mock(User.class);
+    given(sameUser.getId()).willReturn(1L);
+    Todo target = org.mockito.Mockito.mock(Todo.class);
+    given(target.getUser()).willReturn(sameUser);
+    given(todoRepository.findById(99L)).willReturn(Optional.of(target));
+    given(replanRepository.save(any(Replan.class))).willAnswer(inv -> inv.getArgument(0));
+
+    ReplanOperation modifyOp =
+        new ReplanOperation(
+            ReplanAction.MODIFY_TODO, 99L, "[1] 데이터 분석 1~2강", "2026-06-20", "23:59",
+            null, null, null, List.of());
+    ReplanSaveRequest req =
+        new ReplanSaveRequest(42L, List.of("GOAL_NO_PRIORITY"), List.of(modifyOp));
+
+    replanService.save(1L, req);
+
+    then(target).should().updateTitle("[1] 데이터 분석 1~2강");
+    then(target).should().linkReplan(any(Replan.class));
+  }
+
+  @Test
+  void 우선순위_타깃이_남의_투두면_거부된다() {
+    Todo anchor = ownedTodo(42L, 1L);
+    given(todoRepository.findById(42L)).willReturn(Optional.of(anchor));
+
+    User otherUser = org.mockito.Mockito.mock(User.class);
+    given(otherUser.getId()).willReturn(999L);
+    Todo target = org.mockito.Mockito.mock(Todo.class);
+    given(target.getUser()).willReturn(otherUser);
+    given(todoRepository.findById(99L)).willReturn(Optional.of(target));
+
+    ReplanOperation modifyOp =
+        new ReplanOperation(
+            ReplanAction.MODIFY_TODO, 99L, "[1] 데이터 분석 1~2강", "2026-06-20", "23:59",
+            null, null, null, List.of());
+    ReplanSaveRequest req =
+        new ReplanSaveRequest(42L, List.of("GOAL_NO_PRIORITY"), List.of(modifyOp));
+
+    assertThatThrownBy(() -> replanService.save(1L, req))
+        .isInstanceOf(CustomException.class);
+  }
+
+  @Test
   void 마감_지난_일반투두를_ADD로_대체하면_원본을_숨긴다() {
     Todo todo = ownedTodo(42L, 1L);
     given(todo.getRoutine()).willReturn(null);
