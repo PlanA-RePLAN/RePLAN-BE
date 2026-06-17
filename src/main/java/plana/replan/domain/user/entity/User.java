@@ -20,7 +20,10 @@ public class User extends BaseTimeEntity {
   @GeneratedValue(strategy = GenerationType.IDENTITY)
   private Long id;
 
-  @Column(nullable = false, unique = true)
+  // 이메일 유니크 제약은 마이그레이션의 부분 유니크 인덱스(uq_users_email_active,
+  // deleted_at IS NULL 행만 대상)로 관리한다. 엔티티에 unique=true를 두면 "전역 유니크"처럼
+  // 읽혀 마이그레이션 정책과 어긋나므로 두지 않는다.
+  @Column(nullable = false)
   private String email;
 
   @Column private String password;
