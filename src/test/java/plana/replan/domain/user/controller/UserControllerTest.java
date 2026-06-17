@@ -2,9 +2,12 @@ package plana.replan.domain.user.controller;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.BDDMockito.willDoNothing;
 import static org.mockito.BDDMockito.willThrow;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -14,6 +17,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.http.MediaType;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -95,6 +99,85 @@ class UserControllerTest {
         .andExpect(jsonPath("$.status").value(404))
         .andExpect(jsonPath("$.success").value(false))
         .andExpect(jsonPath("$.error.code").value("USER_NOT_FOUND"))
+        .andExpect(jsonPath("$.data").doesNotExist());
+  }
+
+  @Test
+  @DisplayName("인증 없이 PATCH /profile 호출: 401 반환")
+  void updateMyProfile_unauthenticated() throws Exception {
+    mockMvc
+        .perform(
+            patch("/api/users/profile")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"nickname\":\"새닉네임\"}"))
+        .andExpect(status().isUnauthorized())
+        .andExpect(jsonPath("$.error.code").value("EMPTY_TOKEN"));
+  }
+
+  @Test
+  @DisplayName("인증 후 PATCH /profile 성공: 수정된 정보 반환")
+  void updateMyProfile_success() throws Exception {
+    UserResponseDto updated =
+        new UserResponseDto(
+            1L,
+            "test@test.com",
+            "새닉네임",
+            Role.ROLE_USER,
+            Provider.LOCAL,
+            "https://cdn.example.com/profiles/confirmed/new.png");
+    given(userService.updateProfile(any(), any())).willReturn(updated);
+
+    mockMvc
+        .perform(
+            patch("/api/users/profile")
+                .with(authentication(authToken(1L)))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"nickname\":\"새닉네임\",\"profileImageKey\":\"profiles/temp/new.png\"}"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.status").value(200))
+        .andExpect(jsonPath("$.success").value(true))
+        .andExpect(jsonPath("$.data.nickname").value("새닉네임"))
+        .andExpect(
+            jsonPath("$.data.profileImage")
+                .value("https://cdn.example.com/profiles/confirmed/new.png"));
+  }
+
+  @Test
+  @DisplayName("PATCH /profile 닉네임 중복: 409 반환")
+  void updateMyProfile_duplicateNickname() throws Exception {
+    willThrow(new CustomException(UserErrorCode.DUPLICATE_NICKNAME))
+        .given(userService)
+        .updateProfile(any(), any());
+
+    mockMvc
+        .perform(
+            patch("/api/users/profile")
+                .with(authentication(authToken(1L)))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"nickname\":\"중복닉네임\"}"))
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.error.code").value("DUPLICATE_NICKNAME"));
+  }
+
+  @Test
+  @DisplayName("인증 없이 DELETE /api/users 호출: 401 반환")
+  void deleteMyAccount_unauthenticated() throws Exception {
+    mockMvc
+        .perform(delete("/api/users"))
+        .andExpect(status().isUnauthorized())
+        .andExpect(jsonPath("$.error.code").value("EMPTY_TOKEN"));
+  }
+
+  @Test
+  @DisplayName("인증 후 DELETE /api/users 성공: 200, data null")
+  void deleteMyAccount_success() throws Exception {
+    willDoNothing().given(userService).deleteAccount(1L);
+
+    mockMvc
+        .perform(delete("/api/users").with(authentication(authToken(1L))))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.status").value(200))
+        .andExpect(jsonPath("$.success").value(true))
         .andExpect(jsonPath("$.data").doesNotExist());
   }
 }
