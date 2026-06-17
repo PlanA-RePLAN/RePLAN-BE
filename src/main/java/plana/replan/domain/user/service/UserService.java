@@ -1,6 +1,7 @@
 package plana.replan.domain.user.service;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import plana.replan.domain.user.dto.ProfileUpdateRequestDto;
@@ -17,6 +18,7 @@ public class UserService {
 
   private final UserRepository userRepository;
   private final S3Service s3Service;
+  private final StringRedisTemplate redisTemplate;
 
   @Transactional(readOnly = true)
   public UserResponseDto getMyInfo(Long userId) {
@@ -42,6 +44,13 @@ public class UserService {
     }
 
     return UserResponseDto.from(user);
+  }
+
+  @Transactional
+  public void deleteAccount(Long userId) {
+    User user = findUser(userId);
+    user.softDelete();
+    redisTemplate.delete("refresh:" + user.getEmail());
   }
 
   private User findUser(Long userId) {

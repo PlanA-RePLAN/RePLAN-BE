@@ -279,4 +279,85 @@ public interface UserControllerDocs {
                                 """)
                       }))
           ProfileUpdateRequestDto request);
+
+  @Operation(
+      summary = "계정 삭제(회원 탈퇴)",
+      description =
+          """
+          현재 로그인한 유저의 계정을 삭제합니다. 데이터는 soft delete로 처리되며, 발급된 refresh token도 무효화됩니다.
+          삭제 후에는 동일 토큰으로 다른 API를 호출해도 유저를 찾을 수 없어 404가 반환됩니다.
+
+          ---
+
+          ### Request Headers
+
+          | 헤더명 | 필수 여부 | 타입 | 설명 |
+          |--------|-----------|------|------|
+          | Authorization | ✅ 필수 | string | `Bearer {accessToken}` 형식의 JWT 액세스 토큰 |
+          """,
+      security = @SecurityRequirement(name = "Bearer Authentication"))
+  @ApiResponses({
+    @ApiResponse(
+        responseCode = "200",
+        description = "계정 삭제 성공",
+        content =
+            @Content(
+                examples =
+                    @ExampleObject(
+                        value =
+                            """
+                            {
+                              "status": 200,
+                              "success": true,
+                              "data": null,
+                              "error": null
+                            }
+                            """))),
+    @ApiResponse(
+        responseCode = "401",
+        description = "인증 실패 — 토큰 없음 또는 만료",
+        content =
+            @Content(
+                examples = {
+                  @ExampleObject(
+                      name = "토큰 없음",
+                      value =
+                          """
+                          {
+                            "status": 401,
+                            "success": false,
+                            "data": null,
+                            "error": { "code": "EMPTY_TOKEN", "message": "토큰이 없습니다.", "detail": null }
+                          }
+                          """),
+                  @ExampleObject(
+                      name = "만료된 토큰",
+                      value =
+                          """
+                          {
+                            "status": 401,
+                            "success": false,
+                            "data": null,
+                            "error": { "code": "EXPIRED_TOKEN", "message": "만료된 토큰입니다.", "detail": null }
+                          }
+                          """)
+                })),
+    @ApiResponse(
+        responseCode = "404",
+        description = "토큰은 유효하나 해당 유저가 DB에 없는 경우",
+        content =
+            @Content(
+                examples =
+                    @ExampleObject(
+                        value =
+                            """
+                            {
+                              "status": 404,
+                              "success": false,
+                              "data": null,
+                              "error": { "code": "USER_NOT_FOUND", "message": "유저를 찾을 수 없습니다.", "detail": null }
+                            }
+                            """)))
+  })
+  ResponseEntity<ApiResult<Void>> deleteMyAccount(@AuthenticationPrincipal Long userId);
 }
