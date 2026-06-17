@@ -1,6 +1,7 @@
 package plana.replan.global.s3;
 
 import java.time.Duration;
+import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
@@ -21,6 +22,9 @@ import software.amazon.awssdk.services.s3.presigner.model.PutObjectPresignReques
 @RequiredArgsConstructor
 public class S3Service {
 
+  private static final Set<String> ALLOWED_CONTENT_TYPES =
+      Set.of("image/jpeg", "image/png", "image/webp", "image/gif");
+
   private final S3Client s3Client;
   private final S3Presigner s3Presigner;
   private final StringRedisTemplate redisTemplate;
@@ -31,9 +35,22 @@ public class S3Service {
   @Value("${cloud.aws.cloudfront.domain}")
   private String cloudFrontDomain;
 
+  /** 신규 OAuth 유저용. tempToken 검증 후 presigned URL 발급. */
   public PresignedUrlResponseDto generatePresignedUrl(
       String originalFilename, String contentType, String tempToken) {
     validateTempToken(tempToken);
+    return createPresignedUrl(originalFilename, contentType);
+  }
+
+  /** 로그인 유저용. 인증은 호출 측(JwtFilter)에서 끝났다는 전제로 presigned URL 발급. */
+  public PresignedUrlResponseDto generatePresignedUrlForUser(
+      String originalFilename, String contentType) {
+    return createPresignedUrl(originalFilename, contentType);
+  }
+
+  private PresignedUrlResponseDto createPresignedUrl(String originalFilename, String contentType) {
+    validateFilename(originalFilename);
+    validateContentType(contentType);
 
     String key = "profiles/temp/" + UUID.randomUUID() + "_" + originalFilename;
 
@@ -49,6 +66,23 @@ public class S3Service {
     PresignedPutObjectRequest presigned = s3Presigner.presignPutObject(presignRequest);
 
     return new PresignedUrlResponseDto(presigned.url().toString(), key);
+  }
+
+  private void validateFilename(String filename) {
+    if (filename == null
+        || filename.isBlank()
+        || filename.contains("..")
+        || filename.contains("/")) {
+      throw new CustomException(UserErrorCode.INVALID_FILENAME);
+    }
+  }
+
+  private void validateContentType(String contentType) {
+    if (contentType == null
+        || contentType.isBlank()
+        || !ALLOWED_CONTENT_TYPES.contains(contentType)) {
+      throw new CustomException(UserErrorCode.UNSUPPORTED_CONTENT_TYPE);
+    }
   }
 
   public String moveToConfirmed(String tempKey) {
