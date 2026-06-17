@@ -68,4 +68,40 @@ class ReplanAiServiceTest {
     List<ReplanQuestion> questions = service.parseQuestions("{\"questions\":[]}");
     assertThat(questions).isEmpty();
   }
+
+  @Test
+  void 추천_프롬프트에_입력이_포함된다() {
+    RecommendInput input =
+        new RecommendInput(
+            "데이터 분석 공부하기",
+            "2026-06-07",
+            "Study",
+            false,
+            null,
+            java.util.List.of("목표 개선 필요", "우선 순위를 정하지 못했어요"),
+            java.util.List.of(
+                new RecommendInput.AnswerInput("free", "ADsP 4챕터", null, null)),
+            "2026-06-18");
+
+    String prompt = service.buildRecommendPrompt(input);
+
+    assertThat(prompt).contains("데이터 분석 공부하기");
+    assertThat(prompt).contains("우선 순위를 정하지 못했어요");
+    assertThat(prompt).contains("ADsP 4챕터");
+    assertThat(prompt).contains("2026-06-18");
+    assertThat(prompt).contains("operations");
+  }
+
+  @Test
+  void 질문_프롬프트에_입력이_포함된다() {
+    RecommendInput input =
+        new RecommendInput(
+            "영단어 100개 암기", null, null, false, null,
+            java.util.List.of("목표 개선 필요"), java.util.List.of(), "2026-06-18");
+
+    String prompt = service.buildQuestionsPrompt(input);
+
+    assertThat(prompt).contains("영단어 100개 암기");
+    assertThat(prompt).contains("questions");
+  }
 }
