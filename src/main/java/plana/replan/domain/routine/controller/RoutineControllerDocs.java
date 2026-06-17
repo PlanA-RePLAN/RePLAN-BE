@@ -169,7 +169,27 @@ public interface RoutineControllerDocs {
                             }
                           }
                           """)
-                }))
+                })),
+    @ApiResponse(
+        responseCode = "404",
+        description = "유저를 찾을 수 없음",
+        content =
+            @Content(
+                examples =
+                    @ExampleObject(
+                        value =
+                            """
+                            {
+                              "status": 404,
+                              "success": false,
+                              "data": null,
+                              "error": {
+                                "code": "USER_NOT_FOUND",
+                                "message": "유저를 찾을 수 없습니다.",
+                                "detail": null
+                              }
+                            }
+                            """)))
   })
   ResponseEntity<ApiResult<List<RoutineResponseDto>>> getRoutinesByDate(
       @AuthenticationPrincipal Long userId,
