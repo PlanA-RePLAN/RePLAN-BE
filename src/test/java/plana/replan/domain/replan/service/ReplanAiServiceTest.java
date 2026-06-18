@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import plana.replan.domain.replan.dto.QuestionType;
+import plana.replan.domain.replan.dto.RecommendInput;
 import plana.replan.domain.replan.dto.ReplanAction;
 import plana.replan.domain.replan.dto.ReplanOperation;
 import plana.replan.domain.replan.dto.ReplanQuestion;

@@ -1,4 +1,4 @@
-package plana.replan.domain.replan.service;
+package plana.replan.domain.replan.dto;
 
 import java.util.List;
 

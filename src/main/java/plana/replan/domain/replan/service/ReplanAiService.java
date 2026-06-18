@@ -15,6 +15,7 @@ import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 import plana.replan.domain.replan.dto.ChangedField;
 import plana.replan.domain.replan.dto.QuestionType;
+import plana.replan.domain.replan.dto.RecommendInput;
 import plana.replan.domain.replan.dto.ReplanAction;
 import plana.replan.domain.replan.dto.ReplanOperation;
 import plana.replan.domain.replan.dto.ReplanQuestion;
