@@ -80,6 +80,7 @@ public class ReplanAiService {
         사용자가 아래 투두를 끝내지 못한 이유에 맞춰, 투두 수정안과 추가안을 제안하세요.
 
         오늘 날짜: %s
+        대상 투두 ID: %d
         대상 투두: %s
         투두 종류: %s
         마감일: %s
@@ -95,6 +96,9 @@ public class ReplanAiService {
         4. operations: 각 작업의 action은 ADD/MODIFY_TODO/MODIFY_ROUTINE/CREATE_ROUTINE 중 하나
            - 일반 투두 수정은 MODIFY_TODO(targetTodoId=대상), 새 투두는 ADD(targetTodoId=null)
            - 반복 투두 규칙 변경은 MODIFY_ROUTINE, 새 루틴은 CREATE_ROUTINE
+           - MODIFY_TODO일 때 targetTodoId에는 반드시 위 '대상 투두 ID' 값을 사용한다.
+             다른 기존 투두를 수정할 때(우선순위 등)는 아래 '선택 투두' 목록의 실제 ID만 사용한다.
+             ID를 임의로 만들지 않는다.
         5. changedFields: 바뀐 필드만 {field, before, after}로. field는 title/dueTime/tag/routineType
            - ADD는 before=null
         6. dueDate는 yyyy-MM-dd 또는 null, dueTime은 HH:mm 또는 null
@@ -106,6 +110,7 @@ public class ReplanAiService {
         """
         .formatted(
             input.today(),
+            input.anchorTodoId(),
             input.anchorTitle(),
             routineInfo,
             input.anchorDueDate() != null ? input.anchorDueDate() : "없음",
@@ -119,8 +124,11 @@ public class ReplanAiService {
     if (a.text() != null) sb.append(a.text());
     if (a.selectedChips() != null && !a.selectedChips().isEmpty())
       sb.append(" [선택칩: ").append(String.join(",", a.selectedChips())).append("]");
-    if (a.selectedTodoIds() != null && !a.selectedTodoIds().isEmpty())
+    if (a.selectedTodoLabels() != null && !a.selectedTodoLabels().isEmpty()) {
+      sb.append(" [선택 투두: ").append(String.join(", ", a.selectedTodoLabels())).append("]");
+    } else if (a.selectedTodoIds() != null && !a.selectedTodoIds().isEmpty()) {
       sb.append(" [선택투두ID: ").append(a.selectedTodoIds()).append("]");
+    }
     return sb.toString();
   }
 

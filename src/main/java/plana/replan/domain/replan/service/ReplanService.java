@@ -48,12 +48,14 @@ public class ReplanService {
   private final RoutineService routineService;
 
   public List<ReplanQuestion> getQuestions(Long userId, ReplanQuestionsRequest req) {
+    validateReasonCodesForQuestions(req.reasonCodes(), req.directInput());
     Todo anchor = findOwnedTodo(userId, req.anchorTodoId());
     RecommendInput input = buildInput(anchor, req.reasonCodes(), req.directInput(), null);
     return aiService.generateQuestions(input);
   }
 
   public ReplanRecommendResponse recommend(Long userId, ReplanRecommendRequest req) {
+    validateReasonCodes(req.reasonCodes());
     Todo anchor = findOwnedTodo(userId, req.anchorTodoId());
     RecommendInput input = buildInput(anchor, req.reasonCodes(), null, req.answers());
     return aiService.generateRecommend(input);
@@ -69,12 +71,15 @@ public class ReplanService {
     List<RecommendInput.AnswerInput> answerInputs = new ArrayList<>();
     if (answers != null) {
       for (ReplanAnswer a : answers) {
+        List<String> todoLabels =
+            resolveSelectedTodoLabels(a.selectedTodoIds(), anchor.getUser().getId());
         answerInputs.add(
             new RecommendInput.AnswerInput(
-                a.key(), a.text(), a.selectedTodoIds(), a.selectedChips()));
+                a.key(), a.text(), a.selectedTodoIds(), a.selectedChips(), todoLabels));
       }
     }
     return new RecommendInput(
+        anchor.getId(),
         anchor.getTitle(),
         anchor.getDueDate() != null
             ? anchor.getDueDate().toLocalDate().format(DateTimeFormatter.ISO_LOCAL_DATE)
@@ -84,7 +89,21 @@ public class ReplanService {
         routine ? String.valueOf(anchor.getRoutine().getRoutineType()) : null,
         labels,
         answerInputs,
-        LocalDate.now().format(DateTimeFormatter.ISO_LOCAL_DATE));
+        LocalDate.now(clock).format(DateTimeFormatter.ISO_LOCAL_DATE));
+  }
+
+  private List<String> resolveSelectedTodoLabels(List<Long> todoIds, Long userId) {
+    if (todoIds == null || todoIds.isEmpty()) {
+      return List.of();
+    }
+    List<String> labels = new ArrayList<>();
+    for (Long id : todoIds) {
+      todoRepository
+          .findById(id)
+          .filter(t -> t.getUser().getId().equals(userId))
+          .ifPresent(t -> labels.add(id + ":" + t.getTitle()));
+    }
+    return labels;
   }
 
   List<String> toReasonLabels(List<String> codes) {
@@ -104,6 +123,7 @@ public class ReplanService {
 
   @Transactional
   public void save(Long userId, ReplanSaveRequest req) {
+    validateReasonCodes(req.reasonCodes());
     Todo anchor = findOwnedTodo(userId, req.anchorTodoId());
     Replan replan = buildReplan(anchor, req.reasonCodes());
     replanRepository.save(replan);
@@ -140,16 +160,34 @@ public class ReplanService {
   }
 
   private Replan buildReplan(Todo anchor, List<String> reasonCodes) {
-    List<String> codes = reasonCodes != null ? reasonCodes : List.of();
-    String r1 = codes.size() > 0 ? codes.get(0) : "UNKNOWN";
-    String r2 = codes.size() > 1 ? codes.get(1) : null;
-    String r3 = codes.size() > 2 ? codes.get(2) : null;
+    // validateReasonCodes는 save/recommend/getQuestions 진입 시점에 이미 호출됨 — 여기서는 보장된 1~3개
+    String r1 = reasonCodes.get(0);
+    String r2 = reasonCodes.size() > 1 ? reasonCodes.get(1) : null;
+    String r3 = reasonCodes.size() > 2 ? reasonCodes.get(2) : null;
     return Replan.builder()
         .todo(anchor)
         .failureReason1(r1)
         .failureReason2(r2)
         .failureReason3(r3)
         .build();
+  }
+
+  private void validateReasonCodes(List<String> codes) {
+    if (codes == null || codes.size() < 1 || codes.size() > 3) {
+      throw new CustomException(ReplanErrorCode.REPLAN_INVALID_REASON);
+    }
+  }
+
+  /** getQuestions 전용: 코드 목록이 없어도 directInput이 있으면 통과. 단, 코드가 있을 경우 최대 3개. */
+  private void validateReasonCodesForQuestions(List<String> codes, String directInput) {
+    boolean hasDirectInput = directInput != null && !directInput.isBlank();
+    boolean hasCodes = codes != null && !codes.isEmpty();
+    if (!hasCodes && !hasDirectInput) {
+      throw new CustomException(ReplanErrorCode.REPLAN_INVALID_REASON);
+    }
+    if (codes != null && codes.size() > 3) {
+      throw new CustomException(ReplanErrorCode.REPLAN_INVALID_REASON);
+    }
   }
 
   private void applyAdd(ReplanOperation op, Todo anchor, Replan replan) {
@@ -181,7 +219,7 @@ public class ReplanService {
     }
     // dueDate/dueTime 중 하나라도 지정된 경우에만 업데이트한다 — 제목만 바꾸는 op이면 기존 마감일을 보존
     if (op.dueDate() != null || op.dueTime() != null) {
-      target.updateDueDate(combineDueDate(op.dueDate(), op.dueTime()));
+      target.updateDueDate(resolveModifiedDueDate(target, op));
     }
     if (op.tagId() != null) {
       target.updateTag(resolveTag(op.tagId(), target.getUser().getId()));
@@ -221,6 +259,20 @@ public class ReplanService {
     }
   }
 
+  /**
+   * op의 dueDate/dueTime을 기존 투두(target)의 마감일에 안전하게 적용한다. dueDate가 있으면 그 날짜를 사용하고, dueDate가 null이고
+   * dueTime만 있으면 기존 날짜를 유지한 채 시간만 바꾼다. 기존 마감일도 없으면 오늘 날짜를 기준으로 삼는다.
+   */
+  private LocalDateTime resolveModifiedDueDate(Todo target, ReplanOperation op) {
+    if (op.dueDate() != null) {
+      return combineDueDate(op.dueDate(), op.dueTime());
+    }
+    // dueDate null, dueTime present: 기존 날짜를 보존하고 시간만 변경
+    LocalDate baseDate =
+        target.getDueDate() != null ? target.getDueDate().toLocalDate() : LocalDate.now(clock);
+    return baseDate.atTime(parseTime(op.dueTime()));
+  }
+
   private void applyModifyRoutine(ReplanOperation op, Todo anchor, Replan replan) {
     Routine routine = anchor.getRoutine();
     if (routine == null) {
@@ -242,7 +294,7 @@ public class ReplanService {
         anchor.updateTitle(op.title());
       }
       if (op.dueDate() != null || op.dueTime() != null) {
-        anchor.updateDueDate(combineDueDate(op.dueDate(), op.dueTime()));
+        anchor.updateDueDate(resolveModifiedDueDate(anchor, op));
       }
       anchor.linkReplan(replan);
     }
