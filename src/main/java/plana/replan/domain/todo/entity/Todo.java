@@ -128,7 +128,7 @@ public class Todo extends BaseTimeEntity {
     this.user = Objects.requireNonNull(user, "유저는 필수입니다.");
     this.dueDate = dueDate;
     this.sortOrder = sortOrder != null ? sortOrder : 10000.0;
-    this.isPinned = isPinned;
+    this.isPinned = isPinned != null && isPinned;
     this.tag = tag;
     this.goal = goal;
     this.routine = routine;
