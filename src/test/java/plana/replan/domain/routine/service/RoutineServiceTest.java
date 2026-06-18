@@ -133,6 +133,26 @@ class RoutineServiceTest {
     verify(todoRepository, never()).saveAndFlush(any());
   }
 
+  @Test
+  void 루틴_생성_종료일이_오늘_자정이어도_그날_회차는_만든다() {
+    given(userRepository.findById(1L)).willReturn(Optional.of(testUser()));
+    given(routineRepository.save(any(Routine.class))).willAnswer(inv -> inv.getArgument(0));
+
+    // 종료일이 오늘(2024-01-15) 자정으로 저장돼도, 그날 회차(23:59)는 종료일 안쪽이므로 생성돼야 한다
+    routineService.createRoutine(
+        1L,
+        new RoutineCreateRequestDto(
+            "오늘까지 루틴",
+            java.time.LocalDateTime.of(2024, 1, 15, 0, 0),
+            null,
+            RoutineType.DAILY,
+            null,
+            null,
+            null));
+
+    verify(todoRepository).saveAndFlush(any(Todo.class));
+  }
+
   // ========== DAILY ==========
 
   @Test
