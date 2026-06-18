@@ -40,6 +40,12 @@ class GoalAiServiceTest {
   }
 
   @Test
+  void 새로고침_생략_null이면_0회차처럼_스타일_블록이_없다() {
+    String prompt = service.buildRecommendPrompt(req(null));
+    assertThat(prompt).doesNotContain("[이번 새로고침 스타일]");
+  }
+
+  @Test
   void 새로고침_2회차면_벼락치기_스타일_블록이_붙는다() {
     String prompt = service.buildRecommendPrompt(req(2));
     assertThat(prompt).contains("[이번 새로고침 스타일]");
