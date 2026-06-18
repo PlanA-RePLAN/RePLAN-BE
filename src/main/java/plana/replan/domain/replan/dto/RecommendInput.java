@@ -12,7 +12,8 @@ public record RecommendInput(
     String routineType,
     List<String> reasonLabels,
     List<AnswerInput> answers,
-    String today) {
+    String today,
+    int refreshCount) {
 
   public record AnswerInput(
       String key,

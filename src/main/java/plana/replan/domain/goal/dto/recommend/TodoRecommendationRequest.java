@@ -35,4 +35,9 @@ public record TodoRecommendationRequest(
             description = "특이사항",
             example = "해커스 보카·RC·LC 활용. 주 1회 모의고사. 매주 오답 노트 정리.",
             requiredMode = Schema.RequiredMode.NOT_REQUIRED)
-        String notes) {}
+        String notes,
+    @Schema(
+            description = "새로고침 횟수(0~3). 0 또는 생략은 첫 추천, 1~3은 다시 추천(회차별 스타일 적용)",
+            example = "0",
+            requiredMode = Schema.RequiredMode.NOT_REQUIRED)
+        Integer refreshCount) {}

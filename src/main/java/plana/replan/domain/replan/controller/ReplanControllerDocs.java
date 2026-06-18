@@ -21,7 +21,7 @@ public interface ReplanControllerDocs {
           "2단계로 선택한 실패 이유(reasonCodes)를 보냅니다. 서버가 그 이유에 추가 질문이 필요한지 결정합니다.\n"
               + "- 추가 질문이 필요하면 needsMoreInfo=true와 questions, 그리고 \"기존 투두 수정 사항\" 카드용 anchorTodo(앵커 투두의 기존 정보)가 옵니다. 사용자가 답한 뒤 answers를 채워 다시 호출하세요.\n"
               + "- 질문이 필요 없거나 answers가 있으면 needsMoreInfo=false와 추천(reasonLabels, operations)이 옵니다.\n"
-              + "- 새로고침은 같은 요청을 그대로 다시 호출하면 됩니다.")
+              + "- 새로고침: 같은 요청 몸체에 refreshCount만 1~3으로 올려 다시 호출하면 회차별 다른 스타일의 추천이 옵니다(최대 3회).")
   @ApiResponses({
     @ApiResponse(
         responseCode = "200",
@@ -130,24 +130,41 @@ public interface ReplanControllerDocs {
                 })),
     @ApiResponse(
         responseCode = "400",
-        description = "실패 이유 개수가 올바르지 않음",
+        description = "실패 이유 개수 또는 새로고침 횟수가 올바르지 않음",
         content =
             @Content(
-                examples =
-                    @ExampleObject(
-                        value =
-                            """
-                            {
-                              "status": 400,
-                              "success": false,
-                              "data": null,
-                              "error": {
-                                "code": "REPLAN_INVALID_REASON",
-                                "message": "실패 이유는 최소 1개, 최대 3개여야 합니다.",
-                                "detail": null
-                              }
+                examples = {
+                  @ExampleObject(
+                      name = "실패 이유 개수 오류",
+                      value =
+                          """
+                          {
+                            "status": 400,
+                            "success": false,
+                            "data": null,
+                            "error": {
+                              "code": "REPLAN_INVALID_REASON",
+                              "message": "실패 이유는 최소 1개, 최대 3개여야 합니다.",
+                              "detail": null
                             }
-                            """))),
+                          }
+                          """),
+                  @ExampleObject(
+                      name = "새로고침 횟수 오류",
+                      value =
+                          """
+                          {
+                            "status": 400,
+                            "success": false,
+                            "data": null,
+                            "error": {
+                              "code": "REPLAN_INVALID_REFRESH_COUNT",
+                              "message": "새로고침 횟수는 0 이상 3 이하여야 합니다.",
+                              "detail": null
+                            }
+                          }
+                          """)
+                })),
     @ApiResponse(
         responseCode = "404",
         description = "리플랜 대상 투두를 찾을 수 없음",
