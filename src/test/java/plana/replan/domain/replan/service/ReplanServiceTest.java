@@ -595,6 +595,18 @@ class ReplanServiceTest {
   }
 
   @Test
+  void 실패이유가_128자를_넘으면_저장_실패() {
+    // 직접 입력 사유가 컬럼 길이(128자)를 넘으면 DB 오류 전에 400으로 막아야 한다
+    String tooLong = "가".repeat(129);
+    ReplanSaveRequest req = new ReplanSaveRequest(42L, List.of(tooLong), List.of());
+
+    assertThatThrownBy(() -> replanService.save(1L, req))
+        .isInstanceOfSatisfying(
+            CustomException.class,
+            e -> assertThat(e.getErrorCode()).isEqualTo(ReplanErrorCode.REPLAN_INVALID_REASON));
+  }
+
+  @Test
   void 추천_시_실패이유가_없으면_실패() {
     ReplanRecommendRequest req = new ReplanRecommendRequest(42L, List.of(), null);
 

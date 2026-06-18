@@ -43,6 +43,9 @@ public class ReplanService {
   private static final DateTimeFormatter ANCHOR_DUE_FORMAT =
       DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
 
+  // Replan 테이블 failure_reason_* 컬럼 길이(VARCHAR(128))와 맞춘다.
+  private static final int MAX_REASON_LENGTH = 128;
+
   private final TodoRepository todoRepository;
   private final ReplanRepository replanRepository;
   private final ReplanAiService aiService;
@@ -241,7 +244,9 @@ public class ReplanService {
       throw new CustomException(ReplanErrorCode.REPLAN_INVALID_REASON);
     }
     for (String code : codes) {
-      if (code == null || code.isBlank()) {
+      // 직접 입력 사유는 Replan 테이블의 failure_reason 컬럼(최대 128자)에 그대로 저장되므로,
+      // 길이를 넘으면 저장 시 DB 오류(500) 대신 여기서 미리 400으로 막는다.
+      if (code == null || code.isBlank() || code.length() > MAX_REASON_LENGTH) {
         throw new CustomException(ReplanErrorCode.REPLAN_INVALID_REASON);
       }
     }
