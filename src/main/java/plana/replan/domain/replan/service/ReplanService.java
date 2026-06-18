@@ -379,6 +379,8 @@ public class ReplanService {
     Routine routine =
         Routine.builder()
             .title(op.title())
+            // op.dueDate는 루틴의 반복 종료일(이 날짜 이후로는 회차를 만들지 않음)로 보존한다.
+            .dueDate(parseRoutineEndDate(op.dueDate()))
             .routineTime(parseTime(op.dueTime()))
             .routineType(type)
             .routineDate(op.routineDate())
@@ -410,6 +412,18 @@ public class ReplanService {
     }
     try {
       return LocalTime.parse(time);
+    } catch (DateTimeParseException e) {
+      throw new CustomException(ReplanErrorCode.REPLAN_INVALID_OPERATION);
+    }
+  }
+
+  /** 루틴 반복 종료일(yyyy-MM-dd)을 파싱한다. 없으면 null(무기한 반복). */
+  private LocalDateTime parseRoutineEndDate(String dueDate) {
+    if (dueDate == null) {
+      return null;
+    }
+    try {
+      return LocalDate.parse(dueDate).atStartOfDay();
     } catch (DateTimeParseException e) {
       throw new CustomException(ReplanErrorCode.REPLAN_INVALID_OPERATION);
     }

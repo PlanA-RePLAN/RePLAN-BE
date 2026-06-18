@@ -103,6 +103,7 @@ public class ReplanAiService {
         5. changedFields: 수정(MODIFY_TODO/MODIFY_ROUTINE)에서 바뀐 필드만 {field, before, after}로 채운다. field는 title/dueTime/tag/routineType.
            새로 만드는 ADD·CREATE_ROUTINE은 changedFields를 빈 배열([])로 둔다.
         6. dueDate는 yyyy-MM-dd 또는 null, dueTime은 HH:mm 또는 null. routineType은 DAILY/WEEKLY/MONTHLY 또는 null, routineDate는 정수 또는 null.
+           - CREATE_ROUTINE의 dueDate는 '반복을 끝낼 종료일'을 뜻한다(이 날짜 이후로는 회차를 만들지 않음). 무기한 반복이면 null로 둔다. 새 루틴의 반복 시각은 dueTime으로 지정한다.
 
         반드시 아래 JSON만 출력 (다른 설명 없이):
         {"operations":[{"action":"","targetTodoId":null,"title":"","dueDate":null,"dueTime":null,"tagId":null,"routineType":null,"routineDate":null,"changedFields":[{"field":"","before":null,"after":""}]}]}

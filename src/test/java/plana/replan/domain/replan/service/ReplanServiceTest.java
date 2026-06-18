@@ -392,6 +392,33 @@ class ReplanServiceTest {
   }
 
   @Test
+  void CREATE_ROUTINE은_종료일이_있으면_루틴_종료일로_저장한다() {
+    Todo todo = ownedTodo(42L, 1L);
+    given(todoRepository.findById(42L)).willReturn(Optional.of(todo));
+    given(replanRepository.save(any(Replan.class))).willAnswer(inv -> inv.getArgument(0));
+
+    ReplanOperation op =
+        new ReplanOperation(
+            ReplanAction.CREATE_ROUTINE,
+            null,
+            "스트레칭",
+            "2026-12-31", // 반복 종료일
+            "20:00",
+            null,
+            "DAILY",
+            null,
+            List.of());
+    ReplanSaveRequest req = new ReplanSaveRequest(42L, List.of("CONDITION_PAIN"), List.of(op));
+
+    replanService.save(1L, req);
+
+    org.mockito.ArgumentCaptor<Routine> captor = org.mockito.ArgumentCaptor.forClass(Routine.class);
+    then(routineRepository).should().save(captor.capture());
+    assertThat(captor.getValue().getDueDate())
+        .isEqualTo(LocalDateTime.of(2026, 12, 31, 0, 0));
+  }
+
+  @Test
   void 마감_지난_일반투두를_ADD로_대체하면_원본을_숨긴다() {
     Todo todo = ownedTodo(42L, 1L);
     given(todo.getRoutine()).willReturn(null);

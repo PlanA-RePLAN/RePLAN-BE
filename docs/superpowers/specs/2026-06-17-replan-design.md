@@ -15,8 +15,8 @@
   → 1단계: 큰 분류 선택 (심리적 저항 / 컨디션 난조 / 목표 개선 필요 / 예상치 못한 방해 / 직접 입력)
   → 2단계: 세부 이유 선택
   → 3단계: (일부 이유만) 더 세부 선택        ← 트리는 프론트에 하드코딩
-  → (AI가 필요하면) 추가 질문                 ← POST /replans/questions
-  → "이렇게 정리했어요" (AI가 입력을 요약)     ← /recommend 응답의 summary
+  → (백엔드가 필요하다고 판단하면) 추가 질문   ← POST /replans/recommend 응답(needsMoreInfo=true, questions)
+  → 답변을 채워 같은 API 재호출               ← POST /replans/recommend (answers 포함)
   → "다음과 같은 투두리스트 제안" (diff 파란색) ← /recommend 응답의 operations[]
   → [투두 추가하기] or [추가 없이 끝내기]       ← POST /replans
 ```
@@ -29,12 +29,21 @@
 4. **상반된 안은 동시 노출 금지** — A안(디폴트) 먼저, 새로고침 시 다른 안.
 5. **바뀐 부분은 파란색 강조** → 응답의 `changedFields`(원래값→새값)로 표현.
 
-## 4. API 설계 — 상태 없는 3개
+## 4. API 설계 — 상태 없는 2개
 
 기존 `GoalAiService`의 refine/recommend 패턴과 동일하게, 백엔드는 상태를 들지 않고
 프론트가 매 단계 컨텍스트를 다시 넘긴다.
 
-### 4.1 `POST /api/replans/questions` — 추가 질문 받기
+> **구현 반영(최신):** 이 절은 초기 설계 스냅샷이라 아래 4.1~4.3 본문 일부가 실제 구현과 다르다.
+> 실제로는 **질문 전용 엔드포인트(`/questions`)를 따로 두지 않고, `/recommend` 하나로 통합**했다.
+> "추가 질문이 필요한지"는 프론트나 AI가 아니라 **백엔드가 결정**해야 한다는 원칙에 따라,
+> `/recommend`가 질문이 필요하면 `needsMoreInfo=true`와 `questions`(+질문 화면용 `anchorTodo`)를,
+> 충분하면 `needsMoreInfo=false`와 `operations`(+`reasonLabels`)를 반환한다. `summary`/`tipNote`는 제거됐다.
+> 정확한 최신 요청/응답 형태는 Swagger(`ReplanControllerDocs`)를 기준으로 본다.
+
+### 4.1 (구버전) `POST /api/replans/questions` — 추가 질문 받기
+
+> ⚠️ 이 엔드포인트는 구현되지 않았다. `/recommend`의 질문 분기로 대체됐다(위 구현 반영 참고).
 
 실패사유(+직접입력)를 받아, AI가 추가로 물어볼 질문을 반환한다. 없으면 빈 배열.
 
