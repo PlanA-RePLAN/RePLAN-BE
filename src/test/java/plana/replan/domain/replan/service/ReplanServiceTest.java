@@ -86,7 +86,8 @@ class ReplanServiceTest {
     given(todoRepository.findById(42L)).willReturn(Optional.of(todo));
 
     // GOAL_NO_PRIORITY는 우선순위 투두 선택 질문이 필요한 사유
-    ReplanRecommendRequest req = new ReplanRecommendRequest(42L, List.of("GOAL_NO_PRIORITY"), null, null);
+    ReplanRecommendRequest req =
+        new ReplanRecommendRequest(42L, List.of("GOAL_NO_PRIORITY"), null, null);
 
     ReplanRecommendResponse res = replanService.recommend(1L, req);
 
@@ -108,7 +109,8 @@ class ReplanServiceTest {
     Todo todo = ownedTodo(42L, 999L);
     given(todoRepository.findById(42L)).willReturn(Optional.of(todo));
 
-    ReplanRecommendRequest req = new ReplanRecommendRequest(42L, List.of("GOAL_NO_PRIORITY"), null, null);
+    ReplanRecommendRequest req =
+        new ReplanRecommendRequest(42L, List.of("GOAL_NO_PRIORITY"), null, null);
 
     assertThatThrownBy(() -> replanService.recommend(1L, req)).isInstanceOf(CustomException.class);
   }
@@ -122,7 +124,8 @@ class ReplanServiceTest {
     given(aiService.generateRecommend(any())).willReturn(List.of());
 
     // INTERRUPT_SUDDEN(돌발 상황)은 추가 질문 없이 바로 추천
-    ReplanRecommendRequest req = new ReplanRecommendRequest(42L, List.of("INTERRUPT_SUDDEN"), null, null);
+    ReplanRecommendRequest req =
+        new ReplanRecommendRequest(42L, List.of("INTERRUPT_SUDDEN"), null, null);
 
     ReplanRecommendResponse res = replanService.recommend(1L, req);
 
@@ -556,7 +559,8 @@ class ReplanServiceTest {
     Todo todo = org.mockito.Mockito.mock(Todo.class);
     given(todo.getDueDate()).willReturn(LocalDateTime.of(2026, 6, 7, 10, 0));
 
-    RecommendInput input = replanService.buildInput(todo, List.of("INTERRUPT_SUDDEN"), null, null, 0);
+    RecommendInput input =
+        replanService.buildInput(todo, List.of("INTERRUPT_SUDDEN"), null, null, 0);
 
     assertThat(input.anchorDueDate()).isEqualTo("2026-06-07 10:00");
   }
@@ -660,7 +664,9 @@ class ReplanServiceTest {
     assertThatThrownBy(() -> replanService.recommend(1L, req))
         .isInstanceOfSatisfying(
             CustomException.class,
-            e -> assertThat(e.getErrorCode()).isEqualTo(ReplanErrorCode.REPLAN_INVALID_REFRESH_COUNT));
+            e ->
+                assertThat(e.getErrorCode())
+                    .isEqualTo(ReplanErrorCode.REPLAN_INVALID_REFRESH_COUNT));
   }
 
   @Test
@@ -671,7 +677,9 @@ class ReplanServiceTest {
     assertThatThrownBy(() -> replanService.recommend(1L, req))
         .isInstanceOfSatisfying(
             CustomException.class,
-            e -> assertThat(e.getErrorCode()).isEqualTo(ReplanErrorCode.REPLAN_INVALID_REFRESH_COUNT));
+            e ->
+                assertThat(e.getErrorCode())
+                    .isEqualTo(ReplanErrorCode.REPLAN_INVALID_REFRESH_COUNT));
   }
 
   @Test

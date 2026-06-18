@@ -109,15 +109,15 @@ public class ReplanAiService {
         반드시 아래 JSON만 출력 (다른 설명 없이):
         {"operations":[{"action":"","targetTodoId":null,"title":"","dueDate":null,"dueTime":null,"tagId":null,"routineType":null,"routineDate":null,"changedFields":[{"field":"","before":null,"after":""}]}]}
         """
-        .formatted(
-            input.today(),
-            input.anchorTodoId(),
-            input.anchorTitle(),
-            routineInfo,
-            input.anchorDueDate() != null ? input.anchorDueDate() : "없음",
-            input.anchorTagName() != null ? input.anchorTagName() : "없음",
-            String.join(", ", input.reasonLabels()),
-            answers);
+            .formatted(
+                input.today(),
+                input.anchorTodoId(),
+                input.anchorTitle(),
+                routineInfo,
+                input.anchorDueDate() != null ? input.anchorDueDate() : "없음",
+                input.anchorTagName() != null ? input.anchorTagName() : "없음",
+                String.join(", ", input.reasonLabels()),
+                answers);
     return prompt + refreshStyleBlock(input.refreshCount());
   }
 
@@ -125,12 +125,9 @@ public class ReplanAiService {
   static String refreshStyleBlock(int refreshCount) {
     String line =
         switch (refreshCount) {
-          case 1 ->
-              "1회차(여유): 기간은 기존 예상 소요의 1.5배 이상으로 넉넉히 잡고, 할 일은 아주 잘게(마이크로) 쪼개며, 가장 쉽고 만만한 것부터 시작하도록 정순으로 배치한다.";
-          case 2 ->
-              "2회차(벼락치기): 버퍼 없이 짧게(15~25분 타임박싱) 잡고, 핵심 1개(1-Pick)만 남기며, 가장 어렵고 중요한 것부터 처리하도록 역순으로 배치한다.";
-          case 3 ->
-              "3회차(환경 제약): 기간·덩어리·난이도는 적정 수준으로 두되, 시간대를 옮기거나(다른 시간/요일) 장소·환경을 통제하는(조용한 곳 이동, 방해금지 등) 방향으로 제안한다.";
+          case 1 -> "1회차(여유): 기간은 기존 예상 소요의 1.5배 이상으로 넉넉히 잡고, 할 일은 아주 잘게(마이크로) 쪼개며, 가장 쉽고 만만한 것부터 시작하도록 정순으로 배치한다.";
+          case 2 -> "2회차(벼락치기): 버퍼 없이 짧게(15~25분 타임박싱) 잡고, 핵심 1개(1-Pick)만 남기며, 가장 어렵고 중요한 것부터 처리하도록 역순으로 배치한다.";
+          case 3 -> "3회차(환경 제약): 기간·덩어리·난이도는 적정 수준으로 두되, 시간대를 옮기거나(다른 시간/요일) 장소·환경을 통제하는(조용한 곳 이동, 방해금지 등) 방향으로 제안한다.";
           default -> null;
         };
     if (line == null) {
