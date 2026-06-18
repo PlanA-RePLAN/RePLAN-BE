@@ -7,7 +7,6 @@ import org.junit.jupiter.api.Test;
 import plana.replan.domain.replan.dto.RecommendInput;
 import plana.replan.domain.replan.dto.ReplanAction;
 import plana.replan.domain.replan.dto.ReplanOperation;
-import plana.replan.domain.replan.dto.ReplanRecommendResponse;
 
 class ReplanAiServiceTest {
 
@@ -29,20 +28,20 @@ class ReplanAiServiceTest {
         ]} 뒤 텍스트
         """;
 
-    ReplanRecommendResponse res = service.parseRecommend(raw);
+    List<ReplanOperation> ops = service.parseRecommend(raw);
 
-    assertThat(res.needsMoreInfo()).isFalse();
-    assertThat(res.summary()).isEqualTo("강의 4강");
-    assertThat(res.tipNote()).isEqualTo("무리하지 마세요");
-    assertThat(res.operations()).hasSize(2);
-    ReplanOperation first = res.operations().get(0);
+    assertThat(ops).hasSize(2);
+    ReplanOperation first = ops.get(0);
     assertThat(first.action()).isEqualTo(ReplanAction.MODIFY_TODO);
     assertThat(first.targetTodoId()).isEqualTo(42L);
     assertThat(first.tagId()).isEqualTo(5L);
+    // 수정(MODIFY)은 changedFields를 유지
     assertThat(first.changedFields()).hasSize(1);
     assertThat(first.changedFields().get(0).before()).isEqualTo("데이터 분석 공부");
-    assertThat(res.operations().get(1).action()).isEqualTo(ReplanAction.ADD);
-    assertThat(res.operations().get(1).targetTodoId()).isNull();
+    // 추가(ADD)는 changedFields를 비운다
+    assertThat(ops.get(1).action()).isEqualTo(ReplanAction.ADD);
+    assertThat(ops.get(1).targetTodoId()).isNull();
+    assertThat(ops.get(1).changedFields()).isEmpty();
   }
 
   @Test

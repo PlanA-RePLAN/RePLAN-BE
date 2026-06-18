@@ -57,17 +57,50 @@ public class ReplanService {
   public ReplanRecommendResponse recommend(Long userId, ReplanRecommendRequest req) {
     validateReasonCodes(req.reasonCodes());
     Todo anchor = findOwnedTodo(userId, req.anchorTodoId());
+    List<String> reasonLabels = toReasonLabelPath(req.reasonCodes());
 
     boolean noAnswers = req.answers() == null || req.answers().isEmpty();
     if (noAnswers) {
       List<ReplanQuestion> questions = ReplanQuestionRegistry.forReasonCodes(req.reasonCodes());
       if (!questions.isEmpty()) {
-        return ReplanRecommendResponse.askQuestions(questions);
+        return ReplanRecommendResponse.askQuestions(questions, reasonLabels);
       }
     }
 
     RecommendInput input = buildInput(anchor, req.reasonCodes(), null, req.answers());
-    return aiService.generateRecommend(input);
+    List<ReplanOperation> operations = aiService.generateRecommend(input);
+    return ReplanRecommendResponse.recommendation(operations, reasonLabels);
+  }
+
+  /**
+   * 선택한 실패 이유 코드를 화면 표시용 한글 라벨 목록으로 변환한다. 각 코드의 상위(부모)→하위 순서로 라벨을 펼쳐, 프론트가 "목표/계획 개선 필요 > 구체적 계획
+   * 수립을 실패했어요"처럼 2단계 라벨을 그대로 보여줄 수 있게 한다. enum에 없는 코드(직접입력)는 원문을 그대로 넣는다.
+   */
+  List<String> toReasonLabelPath(List<String> codes) {
+    List<String> result = new ArrayList<>();
+    if (codes == null) {
+      return result;
+    }
+    for (String code : codes) {
+      try {
+        java.util.Deque<String> path = new java.util.ArrayDeque<>();
+        FailureReasonCode fc = FailureReasonCode.valueOf(code);
+        while (fc != null) {
+          path.addFirst(fc.getLabel());
+          fc = fc.getParent();
+        }
+        for (String label : path) {
+          if (!result.contains(label)) {
+            result.add(label);
+          }
+        }
+      } catch (IllegalArgumentException e) {
+        if (!result.contains(code)) {
+          result.add(code);
+        }
+      }
+    }
+    return result;
   }
 
   RecommendInput buildInput(

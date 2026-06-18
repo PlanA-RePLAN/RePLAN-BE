@@ -43,7 +43,9 @@ class ReplanControllerTest {
   @Test
   void 추천_엔드포인트_추천반환() throws Exception {
     given(replanService.recommend(eq(1L), any()))
-        .willReturn(ReplanRecommendResponse.recommendation("요약", "팁", List.of()));
+        .willReturn(
+            ReplanRecommendResponse.recommendation(
+                List.of(), List.of("예상치 못한 방해 발생", "돌발 상황이 발생했어요")));
 
     mockMvc
         .perform(
@@ -57,7 +59,7 @@ class ReplanControllerTest {
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.success").value(true))
         .andExpect(jsonPath("$.data.needsMoreInfo").value(false))
-        .andExpect(jsonPath("$.data.summary").value("요약"));
+        .andExpect(jsonPath("$.data.reasonLabels[0]").value("예상치 못한 방해 발생"));
   }
 
   @Test
@@ -67,7 +69,8 @@ class ReplanControllerTest {
             ReplanRecommendResponse.askQuestions(
                 List.of(
                     new ReplanQuestion(
-                        "priority_targets", QuestionType.TODO_SELECT, "투두 선택", null))));
+                        "priority_targets", QuestionType.TODO_SELECT, "투두 선택", null)),
+                List.of("목표/계획 개선 필요", "우선 순위를 정하지 못했어요")));
 
     mockMvc
         .perform(

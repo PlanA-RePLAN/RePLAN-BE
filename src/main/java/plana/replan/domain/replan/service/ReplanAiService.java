@@ -17,7 +17,6 @@ import plana.replan.domain.replan.dto.ChangedField;
 import plana.replan.domain.replan.dto.RecommendInput;
 import plana.replan.domain.replan.dto.ReplanAction;
 import plana.replan.domain.replan.dto.ReplanOperation;
-import plana.replan.domain.replan.dto.ReplanRecommendResponse;
 import plana.replan.domain.replan.exception.ReplanErrorCode;
 import plana.replan.global.exception.CustomException;
 
@@ -39,8 +38,8 @@ public class ReplanAiService {
   private final RestClient geminiRestClient;
   private final ObjectMapper objectMapper = new ObjectMapper();
 
-  /** 카테고리별 로직에 따른 추천(요약 + 팁노트 + 작업 목록)을 생성한다. */
-  public ReplanRecommendResponse generateRecommend(RecommendInput input) {
+  /** 카테고리별 로직에 따른 추천 작업 목록을 생성한다. */
+  public List<ReplanOperation> generateRecommend(RecommendInput input) {
     return parseRecommend(callGemini(buildRecommendPrompt(input)));
   }
 
@@ -94,19 +93,19 @@ public class ReplanAiService {
 
         [공통 규칙]
         1. 결과는 기존 투두 형식(제목/마감기한/태그/반복)만 사용. 새로운 형태 금지.
-        2. 억지스러운 멘탈케어성 내용(명언 읽기 등)은 투두로 만들지 말고 tipNote(줄글)로 안내.
+        2. 억지스러운 멘탈케어성 내용(명언 읽기 등)은 투두로 만들지 말 것.
         3. 상호 배타적인 안(완전 휴식 vs 타협 실행)을 동시에 넣지 말 것. 가장 권장하는 한 가지 방향(A안)만.
-        4. summary: 사용자 자유입력을 구조화해 1~3줄로 요약(없으면 빈 문자열).
-        5. action은 ADD/MODIFY_TODO/MODIFY_ROUTINE/CREATE_ROUTINE 중 하나.
+        4. action은 ADD/MODIFY_TODO/MODIFY_ROUTINE/CREATE_ROUTINE 중 하나.
            - 일반 투두를 그 자리에서 고치면 MODIFY_TODO(targetTodoId=대상), 새 투두는 ADD(targetTodoId=null).
            - 마감이 이미 지난 일반 투두는 MODIFY_TODO 대신 ADD로 새 투두를 만든다.
            - 반복 투두 규칙 변경은 MODIFY_ROUTINE(targetTodoId=대상 투두 ID), 새 루틴은 CREATE_ROUTINE.
            - MODIFY_TODO의 targetTodoId에는 위 '대상 투두 ID'를, 다른 기존 투두 수정(우선순위 등)은 아래 '선택 투두' 목록의 실제 ID만 사용. ID를 임의로 만들지 않는다.
-        6. changedFields: 바뀐 필드만 {field, before, after}. field는 title/dueTime/tag/routineType. ADD는 before=null.
-        7. dueDate는 yyyy-MM-dd 또는 null, dueTime은 HH:mm 또는 null. routineType은 DAILY/WEEKLY/MONTHLY 또는 null, routineDate는 정수 또는 null.
+        5. changedFields: 수정(MODIFY_TODO/MODIFY_ROUTINE)에서 바뀐 필드만 {field, before, after}로 채운다. field는 title/dueTime/tag/routineType.
+           새로 만드는 ADD·CREATE_ROUTINE은 changedFields를 빈 배열([])로 둔다.
+        6. dueDate는 yyyy-MM-dd 또는 null, dueTime은 HH:mm 또는 null. routineType은 DAILY/WEEKLY/MONTHLY 또는 null, routineDate는 정수 또는 null.
 
         반드시 아래 JSON만 출력 (다른 설명 없이):
-        {"summary":"","tipNote":"","operations":[{"action":"","targetTodoId":null,"title":"","dueDate":null,"dueTime":null,"tagId":null,"routineType":null,"routineDate":null,"changedFields":[{"field":"","before":null,"after":""}]}]}
+        {"operations":[{"action":"","targetTodoId":null,"title":"","dueDate":null,"dueTime":null,"tagId":null,"routineType":null,"routineDate":null,"changedFields":[{"field":"","before":null,"after":""}]}]}
         """
         .formatted(
             input.today(),
@@ -163,24 +162,26 @@ public class ReplanAiService {
     }
   }
 
-  public ReplanRecommendResponse parseRecommend(String raw) {
+  public List<ReplanOperation> parseRecommend(String raw) {
     try {
       JsonNode root = objectMapper.readTree(extractJson(raw));
-      String summary = textOrNull(root.path("summary"));
-      String tipNote = textOrNull(root.path("tipNote"));
       List<ReplanOperation> operations = new ArrayList<>();
       for (JsonNode op : root.path("operations")) {
+        ReplanAction action = ReplanAction.valueOf(op.path("action").asText());
+        // 새로 만드는 작업(ADD/CREATE_ROUTINE)은 before/after diff가 없으므로 changedFields를 비운다.
         List<ChangedField> changed = new ArrayList<>();
-        for (JsonNode cf : op.path("changedFields")) {
-          changed.add(
-              new ChangedField(
-                  cf.path("field").asText(),
-                  textOrNull(cf.path("before")),
-                  textOrNull(cf.path("after"))));
+        if (action == ReplanAction.MODIFY_TODO || action == ReplanAction.MODIFY_ROUTINE) {
+          for (JsonNode cf : op.path("changedFields")) {
+            changed.add(
+                new ChangedField(
+                    cf.path("field").asText(),
+                    textOrNull(cf.path("before")),
+                    textOrNull(cf.path("after"))));
+          }
         }
         operations.add(
             new ReplanOperation(
-                ReplanAction.valueOf(op.path("action").asText()),
+                action,
                 longOrNull(op.path("targetTodoId")),
                 textOrNull(op.path("title")),
                 textOrNull(op.path("dueDate")),
@@ -190,7 +191,7 @@ public class ReplanAiService {
                 intOrNull(op.path("routineDate")),
                 changed));
       }
-      return ReplanRecommendResponse.recommendation(summary, tipNote, operations);
+      return operations;
     } catch (Exception e) {
       log.error("리플랜 추천 응답 파싱 실패: {}", raw, e);
       throw new CustomException(ReplanErrorCode.REPLAN_GEMINI_PARSE_ERROR);

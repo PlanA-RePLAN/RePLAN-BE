@@ -110,8 +110,7 @@ class ReplanServiceTest {
     given(todo.getDueDate()).willReturn(LocalDateTime.of(2026, 6, 7, 10, 0));
     given(todo.getTag()).willReturn(org.mockito.Mockito.mock(Tag.class));
     given(todoRepository.findById(42L)).willReturn(Optional.of(todo));
-    given(aiService.generateRecommend(any()))
-        .willReturn(ReplanRecommendResponse.recommendation("요약", "팁", List.of()));
+    given(aiService.generateRecommend(any())).willReturn(List.of());
 
     // INTERRUPT_SUDDEN(돌발 상황)은 추가 질문 없이 바로 추천
     ReplanRecommendRequest req = new ReplanRecommendRequest(42L, List.of("INTERRUPT_SUDDEN"), null);
@@ -119,15 +118,15 @@ class ReplanServiceTest {
     ReplanRecommendResponse res = replanService.recommend(1L, req);
 
     assertThat(res.needsMoreInfo()).isFalse();
-    assertThat(res.summary()).isEqualTo("요약");
+    // 선택 사유의 상위→하위 라벨이 함께 내려간다
+    assertThat(res.reasonLabels()).containsExactly("예상치 못한 방해 발생", "돌발 상황이 발생했어요");
   }
 
   @Test
   void 답변이_있으면_질문단계를_건너뛰고_추천을_생성한다() {
     Todo todo = ownedTodo(42L, 1L);
     given(todoRepository.findById(42L)).willReturn(Optional.of(todo));
-    given(aiService.generateRecommend(any()))
-        .willReturn(ReplanRecommendResponse.recommendation("요약", "팁", List.of()));
+    given(aiService.generateRecommend(any())).willReturn(List.of());
 
     // GOAL_NO_PRIORITY는 원래 질문이 필요하지만, 답변이 있으면 곧바로 추천
     ReplanRecommendRequest req =
