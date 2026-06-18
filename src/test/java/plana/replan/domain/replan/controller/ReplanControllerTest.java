@@ -19,6 +19,8 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import plana.replan.domain.replan.dto.QuestionType;
+import plana.replan.domain.replan.dto.ReplanQuestion;
 import plana.replan.domain.replan.dto.ReplanRecommendResponse;
 import plana.replan.domain.replan.service.ReplanService;
 import plana.replan.global.config.SecurityConfig;
@@ -72,5 +74,26 @@ class ReplanControllerTest {
                     """))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.success").value(true));
+  }
+
+  @Test
+  void 질문_엔드포인트_성공() throws Exception {
+    given(replanService.getQuestions(eq(1L), any()))
+        .willReturn(
+            List.of(new ReplanQuestion("priority_targets", QuestionType.TODO_SELECT, "투두 선택", null)));
+
+    mockMvc
+        .perform(
+            post("/api/replans/questions")
+                .with(authentication(authToken(1L)))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """
+                    {"anchorTodoId":42,"reasonCodes":["GOAL_NO_PRIORITY"],"directInput":null}
+                    """))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.success").value(true))
+        .andExpect(jsonPath("$.data[0].type").value("TODO_SELECT"))
+        .andExpect(jsonPath("$.data[0].key").value("priority_targets"));
   }
 }
