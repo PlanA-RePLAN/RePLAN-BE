@@ -29,10 +29,12 @@ import plana.replan.domain.replan.dto.ReplanRecommendRequest;
 import plana.replan.domain.replan.dto.ReplanRecommendResponse;
 import plana.replan.domain.replan.dto.ReplanSaveRequest;
 import plana.replan.domain.replan.entity.Replan;
+import plana.replan.domain.replan.exception.ReplanErrorCode;
 import plana.replan.domain.replan.repository.ReplanRepository;
 import plana.replan.domain.routine.entity.Routine;
 import plana.replan.domain.routine.entity.RoutineType;
 import plana.replan.domain.routine.repository.RoutineRepository;
+import plana.replan.domain.routine.service.RoutineService;
 import plana.replan.domain.tag.entity.Tag;
 import plana.replan.domain.tag.repository.TagRepository;
 import plana.replan.domain.todo.entity.Todo;
@@ -48,6 +50,7 @@ class ReplanServiceTest {
   @Mock private ReplanAiService aiService;
   @Mock private TagRepository tagRepository;
   @Mock private RoutineRepository routineRepository;
+  @Mock private RoutineService routineService;
 
   private final Clock clock = Clock.fixed(Instant.parse("2026-06-18T00:00:00Z"), ZoneId.of("UTC"));
 
@@ -57,7 +60,13 @@ class ReplanServiceTest {
   void setUp() {
     replanService =
         new ReplanService(
-            todoRepository, replanRepository, aiService, tagRepository, clock, routineRepository);
+            todoRepository,
+            replanRepository,
+            aiService,
+            tagRepository,
+            clock,
+            routineRepository,
+            routineService);
   }
 
   private Todo ownedTodo(Long todoId, Long userId) {
@@ -172,6 +181,32 @@ class ReplanServiceTest {
     then(todo).should().updateTitle("데이터 분석 1~2강");
     then(todo).should().linkReplan(any(Replan.class));
     then(todoRepository).should(never()).save(any(Todo.class));
+  }
+
+  @Test
+  void MODIFY_TODO_제목만_바꾸면_마감일은_유지된다() {
+    Todo anchor = ownedTodo(42L, 1L);
+    given(todoRepository.findById(42L)).willReturn(Optional.of(anchor));
+    given(replanRepository.save(any(Replan.class))).willAnswer(inv -> inv.getArgument(0));
+
+    ReplanOperation modify =
+        new ReplanOperation(
+            ReplanAction.MODIFY_TODO,
+            42L,
+            "새 제목",
+            null, // dueDate null
+            null, // dueTime null
+            null,
+            null,
+            null,
+            List.of());
+    ReplanSaveRequest req =
+        new ReplanSaveRequest(42L, List.of("GOAL_NO_PRIORITY"), List.of(modify));
+
+    replanService.save(1L, req);
+
+    then(anchor).should().updateTitle("새 제목");
+    then(anchor).should(never()).updateDueDate(any());
   }
 
   @Test
@@ -313,6 +348,7 @@ class ReplanServiceTest {
     replanService.save(1L, req);
 
     then(routineRepository).should(times(1)).save(any(Routine.class));
+    then(routineService).should().createTodoTreeFromMother(any());
   }
 
   @Test
@@ -339,5 +375,53 @@ class ReplanServiceTest {
     replanService.save(1L, req);
 
     then(todo).should().deactivate();
+  }
+
+  @Test
+  void 마감_지난_앵커를_MODIFY하고_ADD도_있으면_원본은_안숨긴다() {
+    Todo anchor = ownedTodo(42L, 1L);
+    given(anchor.getId()).willReturn(42L);
+    given(anchor.getRoutine()).willReturn(null);
+    given(anchor.getDueDate()).willReturn(LocalDateTime.of(2026, 6, 1, 10, 0)); // 과거
+    given(todoRepository.findById(42L)).willReturn(Optional.of(anchor));
+    given(replanRepository.save(any(Replan.class))).willAnswer(inv -> inv.getArgument(0));
+
+    ReplanOperation modifyOp =
+        new ReplanOperation(
+            ReplanAction.MODIFY_TODO,
+            42L,
+            "수정된 제목",
+            "2026-06-25",
+            null,
+            null,
+            null,
+            null,
+            List.of());
+    ReplanOperation addOp =
+        new ReplanOperation(
+            ReplanAction.ADD, null, "추가 투두", "2026-06-26", null, null, null, null, List.of());
+    ReplanSaveRequest req =
+        new ReplanSaveRequest(42L, List.of("GOAL_NO_PRIORITY"), List.of(modifyOp, addOp));
+
+    replanService.save(1L, req);
+
+    then(anchor).should(never()).deactivate();
+  }
+
+  @Test
+  void 잘못된_마감형식이면_400() {
+    Todo anchor = ownedTodo(42L, 1L);
+    given(todoRepository.findById(42L)).willReturn(Optional.of(anchor));
+    given(replanRepository.save(any(Replan.class))).willAnswer(inv -> inv.getArgument(0));
+
+    ReplanOperation addOp =
+        new ReplanOperation(
+            ReplanAction.ADD, null, "새 투두", "not-a-date", null, null, null, null, List.of());
+    ReplanSaveRequest req = new ReplanSaveRequest(42L, List.of("GOAL_NO_PRIORITY"), List.of(addOp));
+
+    assertThatThrownBy(() -> replanService.save(1L, req))
+        .isInstanceOfSatisfying(
+            CustomException.class,
+            e -> assertThat(e.getErrorCode()).isEqualTo(ReplanErrorCode.REPLAN_INVALID_OPERATION));
   }
 }

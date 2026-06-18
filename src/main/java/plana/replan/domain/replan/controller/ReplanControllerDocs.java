@@ -36,8 +36,8 @@ public interface ReplanControllerDocs {
                                 {
                                   "key": "priority_targets",
                                   "type": "TODO_SELECT",
-                                  "label": "투두 선택",
-                                  "options": null
+                                  "title": "투두 선택",
+                                  "chips": null
                                 }
                               ],
                               "error": null
@@ -157,7 +157,7 @@ public interface ReplanControllerDocs {
                               "success": true,
                               "data": {
                                 "summary": "일정이 너무 촉박했습니다. 마감 기한을 늘리고 단계를 나눠보세요.",
-                                "tip": "작은 단위로 쪼개면 성공률이 올라갑니다.",
+                                "tipNote": "작은 단위로 쪼개면 성공률이 올라갑니다.",
                                 "operations": []
                               },
                               "error": null
@@ -316,6 +316,26 @@ public interface ReplanControllerDocs {
                           }
                           """)
                 })),
+    @ApiResponse(
+        responseCode = "400",
+        description = "수락한 작업의 형식이 올바르지 않음",
+        content =
+            @Content(
+                examples =
+                    @ExampleObject(
+                        value =
+                            """
+                            {
+                              "status": 400,
+                              "success": false,
+                              "data": null,
+                              "error": {
+                                "code": "REPLAN_INVALID_OPERATION",
+                                "message": "수락한 작업의 형식이 올바르지 않습니다.",
+                                "detail": null
+                              }
+                            }
+                            """))),
     @ApiResponse(
         responseCode = "404",
         description = "리플랜 대상 투두 또는 태그를 찾을 수 없음",

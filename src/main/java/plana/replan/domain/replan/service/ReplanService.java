@@ -25,6 +25,7 @@ import plana.replan.domain.replan.repository.ReplanRepository;
 import plana.replan.domain.routine.entity.Routine;
 import plana.replan.domain.routine.entity.RoutineType;
 import plana.replan.domain.routine.repository.RoutineRepository;
+import plana.replan.domain.routine.service.RoutineService;
 import plana.replan.domain.tag.entity.Tag;
 import plana.replan.domain.tag.exception.TagErrorCode;
 import plana.replan.domain.tag.repository.TagRepository;
@@ -43,6 +44,7 @@ public class ReplanService {
   private final TagRepository tagRepository;
   private final Clock clock;
   private final RoutineRepository routineRepository;
+  private final RoutineService routineService;
 
   public List<ReplanQuestion> getQuestions(Long userId, ReplanQuestionsRequest req) {
     Todo anchor = findOwnedTodo(userId, req.anchorTodoId());
@@ -108,16 +110,31 @@ public class ReplanService {
     if (req.acceptedOperations() == null) {
       return;
     }
+
+    boolean anyAdd = false;
+    boolean anchorModifiedInPlace = false;
+
     for (ReplanOperation op : req.acceptedOperations()) {
       switch (op.action()) {
         case ADD -> {
           applyAdd(op, anchor, replan);
-          deactivateIfReplacedOriginal(anchor);
+          anyAdd = true;
         }
-        case MODIFY_TODO -> applyModifyTodo(op, anchor, replan);
+        case MODIFY_TODO -> {
+          applyModifyTodo(op, anchor, replan);
+          if (op.targetTodoId() != null && op.targetTodoId().equals(anchor.getId())) {
+            anchorModifiedInPlace = true;
+          }
+        }
         case MODIFY_ROUTINE -> applyModifyRoutine(op, anchor, replan);
         case CREATE_ROUTINE -> applyCreateRoutine(op, anchor, replan);
       }
+    }
+
+    // 마감 지난 일반 투두(앵커)를 ADD로 대체한 경우에만 한 번 숨긴다.
+    // MODIFY_TODO로 앵커 자체를 수정했다면 숨기지 않는다.
+    if (anchor.getRoutine() == null && isOverdue(anchor) && anyAdd && !anchorModifiedInPlace) {
+      anchor.deactivate();
     }
   }
 
@@ -161,21 +178,19 @@ public class ReplanService {
     if (op.title() != null) {
       target.updateTitle(op.title());
     }
-    target.updateDueDate(combineDueDate(op.dueDate(), op.dueTime()));
+    // dueDate/dueTime 중 하나라도 지정된 경우에만 업데이트한다 — 제목만 바꾸는 op이면 기존 마감일을 보존
+    if (op.dueDate() != null || op.dueTime() != null) {
+      target.updateDueDate(combineDueDate(op.dueDate(), op.dueTime()));
+    }
     if (op.tagId() != null) {
       target.updateTag(resolveTag(op.tagId(), target.getUser().getId()));
     }
     target.linkReplan(replan);
   }
 
-  /** 마감 지난 일반 투두(앵커)를 ADD로 대체한 경우, 원본은 통계엔 남기되 목록에서만 숨긴다. */
-  private void deactivateIfReplacedOriginal(Todo anchor) {
-    boolean basic = anchor.getRoutine() == null;
-    boolean overdue =
-        anchor.getDueDate() != null && anchor.getDueDate().isBefore(LocalDateTime.now(clock));
-    if (basic && overdue) {
-      anchor.deactivate();
-    }
+  /** 앵커의 마감이 지났는지 확인한다. */
+  private boolean isOverdue(Todo anchor) {
+    return anchor.getDueDate() != null && anchor.getDueDate().isBefore(LocalDateTime.now(clock));
   }
 
   private Tag resolveTag(Long tagId, Long userId) {
@@ -201,7 +216,7 @@ public class ReplanService {
       LocalTime time = dueTime != null ? LocalTime.parse(dueTime) : LocalTime.of(23, 59, 59);
       return date.atTime(time);
     } catch (DateTimeParseException e) {
-      throw new CustomException(ReplanErrorCode.REPLAN_GEMINI_PARSE_ERROR);
+      throw new CustomException(ReplanErrorCode.REPLAN_INVALID_OPERATION);
     }
   }
 
@@ -214,7 +229,7 @@ public class ReplanService {
         op.tagId() != null ? resolveTag(op.tagId(), anchor.getUser().getId()) : routine.getTag();
     routine.update(
         op.title() != null ? op.title() : routine.getTitle(),
-        op.routineType() != null ? RoutineType.valueOf(op.routineType()) : routine.getRoutineType(),
+        op.routineType() != null ? parseRoutineType(op.routineType()) : routine.getRoutineType(),
         op.routineDate() != null ? op.routineDate() : routine.getRoutineDate(),
         op.dueTime() != null ? parseTime(op.dueTime()) : routine.getRoutineTime(),
         tag);
@@ -233,19 +248,23 @@ public class ReplanService {
   }
 
   private void applyCreateRoutine(ReplanOperation op, Todo anchor, Replan replan) {
+    if (op.routineType() == null) {
+      throw new CustomException(ReplanErrorCode.REPLAN_INVALID_OPERATION);
+    }
     User user = anchor.getUser();
     Tag tag = resolveTag(op.tagId(), user.getId());
     Routine routine =
         Routine.builder()
             .title(op.title())
             .routineTime(parseTime(op.dueTime()))
-            .routineType(op.routineType() != null ? RoutineType.valueOf(op.routineType()) : null)
+            .routineType(parseRoutineType(op.routineType()))
             .routineDate(op.routineDate())
             .user(user)
             .tag(tag)
             .build();
     routine.linkReplan(replan);
     routineRepository.save(routine);
+    routineService.createTodoTreeFromMother(routine);
   }
 
   private LocalTime parseTime(String time) {
@@ -255,7 +274,15 @@ public class ReplanService {
     try {
       return LocalTime.parse(time);
     } catch (DateTimeParseException e) {
-      throw new CustomException(ReplanErrorCode.REPLAN_GEMINI_PARSE_ERROR);
+      throw new CustomException(ReplanErrorCode.REPLAN_INVALID_OPERATION);
+    }
+  }
+
+  private RoutineType parseRoutineType(String routineType) {
+    try {
+      return RoutineType.valueOf(routineType);
+    } catch (IllegalArgumentException e) {
+      throw new CustomException(ReplanErrorCode.REPLAN_INVALID_OPERATION);
     }
   }
 
