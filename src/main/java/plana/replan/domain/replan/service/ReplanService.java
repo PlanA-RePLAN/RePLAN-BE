@@ -12,6 +12,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import plana.replan.domain.replan.dto.RecommendInput;
+import plana.replan.domain.replan.dto.ReplanAction;
 import plana.replan.domain.replan.dto.ReplanAnswer;
 import plana.replan.domain.replan.dto.ReplanOperation;
 import plana.replan.domain.replan.dto.ReplanQuestion;
@@ -136,6 +137,7 @@ public class ReplanService {
     boolean anchorModifiedInPlace = false;
 
     for (ReplanOperation op : req.acceptedOperations()) {
+      validateOperation(op);
       switch (op.action()) {
         case ADD -> {
           applyAdd(op, anchor, replan);
@@ -170,6 +172,20 @@ public class ReplanService {
         .failureReason2(r2)
         .failureReason3(r3)
         .build();
+  }
+
+  private void validateOperation(ReplanOperation op) {
+    if (op == null || op.action() == null) {
+      throw new CustomException(ReplanErrorCode.REPLAN_INVALID_OPERATION);
+    }
+    if ((op.action() == ReplanAction.MODIFY_TODO || op.action() == ReplanAction.MODIFY_ROUTINE)
+        && op.targetTodoId() == null) {
+      throw new CustomException(ReplanErrorCode.REPLAN_INVALID_OPERATION);
+    }
+    if ((op.action() == ReplanAction.ADD || op.action() == ReplanAction.CREATE_ROUTINE)
+        && (op.title() == null || op.title().isBlank())) {
+      throw new CustomException(ReplanErrorCode.REPLAN_INVALID_OPERATION);
+    }
   }
 
   private void validateReasonCodes(List<String> codes) {

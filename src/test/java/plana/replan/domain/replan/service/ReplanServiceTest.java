@@ -558,6 +558,56 @@ class ReplanServiceTest {
   }
 
   @Test
+  void 작업_action이_null이면_400() {
+    Todo todo = ownedTodo(42L, 1L);
+    given(todoRepository.findById(42L)).willReturn(Optional.of(todo));
+    given(replanRepository.save(any(Replan.class))).willAnswer(inv -> inv.getArgument(0));
+
+    ReplanOperation op =
+        new ReplanOperation(null, null, "제목", null, null, null, null, null, List.of());
+    ReplanSaveRequest req = new ReplanSaveRequest(42L, List.of("GOAL_NO_PRIORITY"), List.of(op));
+
+    assertThatThrownBy(() -> replanService.save(1L, req))
+        .isInstanceOfSatisfying(
+            CustomException.class,
+            e -> assertThat(e.getErrorCode()).isEqualTo(ReplanErrorCode.REPLAN_INVALID_OPERATION));
+  }
+
+  @Test
+  void MODIFY_TODO_타깃ID_없으면_400() {
+    Todo todo = ownedTodo(42L, 1L);
+    given(todoRepository.findById(42L)).willReturn(Optional.of(todo));
+    given(replanRepository.save(any(Replan.class))).willAnswer(inv -> inv.getArgument(0));
+
+    ReplanOperation op =
+        new ReplanOperation(
+            ReplanAction.MODIFY_TODO, null, "제목", null, null, null, null, null, List.of());
+    ReplanSaveRequest req = new ReplanSaveRequest(42L, List.of("GOAL_NO_PRIORITY"), List.of(op));
+
+    assertThatThrownBy(() -> replanService.save(1L, req))
+        .isInstanceOfSatisfying(
+            CustomException.class,
+            e -> assertThat(e.getErrorCode()).isEqualTo(ReplanErrorCode.REPLAN_INVALID_OPERATION));
+  }
+
+  @Test
+  void ADD_제목이_비면_400() {
+    Todo todo = ownedTodo(42L, 1L);
+    given(todoRepository.findById(42L)).willReturn(Optional.of(todo));
+    given(replanRepository.save(any(Replan.class))).willAnswer(inv -> inv.getArgument(0));
+
+    ReplanOperation op =
+        new ReplanOperation(
+            ReplanAction.ADD, null, null, "2026-06-20", null, null, null, null, List.of());
+    ReplanSaveRequest req = new ReplanSaveRequest(42L, List.of("GOAL_NO_PRIORITY"), List.of(op));
+
+    assertThatThrownBy(() -> replanService.save(1L, req))
+        .isInstanceOfSatisfying(
+            CustomException.class,
+            e -> assertThat(e.getErrorCode()).isEqualTo(ReplanErrorCode.REPLAN_INVALID_OPERATION));
+  }
+
+  @Test
   void MODIFY_ROUTINE_태그변경은_미완료_현재투두에도_반영된다() {
     // ownedTodo가 내부적으로 User mock(getId()→1L)을 anchor.getUser()에 연결해 둔다
     Todo anchor = ownedTodo(42L, 1L);
