@@ -61,6 +61,7 @@ public class ReplanService {
    */
   public ReplanRecommendResponse recommend(Long userId, ReplanRecommendRequest req) {
     validateReasonCodes(req.reasonCodes());
+    int refreshCount = normalizeRefreshCount(req.refreshCount());
     Todo anchor = findOwnedTodo(userId, req.anchorTodoId());
     List<String> reasonLabels = toReasonLabelPath(req.reasonCodes());
 
@@ -84,7 +85,7 @@ public class ReplanService {
       }
     }
 
-    RecommendInput input = buildInput(anchor, req.reasonCodes(), null, req.answers());
+    RecommendInput input = buildInput(anchor, req.reasonCodes(), null, req.answers(), refreshCount);
     List<ReplanOperation> operations = aiService.generateRecommend(input);
     return ReplanRecommendResponse.recommendation(operations, reasonLabels);
   }
@@ -121,7 +122,11 @@ public class ReplanService {
   }
 
   RecommendInput buildInput(
-      Todo anchor, List<String> reasonCodes, String directInput, List<ReplanAnswer> answers) {
+      Todo anchor,
+      List<String> reasonCodes,
+      String directInput,
+      List<ReplanAnswer> answers,
+      int refreshCount) {
     List<String> labels = toReasonLabels(reasonCodes);
     if (directInput != null && !directInput.isBlank()) {
       labels.add(directInput);
@@ -150,7 +155,8 @@ public class ReplanService {
         routine ? String.valueOf(anchor.getRoutine().getRoutineType()) : null,
         labels,
         answerInputs,
-        LocalDate.now(clock).format(DateTimeFormatter.ISO_LOCAL_DATE));
+        LocalDate.now(clock).format(DateTimeFormatter.ISO_LOCAL_DATE),
+        refreshCount);
   }
 
   private List<String> resolveSelectedTodoLabels(List<Long> todoIds, Long userId) {
@@ -252,6 +258,17 @@ public class ReplanService {
         && op.title().isBlank()) {
       throw new CustomException(ReplanErrorCode.REPLAN_INVALID_OPERATION);
     }
+  }
+
+  /** 새로고침 횟수를 0~3로 검증하고 null은 0으로 정규화한다. */
+  private int normalizeRefreshCount(Integer refreshCount) {
+    if (refreshCount == null) {
+      return 0;
+    }
+    if (refreshCount < 0 || refreshCount > 3) {
+      throw new CustomException(ReplanErrorCode.REPLAN_INVALID_REFRESH_COUNT);
+    }
+    return refreshCount;
   }
 
   private void validateReasonCodes(List<String> codes) {

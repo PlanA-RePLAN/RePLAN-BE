@@ -56,7 +56,8 @@ class ReplanAiServiceTest {
             null,
             List.of("목표 개선 필요", "우선 순위를 정하지 못했어요"),
             List.of(new RecommendInput.AnswerInput("free", "ADsP 4챕터", null, null, null)),
-            "2026-06-18");
+            "2026-06-18",
+            0);
 
     String prompt = service.buildRecommendPrompt(input);
 
@@ -79,13 +80,57 @@ class ReplanAiServiceTest {
             null,
             List.of("목표 개선 필요"),
             List.of(),
-            "2026-06-18");
+            "2026-06-18",
+            0);
 
     String prompt = service.buildRecommendPrompt(input);
 
     assertThat(prompt).contains("42");
     assertThat(prompt).contains("targetTodoId");
     assertThat(prompt).contains("'대상 투두 ID'");
+  }
+
+  @Test
+  void 새로고침_0회차면_스타일_블록이_없다() {
+    RecommendInput input =
+        new RecommendInput(
+            7L,
+            "데이터 분석",
+            "2026-06-07",
+            null,
+            false,
+            null,
+            List.of("목표 개선 필요"),
+            List.of(),
+            "2026-06-18",
+            0);
+
+    String prompt = service.buildRecommendPrompt(input);
+
+    assertThat(prompt).doesNotContain("[이번 새로고침 스타일]");
+  }
+
+  @Test
+  void 새로고침_2회차면_벼락치기_스타일_블록이_붙는다() {
+    RecommendInput input =
+        new RecommendInput(
+            7L,
+            "데이터 분석",
+            "2026-06-07",
+            null,
+            false,
+            null,
+            List.of("목표 개선 필요"),
+            List.of(),
+            "2026-06-18",
+            2);
+
+    String prompt = service.buildRecommendPrompt(input);
+
+    assertThat(prompt).contains("[이번 새로고침 스타일]");
+    assertThat(prompt).contains("벼락치기");
+    // 기존 공통 규칙/포맷은 여전히 포함
+    assertThat(prompt).contains("operations");
   }
 
   @Test
@@ -106,7 +151,8 @@ class ReplanAiServiceTest {
                     List.of(99L, 100L),
                     null,
                     List.of("99:영단어 100개 암기", "100:독서 30분"))),
-            "2026-06-18");
+            "2026-06-18",
+            0);
 
     String prompt = service.buildRecommendPrompt(input);
 
