@@ -332,6 +332,10 @@ class ReplanServiceTest {
     given(todoRepository.findById(42L)).willReturn(Optional.of(todo));
     given(replanRepository.save(any(Replan.class))).willAnswer(inv -> inv.getArgument(0));
 
+    Todo instanceTodo = org.mockito.Mockito.mock(Todo.class);
+    given(todoRepository.findFirstUpcomingMotherTodoByRoutine(any(), any()))
+        .willReturn(Optional.of(instanceTodo));
+
     ReplanOperation op =
         new ReplanOperation(
             ReplanAction.CREATE_ROUTINE,
@@ -349,6 +353,7 @@ class ReplanServiceTest {
 
     then(routineRepository).should(times(1)).save(any(Routine.class));
     then(routineService).should().createTodoTreeFromMother(any());
+    then(instanceTodo).should().linkReplan(any(Replan.class));
   }
 
   @Test

@@ -11,6 +11,7 @@ import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import plana.replan.domain.replan.dto.RecommendInput;
 import plana.replan.domain.replan.dto.ReplanAnswer;
 import plana.replan.domain.replan.dto.ReplanOperation;
 import plana.replan.domain.replan.dto.ReplanQuestion;
@@ -265,6 +266,9 @@ public class ReplanService {
     routine.linkReplan(replan);
     routineRepository.save(routine);
     routineService.createTodoTreeFromMother(routine);
+    todoRepository
+        .findFirstUpcomingMotherTodoByRoutine(routine, LocalDate.now(clock).atStartOfDay())
+        .ifPresent(instanceTodo -> instanceTodo.linkReplan(replan));
   }
 
   private LocalTime parseTime(String time) {
