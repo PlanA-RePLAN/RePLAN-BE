@@ -18,7 +18,8 @@ public enum GoalErrorCode implements ErrorCode {
   TODO_SUB_ROUTINE_NOT_ALLOWED_FOR_ONE_TIME(400, "단발성 투두에는 하위 루틴을 추가할 수 없습니다."),
   TODO_SUB_ROUTINE_INVALID_TITLE(400, "하위 루틴 제목은 비어있을 수 없습니다."),
   GEMINI_API_ERROR(502, "AI 추천 서비스에 일시적인 오류가 발생했습니다."),
-  GEMINI_PARSE_ERROR(502, "AI 응답을 처리하는 중 오류가 발생했습니다.");
+  GEMINI_PARSE_ERROR(502, "AI 응답을 처리하는 중 오류가 발생했습니다."),
+  INVALID_REFRESH_COUNT(400, "새로고침 횟수는 0 이상 3 이하여야 합니다.");
 
   private final int status;
   private final String message;

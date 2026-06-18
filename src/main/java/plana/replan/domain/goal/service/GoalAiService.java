@@ -131,14 +131,27 @@ public class GoalAiService {
   }
 
   public TodoRecommendationResponse recommendTodos(TodoRecommendationRequest request) {
+    normalizeRefreshCount(request.refreshCount());
     String prompt = buildRecommendPrompt(request);
     String raw = callGemini(prompt);
     return parseRecommendResponse(raw);
   }
 
-  private String buildRecommendPrompt(TodoRecommendationRequest req) {
+  /** 새로고침 횟수를 0~3로 검증하고 null은 0으로 정규화한다. */
+  private int normalizeRefreshCount(Integer refreshCount) {
+    if (refreshCount == null) {
+      return 0;
+    }
+    if (refreshCount < 0 || refreshCount > 3) {
+      throw new CustomException(GoalErrorCode.INVALID_REFRESH_COUNT);
+    }
+    return refreshCount;
+  }
+
+  String buildRecommendPrompt(TodoRecommendationRequest req) {
     String deadlineInfo = buildDeadlineInfo(req.deadlineDate(), req.deadlineTime());
-    return """
+    String prompt =
+        """
         당신은 목표 달성 플래닝 전문가입니다.
 
         목표: %s
@@ -188,12 +201,33 @@ public class GoalAiService {
         반드시 아래 JSON만 출력하세요 (다른 설명 없이):
         {"overallReason":"","todos":[{"type":"","title":"","dueDate":null,"dueTime":null,"routineType":null,"routineDate":null}]}
         """
-        .formatted(
-            req.goal(),
-            deadlineInfo,
-            req.currentLevel() != null ? req.currentLevel() : "미입력",
-            req.availableTime() != null ? req.availableTime() : "미입력",
-            req.notes() != null ? req.notes() : "미입력");
+            .formatted(
+                req.goal(),
+                deadlineInfo,
+                req.currentLevel() != null ? req.currentLevel() : "미입력",
+                req.availableTime() != null ? req.availableTime() : "미입력",
+                req.notes() != null ? req.notes() : "미입력");
+    return prompt + refreshStyleBlock(req.refreshCount() == null ? 0 : req.refreshCount());
+  }
+
+  /** 새로고침 회차(1~3)에 맞는 스타일 안내 블록. 0/그 외는 빈 문자열(0회차는 프롬프트 변경 없음). */
+  static String refreshStyleBlock(int refreshCount) {
+    String line =
+        switch (refreshCount) {
+          case 1 ->
+              "1회차(여유): 마감에 5~6일 버퍼를 넉넉히 둔다. 할 일은 아주 잘게(마이크로) 쪼개고, 쉬운 것부터 정순으로 배치한다.";
+          case 2 ->
+              "2회차(벼락치기): 버퍼 없이 혹은 마이너스로 빡빡하게 잡는다. 가장 핵심 1개(1-Pick) 위주로 줄이고, 어려운 것부터 역순으로 배치한다.";
+          case 3 ->
+              "3회차(환경 변경): 분량·난이도는 적정 수준으로 두되, 진행 시간대나 요일을 옮기는 방향으로 제안한다.";
+          default -> null;
+        };
+    if (line == null) {
+      return "";
+    }
+    return "\n\n[이번 새로고침 스타일]\n"
+        + line
+        + "\n위 스타일을 우선으로 적용하되, 결과는 위 공통 규칙(투두 형식·JSON 포맷)을 그대로 따른다.";
   }
 
   private String buildDeadlineInfo(String deadlineDate, String deadlineTime) {

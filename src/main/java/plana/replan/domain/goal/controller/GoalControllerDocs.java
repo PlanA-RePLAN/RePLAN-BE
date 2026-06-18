@@ -942,6 +942,8 @@ public interface GoalControllerDocs {
           목표 정보를 기반으로 AI가 달성에 필요한 투두 리스트를 추천합니다.
           반환된 데이터를 사용해 클라이언트가 기존 투두/루틴 생성 API를 호출하여 실제 투두를 생성합니다.
 
+          새로고침: 같은 요청 몸체에 refreshCount만 1~3으로 올려 다시 호출하면 회차별 다른 스타일의 추천이 옵니다(최대 3회).
+
           ---
 
           ### Request Headers
@@ -963,6 +965,7 @@ public interface GoalControllerDocs {
           | currentLevel | ❌ 선택 | string | 현재 수준 | `"토익 600점"` |
           | availableTime | ❌ 선택 | string | 투자 가능 시간 | `"평일 1시간·주말 4시간"` |
           | notes | ❌ 선택 | string | 특이사항 (교재·루틴·전략 포함 권장) | `"해커스 보카·RC·LC 활용"` |
+          | refreshCount | ❌ 선택 | integer | 새로고침 횟수 (0~3). 0 또는 생략은 첫 추천, 1~3은 회차별 스타일로 다시 추천 | `0` |
 
           > ❌ 선택 필드는 생략하거나 null로 전달해도 동일하게 처리됩니다.
 
@@ -1036,24 +1039,41 @@ public interface GoalControllerDocs {
                             """))),
     @ApiResponse(
         responseCode = "400",
-        description = "필수 필드 누락",
+        description = "필수 필드 누락 또는 새로고침 횟수 오류",
         content =
             @Content(
-                examples =
-                    @ExampleObject(
-                        value =
-                            """
-                            {
-                              "status": 400,
-                              "success": false,
-                              "data": null,
-                              "error": {
-                                "code": "INVALID_INPUT",
-                                "message": "목표는 필수입니다.",
-                                "detail": null
-                              }
+                examples = {
+                  @ExampleObject(
+                      name = "필수 필드 누락",
+                      value =
+                          """
+                          {
+                            "status": 400,
+                            "success": false,
+                            "data": null,
+                            "error": {
+                              "code": "INVALID_INPUT",
+                              "message": "목표는 필수입니다.",
+                              "detail": null
                             }
-                            """))),
+                          }
+                          """),
+                  @ExampleObject(
+                      name = "새로고침 횟수 오류",
+                      value =
+                          """
+                          {
+                            "status": 400,
+                            "success": false,
+                            "data": null,
+                            "error": {
+                              "code": "INVALID_REFRESH_COUNT",
+                              "message": "새로고침 횟수는 0 이상 3 이하여야 합니다.",
+                              "detail": null
+                            }
+                          }
+                          """)
+                })),
     @ApiResponse(
         responseCode = "401",
         description = "인증 실패",
@@ -1130,7 +1150,23 @@ public interface GoalControllerDocs {
                                   "deadlineTime": "08:00",
                                   "currentLevel": "토익 600점 (LC 310·RC 290 추정)",
                                   "availableTime": "평일 1시간·주말 4시간 (주 약 13시간)",
-                                  "notes": "해커스 보카·RC·LC 활용. 주 1회 모의고사. 매주 오답 노트 정리."
+                                  "notes": "해커스 보카·RC·LC 활용. 주 1회 모의고사. 매주 오답 노트 정리.",
+                                  "refreshCount": 0
+                                }
+                                """),
+                        @ExampleObject(
+                            name = "새로고침 2회차 (벼락치기 스타일)",
+                            summary = "같은 내용에 refreshCount만 올려 다시 호출하면 다른 스타일의 추천이 옵니다.",
+                            value =
+                                """
+                                {
+                                  "goal": "토익 900점 달성 (LC 450·RC 450 이상)",
+                                  "deadlineDate": "2025-08-25",
+                                  "deadlineTime": "08:00",
+                                  "currentLevel": "토익 600점 (LC 310·RC 290 추정)",
+                                  "availableTime": "평일 1시간·주말 4시간 (주 약 13시간)",
+                                  "notes": "해커스 보카·RC·LC 활용. 주 1회 모의고사. 매주 오답 노트 정리.",
+                                  "refreshCount": 2
                                 }
                                 """),
                         @ExampleObject(
