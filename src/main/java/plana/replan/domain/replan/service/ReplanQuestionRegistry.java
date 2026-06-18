@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.Map;
 import plana.replan.domain.replan.dto.QuestionType;
 import plana.replan.domain.replan.dto.ReplanQuestion;
+import plana.replan.domain.replan.entity.FailureReasonCode;
 
 /**
  * 실패 사유 코드 → 추가 질문 고정 매핑. "이 사유면 어떤 질문이 필요한가"는 리플랜 로직 문서에 정의된 결정론적 비즈니스 규칙이므로, LLM 판단이나 프론트 선택이 아니라
@@ -67,11 +68,35 @@ public final class ReplanQuestionRegistry {
       return result;
     }
     for (String code : reasonCodes) {
-      ReplanQuestion q = QUESTIONS.get(code);
+      ReplanQuestion q = resolve(code);
       if (q != null && result.stream().noneMatch(r -> r.key().equals(q.key()))) {
         result.add(q);
       }
     }
     return result;
+  }
+
+  /**
+   * 코드에 직접 매핑된 질문을 찾고, 없으면 상위 사유(부모)로 거슬러 올라가 찾는다. 예: 수면 하위 코드(CONDITION_SLEEP_3H_UNDER)는 부모
+   * CONDITION_SLEEP의 질문(reschedule_date)을 상속한다.
+   */
+  private static ReplanQuestion resolve(String code) {
+    ReplanQuestion direct = QUESTIONS.get(code);
+    if (direct != null) {
+      return direct;
+    }
+    try {
+      FailureReasonCode fc = FailureReasonCode.valueOf(code);
+      while (fc != null) {
+        ReplanQuestion q = QUESTIONS.get(fc.name());
+        if (q != null) {
+          return q;
+        }
+        fc = fc.getParent();
+      }
+    } catch (IllegalArgumentException ignored) {
+      // enum에 없는 코드(직접입력 등)는 질문 없음
+    }
+    return null;
   }
 }

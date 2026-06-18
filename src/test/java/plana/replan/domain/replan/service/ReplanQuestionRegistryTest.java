@@ -56,4 +56,13 @@ class ReplanQuestionRegistryTest {
   void null이면_빈목록() {
     assertThat(ReplanQuestionRegistry.forReasonCodes(null)).isEmpty();
   }
+
+  @Test
+  void 수면_하위코드는_부모_질문을_상속한다() {
+    List<ReplanQuestion> questions =
+        ReplanQuestionRegistry.forReasonCodes(List.of("CONDITION_SLEEP_3H_UNDER"));
+
+    assertThat(questions).hasSize(1);
+    assertThat(questions.get(0).key()).isEqualTo("reschedule_date");
+  }
 }

@@ -39,6 +39,9 @@ import plana.replan.global.exception.CustomException;
 @RequiredArgsConstructor
 public class ReplanService {
 
+  private static final DateTimeFormatter ANCHOR_DUE_FORMAT =
+      DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
+
   private final TodoRepository todoRepository;
   private final ReplanRepository replanRepository;
   private final ReplanAiService aiService;
@@ -87,9 +90,8 @@ public class ReplanService {
     return new RecommendInput(
         anchor.getId(),
         anchor.getTitle(),
-        anchor.getDueDate() != null
-            ? anchor.getDueDate().toLocalDate().format(DateTimeFormatter.ISO_LOCAL_DATE)
-            : null,
+        // 마감 시간까지 포함해 보낸다 — +30분/+1시간/+2시간 같은 로직이 기존 시간을 기준으로 계산할 수 있어야 한다.
+        anchor.getDueDate() != null ? anchor.getDueDate().format(ANCHOR_DUE_FORMAT) : null,
         anchor.getTag() != null ? anchor.getTag().getTitle() : null,
         routine,
         routine ? String.valueOf(anchor.getRoutine().getRoutineType()) : null,

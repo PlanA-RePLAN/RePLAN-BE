@@ -21,6 +21,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import plana.replan.domain.replan.dto.RecommendInput;
 import plana.replan.domain.replan.dto.ReplanAction;
 import plana.replan.domain.replan.dto.ReplanAnswer;
 import plana.replan.domain.replan.dto.ReplanOperation;
@@ -464,6 +465,17 @@ class ReplanServiceTest {
         .isInstanceOfSatisfying(
             CustomException.class,
             e -> assertThat(e.getErrorCode()).isEqualTo(ReplanErrorCode.REPLAN_INVALID_REASON));
+  }
+
+  @Test
+  void AI입력에_앵커_마감시간이_포함된다() {
+    // buildInput만 직접 호출하므로 ownedTodo의 user stub은 불필요 — 최소 목만 둔다.
+    Todo todo = org.mockito.Mockito.mock(Todo.class);
+    given(todo.getDueDate()).willReturn(LocalDateTime.of(2026, 6, 7, 10, 0));
+
+    RecommendInput input = replanService.buildInput(todo, List.of("INTERRUPT_SUDDEN"), null, null);
+
+    assertThat(input.anchorDueDate()).isEqualTo("2026-06-07 10:00");
   }
 
   @Test
