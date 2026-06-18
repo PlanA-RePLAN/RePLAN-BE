@@ -290,6 +290,9 @@ public class ReplanService {
   }
 
   private void applyModifyRoutine(ReplanOperation op, Todo anchor, Replan replan) {
+    if (!op.targetTodoId().equals(anchor.getId())) {
+      throw new CustomException(ReplanErrorCode.REPLAN_INVALID_OPERATION);
+    }
     Routine routine = anchor.getRoutine();
     if (routine == null) {
       throw new CustomException(ReplanErrorCode.REPLAN_TODO_NOT_FOUND);

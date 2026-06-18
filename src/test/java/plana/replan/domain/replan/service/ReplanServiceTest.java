@@ -272,6 +272,7 @@ class ReplanServiceTest {
   @Test
   void MODIFY_ROUTINE은_루틴_규칙을_수정한다() {
     Todo todo = ownedTodo(42L, 1L);
+    given(todo.getId()).willReturn(42L);
     Routine routine = org.mockito.Mockito.mock(Routine.class);
     given(todo.getRoutine()).willReturn(routine);
     given(todo.isCompleted()).willReturn(false);
@@ -303,6 +304,7 @@ class ReplanServiceTest {
   @Test
   void 루틴_수정_시_미지정_필드는_기존값_유지된다() {
     Todo todo = ownedTodo(42L, 1L);
+    given(todo.getId()).willReturn(42L);
     Routine routine = org.mockito.Mockito.mock(Routine.class);
     given(todo.getRoutine()).willReturn(routine);
     given(todo.isCompleted()).willReturn(false);
@@ -505,6 +507,7 @@ class ReplanServiceTest {
   @Test
   void MODIFY_ROUTINE_위클리인데_요일없으면_400() {
     Todo todo = ownedTodo(42L, 1L);
+    given(todo.getId()).willReturn(42L);
     Routine routine = org.mockito.Mockito.mock(Routine.class);
     given(todo.getRoutine()).willReturn(routine);
     given(todoRepository.findById(42L)).willReturn(Optional.of(todo));
@@ -523,6 +526,32 @@ class ReplanServiceTest {
             null,
             "WEEKLY",
             null, // routineDate 없음 — 유효하지 않음
+            List.of());
+    ReplanSaveRequest req = new ReplanSaveRequest(42L, List.of("GOAL_NO_PRIORITY"), List.of(op));
+
+    assertThatThrownBy(() -> replanService.save(1L, req))
+        .isInstanceOfSatisfying(
+            CustomException.class,
+            e -> assertThat(e.getErrorCode()).isEqualTo(ReplanErrorCode.REPLAN_INVALID_OPERATION));
+  }
+
+  @Test
+  void MODIFY_ROUTINE_타깃이_앵커가_아니면_400() {
+    Todo anchor = ownedTodo(42L, 1L);
+    given(anchor.getId()).willReturn(42L);
+    given(todoRepository.findById(42L)).willReturn(Optional.of(anchor));
+    given(replanRepository.save(any(Replan.class))).willAnswer(inv -> inv.getArgument(0));
+
+    ReplanOperation op =
+        new ReplanOperation(
+            ReplanAction.MODIFY_ROUTINE,
+            99L, // 앵커(42L)와 다른 타깃
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
             List.of());
     ReplanSaveRequest req = new ReplanSaveRequest(42L, List.of("GOAL_NO_PRIORITY"), List.of(op));
 
@@ -611,6 +640,7 @@ class ReplanServiceTest {
   void MODIFY_ROUTINE_태그변경은_미완료_현재투두에도_반영된다() {
     // ownedTodo가 내부적으로 User mock(getId()→1L)을 anchor.getUser()에 연결해 둔다
     Todo anchor = ownedTodo(42L, 1L);
+    given(anchor.getId()).willReturn(42L);
     Routine routine = org.mockito.Mockito.mock(Routine.class);
     given(anchor.getRoutine()).willReturn(routine);
     given(anchor.isCompleted()).willReturn(false);
