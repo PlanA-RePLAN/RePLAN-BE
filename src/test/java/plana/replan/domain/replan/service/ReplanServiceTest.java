@@ -613,8 +613,6 @@ class ReplanServiceTest {
     given(todoRepository.findById(42L)).willReturn(Optional.of(todo));
     given(replanRepository.save(any(Replan.class))).willAnswer(inv -> inv.getArgument(0));
     // op에 routineType="WEEKLY"이고 routineDate=null → 유효성 검사에서 즉시 실패
-    // effectiveRoutineDate는 op.routineDate()(null) → routine.getRoutineDate() fallback 필요
-    given(routine.getRoutineDate()).willReturn(null);
 
     ReplanOperation op =
         new ReplanOperation(
@@ -627,6 +625,28 @@ class ReplanServiceTest {
             "WEEKLY",
             null, // routineDate 없음 — 유효하지 않음
             List.of());
+    ReplanSaveRequest req = new ReplanSaveRequest(42L, List.of("GOAL_NO_PRIORITY"), List.of(op));
+
+    assertThatThrownBy(() -> replanService.save(1L, req))
+        .isInstanceOfSatisfying(
+            CustomException.class,
+            e -> assertThat(e.getErrorCode()).isEqualTo(ReplanErrorCode.REPLAN_INVALID_OPERATION));
+  }
+
+  @Test
+  void MODIFY_ROUTINE_반복유형_변경시_새_요일을_안주면_400() {
+    Todo todo = ownedTodo(42L, 1L);
+    given(todo.getId()).willReturn(42L);
+    Routine routine = org.mockito.Mockito.mock(Routine.class);
+    given(todo.getRoutine()).willReturn(routine);
+    given(todoRepository.findById(42L)).willReturn(Optional.of(todo));
+    given(replanRepository.save(any(Replan.class))).willAnswer(inv -> inv.getArgument(0));
+    // 기존은 MONTHLY → WEEKLY로 바꾸면서 routineDate를 안 주면 기존 일자를 요일로 오용하면 안 되므로 400
+    given(routine.getRoutineType()).willReturn(RoutineType.MONTHLY);
+
+    ReplanOperation op =
+        new ReplanOperation(
+            ReplanAction.MODIFY_ROUTINE, 42L, null, null, null, null, "WEEKLY", null, List.of());
     ReplanSaveRequest req = new ReplanSaveRequest(42L, List.of("GOAL_NO_PRIORITY"), List.of(op));
 
     assertThatThrownBy(() -> replanService.save(1L, req))

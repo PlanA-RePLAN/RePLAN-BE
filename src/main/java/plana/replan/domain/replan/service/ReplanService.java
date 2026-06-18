@@ -342,8 +342,14 @@ public class ReplanService {
         op.tagId() != null ? resolveTag(op.tagId(), anchor.getUser().getId()) : routine.getTag();
     RoutineType effectiveType =
         op.routineType() != null ? parseRoutineType(op.routineType()) : routine.getRoutineType();
+    // 반복 유형이 바뀌면 기존 routineDate는 의미가 달라(WEEKLY=요일 비트마스크 ↔ MONTHLY=일자)
+    // 재사용하지 않고, 새 유형에 맞는 routineDate를 op가 명시하도록 강제한다(없으면 아래 검증에서 400).
+    // 유형이 그대로면 생략된 routineDate를 기존 값으로 보완한다.
+    boolean typeChanged = op.routineType() != null && effectiveType != routine.getRoutineType();
     Integer effectiveRoutineDate =
-        op.routineDate() != null ? op.routineDate() : routine.getRoutineDate();
+        typeChanged
+            ? op.routineDate()
+            : (op.routineDate() != null ? op.routineDate() : routine.getRoutineDate());
     validateRecurrence(effectiveType, effectiveRoutineDate);
     routine.update(
         op.title() != null ? op.title() : routine.getTitle(),
