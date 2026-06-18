@@ -235,6 +235,35 @@ class ReplanServiceTest {
         .update(eq("영단어 50개 암기"), eq(RoutineType.WEEKLY), eq(62),
             eq(LocalTime.of(11, 15)), any());
     then(routine).should().linkReplan(any(Replan.class));
+    then(todo).should().linkReplan(any(Replan.class));
+  }
+
+  @Test
+  void 루틴_수정_시_미지정_필드는_기존값_유지된다() {
+    Todo todo = ownedTodo(42L, 1L);
+    Routine routine = org.mockito.Mockito.mock(Routine.class);
+    given(todo.getRoutine()).willReturn(routine);
+    given(todo.isCompleted()).willReturn(false);
+    given(todoRepository.findById(42L)).willReturn(Optional.of(todo));
+    given(replanRepository.save(any(Replan.class))).willAnswer(inv -> inv.getArgument(0));
+    // op에서 title만 지정, 나머지는 null → 기존 루틴 값으로 fallback
+    given(routine.getRoutineType()).willReturn(RoutineType.DAILY);
+    given(routine.getRoutineDate()).willReturn(3);
+    given(routine.getRoutineTime()).willReturn(LocalTime.of(7, 30));
+    given(routine.getTag()).willReturn(null);
+
+    ReplanOperation op =
+        new ReplanOperation(
+            ReplanAction.MODIFY_ROUTINE, 42L, "새 제목", null, null,
+            null, null, null, List.of());
+    ReplanSaveRequest req =
+        new ReplanSaveRequest(42L, List.of("GOAL_NO_PRIORITY"), List.of(op));
+
+    replanService.save(1L, req);
+
+    then(routine).should()
+        .update(eq("새 제목"), eq(RoutineType.DAILY), eq(3),
+            eq(LocalTime.of(7, 30)), any());
   }
 
   @Test

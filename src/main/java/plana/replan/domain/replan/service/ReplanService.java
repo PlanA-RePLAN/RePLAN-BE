@@ -215,8 +215,8 @@ public class ReplanService {
     routine.update(
         op.title() != null ? op.title() : routine.getTitle(),
         op.routineType() != null ? RoutineType.valueOf(op.routineType()) : routine.getRoutineType(),
-        op.routineDate(),
-        parseTime(op.dueTime()),
+        op.routineDate() != null ? op.routineDate() : routine.getRoutineDate(),
+        op.dueTime() != null ? parseTime(op.dueTime()) : routine.getRoutineTime(),
         tag);
     routine.linkReplan(replan);
 
