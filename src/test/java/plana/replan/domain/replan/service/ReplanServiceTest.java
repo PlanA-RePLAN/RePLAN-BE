@@ -81,6 +81,8 @@ class ReplanServiceTest {
   @Test
   void 추가질문_필요한_사유는_질문을_반환하고_AI를_부르지_않는다() {
     Todo todo = ownedTodo(42L, 1L);
+    given(todo.getId()).willReturn(42L);
+    given(todo.getDueDate()).willReturn(LocalDateTime.of(2026, 6, 25, 11, 0));
     given(todoRepository.findById(42L)).willReturn(Optional.of(todo));
 
     // GOAL_NO_PRIORITY는 우선순위 투두 선택 질문이 필요한 사유
@@ -91,6 +93,13 @@ class ReplanServiceTest {
     assertThat(res.needsMoreInfo()).isTrue();
     assertThat(res.questions()).hasSize(1);
     assertThat(res.questions().get(0).key()).isEqualTo("priority_targets");
+    // 질문 단계에는 reasonLabels를 내려보내지 않는다(최종 추천 화면 전용)
+    assertThat(res.reasonLabels()).isNull();
+    // "기존 투두 수정 사항" 카드용으로 앵커 투두의 기존 정보를 함께 내려준다
+    assertThat(res.anchorTodo()).isNotNull();
+    assertThat(res.anchorTodo().todoId()).isEqualTo(42L);
+    assertThat(res.anchorTodo().title()).isEqualTo("데이터 분석 공부하기");
+    assertThat(res.anchorTodo().dueDate()).isEqualTo(LocalDateTime.of(2026, 6, 25, 11, 0));
     then(aiService).should(never()).generateRecommend(any());
   }
 
@@ -120,6 +129,8 @@ class ReplanServiceTest {
     assertThat(res.needsMoreInfo()).isFalse();
     // 선택 사유의 상위→하위 라벨이 함께 내려간다
     assertThat(res.reasonLabels()).containsExactly("예상치 못한 방해 발생", "돌발 상황이 발생했어요");
+    // 추천 단계에는 질문용 앵커 정보를 내려보내지 않는다
+    assertThat(res.anchorTodo()).isNull();
   }
 
   @Test

@@ -13,6 +13,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import plana.replan.domain.replan.dto.RecommendInput;
 import plana.replan.domain.replan.dto.ReplanAction;
+import plana.replan.domain.replan.dto.ReplanAnchorTodo;
 import plana.replan.domain.replan.dto.ReplanAnswer;
 import plana.replan.domain.replan.dto.ReplanOperation;
 import plana.replan.domain.replan.dto.ReplanQuestion;
@@ -63,7 +64,8 @@ public class ReplanService {
     if (noAnswers) {
       List<ReplanQuestion> questions = ReplanQuestionRegistry.forReasonCodes(req.reasonCodes());
       if (!questions.isEmpty()) {
-        return ReplanRecommendResponse.askQuestions(questions, reasonLabels);
+        // 질문 화면의 "기존 투두 수정 사항" 카드용으로 앵커 투두의 기존 정보를 함께 내려준다.
+        return ReplanRecommendResponse.askQuestions(questions, ReplanAnchorTodo.from(anchor));
       }
     }
 

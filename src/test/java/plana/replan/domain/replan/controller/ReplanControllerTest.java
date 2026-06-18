@@ -9,6 +9,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -20,6 +21,7 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import plana.replan.domain.replan.dto.QuestionType;
+import plana.replan.domain.replan.dto.ReplanAnchorTodo;
 import plana.replan.domain.replan.dto.ReplanQuestion;
 import plana.replan.domain.replan.dto.ReplanRecommendResponse;
 import plana.replan.domain.replan.service.ReplanService;
@@ -70,7 +72,14 @@ class ReplanControllerTest {
                 List.of(
                     new ReplanQuestion(
                         "priority_targets", QuestionType.TODO_SELECT, "투두 선택", null)),
-                List.of("목표/계획 개선 필요", "우선 순위를 정하지 못했어요")));
+                new ReplanAnchorTodo(
+                    42L,
+                    "데이터 분석 공부하기",
+                    LocalDateTime.of(2026, 6, 25, 11, 0),
+                    3L,
+                    "Study",
+                    "#FAD7A0",
+                    null)));
 
     mockMvc
         .perform(
@@ -85,7 +94,12 @@ class ReplanControllerTest {
         .andExpect(jsonPath("$.success").value(true))
         .andExpect(jsonPath("$.data.needsMoreInfo").value(true))
         .andExpect(jsonPath("$.data.questions[0].type").value("TODO_SELECT"))
-        .andExpect(jsonPath("$.data.questions[0].key").value("priority_targets"));
+        .andExpect(jsonPath("$.data.questions[0].key").value("priority_targets"))
+        // 질문 단계엔 reasonLabels 대신 앵커 투두의 기존 정보가 내려간다
+        .andExpect(jsonPath("$.data.reasonLabels").doesNotExist())
+        .andExpect(jsonPath("$.data.anchorTodo.todoId").value(42))
+        .andExpect(jsonPath("$.data.anchorTodo.title").value("데이터 분석 공부하기"))
+        .andExpect(jsonPath("$.data.anchorTodo.tagTitle").value("Study"));
   }
 
   @Test

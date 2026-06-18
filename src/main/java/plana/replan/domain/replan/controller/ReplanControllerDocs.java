@@ -19,8 +19,8 @@ public interface ReplanControllerDocs {
       summary = "추천 받기 (질문 또는 추천)",
       description =
           "2단계로 선택한 실패 이유(reasonCodes)를 보냅니다. 서버가 그 이유에 추가 질문이 필요한지 결정합니다.\n"
-              + "- 추가 질문이 필요하면 needsMoreInfo=true와 questions가 옵니다. 사용자가 답한 뒤 answers를 채워 다시 호출하세요.\n"
-              + "- 질문이 필요 없거나 answers가 있으면 needsMoreInfo=false와 추천(summary/tipNote/operations)이 옵니다.\n"
+              + "- 추가 질문이 필요하면 needsMoreInfo=true와 questions, 그리고 \"기존 투두 수정 사항\" 카드용 anchorTodo(앵커 투두의 기존 정보)가 옵니다. 사용자가 답한 뒤 answers를 채워 다시 호출하세요.\n"
+              + "- 질문이 필요 없거나 answers가 있으면 needsMoreInfo=false와 추천(reasonLabels, operations)이 옵니다.\n"
               + "- 새로고침은 같은 요청을 그대로 다시 호출하면 됩니다.")
   @ApiResponses({
     @ApiResponse(
@@ -38,6 +38,15 @@ public interface ReplanControllerDocs {
                             "success": true,
                             "data": {
                               "needsMoreInfo": true,
+                              "anchorTodo": {
+                                "todoId": 42,
+                                "title": "데이터 분석 공부하기",
+                                "dueDate": "2026-06-25T11:00:00",
+                                "tagId": 3,
+                                "tagTitle": "Study",
+                                "tagColor": "#FAD7A0",
+                                "routineType": null
+                              },
                               "questions": [
                                 {
                                   "key": "priority_targets",
@@ -46,8 +55,6 @@ public interface ReplanControllerDocs {
                                   "chips": null
                                 }
                               ],
-                              "summary": null,
-                              "tipNote": null,
                               "operations": []
                             },
                             "error": null
@@ -63,9 +70,22 @@ public interface ReplanControllerDocs {
                             "data": {
                               "needsMoreInfo": false,
                               "questions": [],
-                              "summary": "일정이 촉박했습니다. 마감을 늘리고 단계를 나눴습니다.",
-                              "tipNote": "작은 단위로 쪼개면 성공률이 올라갑니다.",
-                              "operations": []
+                              "reasonLabels": ["예상치 못한 방해 발생", "돌발 상황이 발생했어요"],
+                              "operations": [
+                                {
+                                  "action": "MODIFY_TODO",
+                                  "targetTodoId": 42,
+                                  "title": "데이터 분석 공부하기",
+                                  "dueDate": "2026-06-26",
+                                  "dueTime": "23:59",
+                                  "tagId": null,
+                                  "routineType": null,
+                                  "routineDate": null,
+                                  "changedFields": [
+                                    {"field": "dueDate", "before": "2026-06-25", "after": "2026-06-26"}
+                                  ]
+                                }
+                              ]
                             },
                             "error": null
                           }
