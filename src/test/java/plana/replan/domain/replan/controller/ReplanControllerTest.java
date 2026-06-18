@@ -1,0 +1,76 @@
+package plana.replan.domain.replan.controller;
+
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.BDDMockito.given;
+import static org.mockito.BDDMockito.willDoNothing;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import java.util.List;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.context.annotation.Import;
+import org.springframework.http.MediaType;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.web.servlet.MockMvc;
+import plana.replan.domain.replan.dto.ReplanRecommendResponse;
+import plana.replan.domain.replan.service.ReplanService;
+import plana.replan.global.config.SecurityConfig;
+import plana.replan.global.jwt.JwtUtil;
+
+@WebMvcTest(ReplanController.class)
+@Import(SecurityConfig.class)
+class ReplanControllerTest {
+
+  @Autowired private MockMvc mockMvc;
+
+  @MockitoBean private ReplanService replanService;
+  @MockitoBean private JwtUtil jwtUtil;
+
+  private UsernamePasswordAuthenticationToken authToken(Long userId) {
+    return new UsernamePasswordAuthenticationToken(
+        userId, null, List.of(new SimpleGrantedAuthority("ROLE_USER")));
+  }
+
+  @Test
+  void 추천_엔드포인트_성공() throws Exception {
+    given(replanService.recommend(eq(1L), any()))
+        .willReturn(new ReplanRecommendResponse("요약", "팁", List.of()));
+
+    mockMvc
+        .perform(
+            post("/api/replans/recommend")
+                .with(authentication(authToken(1L)))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """
+                    {"anchorTodoId":42,"reasonCodes":["GOAL_NO_PRIORITY"],"answers":[]}
+                    """))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.success").value(true))
+        .andExpect(jsonPath("$.data.summary").value("요약"));
+  }
+
+  @Test
+  void 저장_엔드포인트_성공() throws Exception {
+    willDoNothing().given(replanService).save(eq(1L), any());
+
+    mockMvc
+        .perform(
+            post("/api/replans")
+                .with(authentication(authToken(1L)))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """
+                    {"anchorTodoId":42,"reasonCodes":["GOAL_NO_PRIORITY"],"acceptedOperations":[]}
+                    """))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.success").value(true));
+  }
+}
