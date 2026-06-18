@@ -153,6 +153,27 @@ class ReplanServiceTest {
   }
 
   @Test
+  void 필요한_질문중_일부만_답하면_남은_질문을_다시_묻는다() {
+    Todo todo = ownedTodo(42L, 1L);
+    given(todo.getId()).willReturn(42L);
+    given(todoRepository.findById(42L)).willReturn(Optional.of(todo));
+
+    // GOAL_NO_PRIORITY(priority_targets)와 CONDITION_PAIN(pain_area) 둘 다 질문이 필요한데,
+    // priority_targets만 답하면 pain_area는 아직 안 왔으므로 질문 단계로 되돌려야 한다.
+    ReplanRecommendRequest req =
+        new ReplanRecommendRequest(
+            42L,
+            List.of("GOAL_NO_PRIORITY", "CONDITION_PAIN"),
+            List.of(new ReplanAnswer("priority_targets", null, List.of(11L), null)));
+
+    ReplanRecommendResponse res = replanService.recommend(1L, req);
+
+    assertThat(res.needsMoreInfo()).isTrue();
+    assertThat(res.questions()).extracting(q -> q.key()).containsExactly("pain_area");
+    then(aiService).should(never()).generateRecommend(any());
+  }
+
+  @Test
   void 추가없이_끝내기여도_실패사유는_저장된다() {
     Todo todo = ownedTodo(42L, 1L);
     given(todoRepository.findById(42L)).willReturn(Optional.of(todo));

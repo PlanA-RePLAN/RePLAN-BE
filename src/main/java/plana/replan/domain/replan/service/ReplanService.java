@@ -56,19 +56,31 @@ public class ReplanService {
 
   /**
    * 2단계 선택(+선택적 추가질문 답변)을 받아, 추가 질문이 필요하면 질문을, 충분하면 추천을 반환한다. 질문이 필요한지는 {@link
-   * ReplanQuestionRegistry}가 결정론적으로 판단한다(LLM/프론트가 아님). 답변이 이미 있으면 질문 단계를 건너뛰고 곧바로 추천을 생성한다.
+   * ReplanQuestionRegistry}가 결정론적으로 판단한다(LLM/프론트가 아님). 필요한 질문 중 아직 답하지 않은 게 남아 있으면 그 질문들을
+   * 다시 내려주고, 모두 답했으면(또는 필요한 질문이 없으면) 곧바로 추천을 생성한다.
    */
   public ReplanRecommendResponse recommend(Long userId, ReplanRecommendRequest req) {
     validateReasonCodes(req.reasonCodes());
     Todo anchor = findOwnedTodo(userId, req.anchorTodoId());
     List<String> reasonLabels = toReasonLabelPath(req.reasonCodes());
 
-    boolean noAnswers = req.answers() == null || req.answers().isEmpty();
-    if (noAnswers) {
-      List<ReplanQuestion> questions = ReplanQuestionRegistry.forReasonCodes(req.reasonCodes());
-      if (!questions.isEmpty()) {
+    // 필요한 질문 중 아직 답이 안 온 것만 추려서, 하나라도 남아 있으면 질문 단계로 되돌린다.
+    // (사유 여러 개가 각각 질문을 요구하는데 일부 답변만 온 경우, 빠진 질문 없이 추천으로 넘어가지 않도록)
+    List<ReplanQuestion> required = ReplanQuestionRegistry.forReasonCodes(req.reasonCodes());
+    if (!required.isEmpty()) {
+      java.util.Set<String> answeredKeys = new java.util.HashSet<>();
+      if (req.answers() != null) {
+        for (ReplanAnswer a : req.answers()) {
+          if (a != null && a.key() != null) {
+            answeredKeys.add(a.key());
+          }
+        }
+      }
+      List<ReplanQuestion> unanswered =
+          required.stream().filter(q -> !answeredKeys.contains(q.key())).toList();
+      if (!unanswered.isEmpty()) {
         // 질문 화면의 "기존 투두 수정 사항" 카드용으로 앵커 투두의 기존 정보를 함께 내려준다.
-        return ReplanRecommendResponse.askQuestions(questions, ReplanAnchorTodo.from(anchor));
+        return ReplanRecommendResponse.askQuestions(unanswered, ReplanAnchorTodo.from(anchor));
       }
     }
 
