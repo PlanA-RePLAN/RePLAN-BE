@@ -191,11 +191,22 @@ public class ReplanService {
         && (op.title() == null || op.title().isBlank())) {
       throw new CustomException(ReplanErrorCode.REPLAN_INVALID_OPERATION);
     }
+    // MODIFY는 title 생략(null)은 허용하되, 빈 문자열을 명시하면 잘못된 입력으로 본다.
+    if ((op.action() == ReplanAction.MODIFY_TODO || op.action() == ReplanAction.MODIFY_ROUTINE)
+        && op.title() != null
+        && op.title().isBlank()) {
+      throw new CustomException(ReplanErrorCode.REPLAN_INVALID_OPERATION);
+    }
   }
 
   private void validateReasonCodes(List<String> codes) {
     if (codes == null || codes.size() < 1 || codes.size() > 3) {
       throw new CustomException(ReplanErrorCode.REPLAN_INVALID_REASON);
+    }
+    for (String code : codes) {
+      if (code == null || code.isBlank()) {
+        throw new CustomException(ReplanErrorCode.REPLAN_INVALID_REASON);
+      }
     }
   }
 

@@ -454,6 +454,35 @@ class ReplanServiceTest {
             e -> assertThat(e.getErrorCode()).isEqualTo(ReplanErrorCode.REPLAN_INVALID_OPERATION));
   }
 
+  @Test
+  void 실패이유에_null_원소가_있으면_400() {
+    // validateReasonCodes가 findOwnedTodo보다 먼저 던지므로 todo stub은 두지 않는다.
+    ReplanSaveRequest req =
+        new ReplanSaveRequest(42L, java.util.Arrays.asList("GOAL_NO_PRIORITY", null), List.of());
+
+    assertThatThrownBy(() -> replanService.save(1L, req))
+        .isInstanceOfSatisfying(
+            CustomException.class,
+            e -> assertThat(e.getErrorCode()).isEqualTo(ReplanErrorCode.REPLAN_INVALID_REASON));
+  }
+
+  @Test
+  void MODIFY_TODO_제목이_빈문자열이면_400() {
+    Todo anchor = ownedTodo(42L, 1L);
+    given(todoRepository.findById(42L)).willReturn(Optional.of(anchor));
+    given(replanRepository.save(any(Replan.class))).willAnswer(inv -> inv.getArgument(0));
+
+    ReplanOperation op =
+        new ReplanOperation(
+            ReplanAction.MODIFY_TODO, 42L, "", null, null, null, null, null, List.of());
+    ReplanSaveRequest req = new ReplanSaveRequest(42L, List.of("GOAL_NO_PRIORITY"), List.of(op));
+
+    assertThatThrownBy(() -> replanService.save(1L, req))
+        .isInstanceOfSatisfying(
+            CustomException.class,
+            e -> assertThat(e.getErrorCode()).isEqualTo(ReplanErrorCode.REPLAN_INVALID_OPERATION));
+  }
+
   // Fix 2 — 시간만 바꾸면 기존 날짜 보존
   @Test
   void MODIFY_TODO_시간만_바꾸면_기존_날짜는_유지된다() {
