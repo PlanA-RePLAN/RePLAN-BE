@@ -18,8 +18,7 @@ public record ReplanRecommendResponse(
         ReplanAnchorTodo anchorTodo,
     @Schema(description = "추가 질문 목록. needsMoreInfo=false면 빈 배열") List<ReplanQuestion> questions,
     @Schema(
-            description =
-                "사용자가 선택한 실패 이유의 한글 라벨(상위→하위 순). 추천 단계에서만 채워지고 질문 단계면 생략(null)된다.",
+            description = "사용자가 선택한 실패 이유의 한글 라벨(상위→하위 순). 추천 단계에서만 채워지고 질문 단계면 생략(null)된다.",
             example = "[\"예상치 못한 방해 발생\", \"돌발 상황이 발생했어요\"]")
         List<String> reasonLabels,
     @Schema(description = "추천 작업 목록. 질문 단계면 빈 배열") List<ReplanOperation> operations) {

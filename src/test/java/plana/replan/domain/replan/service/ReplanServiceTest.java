@@ -435,8 +435,7 @@ class ReplanServiceTest {
 
     org.mockito.ArgumentCaptor<Routine> captor = org.mockito.ArgumentCaptor.forClass(Routine.class);
     then(routineRepository).should().save(captor.capture());
-    assertThat(captor.getValue().getDueDate())
-        .isEqualTo(LocalDateTime.of(2026, 12, 31, 0, 0));
+    assertThat(captor.getValue().getDueDate()).isEqualTo(LocalDateTime.of(2026, 12, 31, 0, 0));
   }
 
   @Test

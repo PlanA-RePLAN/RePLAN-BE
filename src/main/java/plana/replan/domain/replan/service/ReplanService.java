@@ -56,8 +56,8 @@ public class ReplanService {
 
   /**
    * 2단계 선택(+선택적 추가질문 답변)을 받아, 추가 질문이 필요하면 질문을, 충분하면 추천을 반환한다. 질문이 필요한지는 {@link
-   * ReplanQuestionRegistry}가 결정론적으로 판단한다(LLM/프론트가 아님). 필요한 질문 중 아직 답하지 않은 게 남아 있으면 그 질문들을
-   * 다시 내려주고, 모두 답했으면(또는 필요한 질문이 없으면) 곧바로 추천을 생성한다.
+   * ReplanQuestionRegistry}가 결정론적으로 판단한다(LLM/프론트가 아님). 필요한 질문 중 아직 답하지 않은 게 남아 있으면 그 질문들을 다시 내려주고,
+   * 모두 답했으면(또는 필요한 질문이 없으면) 곧바로 추천을 생성한다.
    */
   public ReplanRecommendResponse recommend(Long userId, ReplanRecommendRequest req) {
     validateReasonCodes(req.reasonCodes());
