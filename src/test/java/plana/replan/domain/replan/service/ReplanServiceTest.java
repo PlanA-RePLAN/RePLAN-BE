@@ -429,4 +429,76 @@ class ReplanServiceTest {
             CustomException.class,
             e -> assertThat(e.getErrorCode()).isEqualTo(ReplanErrorCode.REPLAN_INVALID_OPERATION));
   }
+
+  // Fix 2 — 시간만 바꾸면 기존 날짜 보존
+  @Test
+  void MODIFY_TODO_시간만_바꾸면_기존_날짜는_유지된다() {
+    Todo anchor = ownedTodo(42L, 1L);
+    given(anchor.getDueDate()).willReturn(java.time.LocalDateTime.of(2026, 6, 20, 10, 0));
+    given(todoRepository.findById(42L)).willReturn(Optional.of(anchor));
+    given(replanRepository.save(any(Replan.class))).willAnswer(inv -> inv.getArgument(0));
+
+    ReplanOperation modify =
+        new ReplanOperation(
+            ReplanAction.MODIFY_TODO,
+            42L,
+            null, // 제목 변경 없음
+            null, // dueDate null — 기존 날짜 유지
+            "15:30", // dueTime만 변경
+            null,
+            null,
+            null,
+            List.of());
+    ReplanSaveRequest req =
+        new ReplanSaveRequest(42L, List.of("GOAL_NO_PRIORITY"), List.of(modify));
+
+    replanService.save(1L, req);
+
+    then(anchor).should().updateDueDate(java.time.LocalDateTime.of(2026, 6, 20, 15, 30));
+  }
+
+  // Fix 3 — 실패 이유 개수 검증
+  @Test
+  void 실패이유가_없으면_저장_실패() {
+    ReplanSaveRequest req = new ReplanSaveRequest(42L, List.of(), List.of());
+
+    assertThatThrownBy(() -> replanService.save(1L, req))
+        .isInstanceOfSatisfying(
+            CustomException.class,
+            e -> assertThat(e.getErrorCode()).isEqualTo(ReplanErrorCode.REPLAN_INVALID_REASON));
+  }
+
+  @Test
+  void 실패이유가_4개이면_저장_실패() {
+    ReplanSaveRequest req =
+        new ReplanSaveRequest(
+            42L,
+            List.of("GOAL_NO_PRIORITY", "INTERRUPT_LATE_END", "CONDITION_PAIN", "OTHER"),
+            List.of());
+
+    assertThatThrownBy(() -> replanService.save(1L, req))
+        .isInstanceOfSatisfying(
+            CustomException.class,
+            e -> assertThat(e.getErrorCode()).isEqualTo(ReplanErrorCode.REPLAN_INVALID_REASON));
+  }
+
+  @Test
+  void 실패이유가_null이면_저장_실패() {
+    ReplanSaveRequest req = new ReplanSaveRequest(42L, null, List.of());
+
+    assertThatThrownBy(() -> replanService.save(1L, req))
+        .isInstanceOfSatisfying(
+            CustomException.class,
+            e -> assertThat(e.getErrorCode()).isEqualTo(ReplanErrorCode.REPLAN_INVALID_REASON));
+  }
+
+  @Test
+  void 추천_시_실패이유가_없으면_실패() {
+    ReplanRecommendRequest req = new ReplanRecommendRequest(42L, List.of(), null);
+
+    assertThatThrownBy(() -> replanService.recommend(1L, req))
+        .isInstanceOfSatisfying(
+            CustomException.class,
+            e -> assertThat(e.getErrorCode()).isEqualTo(ReplanErrorCode.REPLAN_INVALID_REASON));
+  }
 }

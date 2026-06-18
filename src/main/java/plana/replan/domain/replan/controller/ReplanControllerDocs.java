@@ -81,6 +81,26 @@ public interface ReplanControllerDocs {
                           """)
                 })),
     @ApiResponse(
+        responseCode = "400",
+        description = "실패 이유 개수가 올바르지 않음",
+        content =
+            @Content(
+                examples =
+                    @ExampleObject(
+                        value =
+                            """
+                            {
+                              "status": 400,
+                              "success": false,
+                              "data": null,
+                              "error": {
+                                "code": "REPLAN_INVALID_REASON",
+                                "message": "실패 이유는 최소 1개, 최대 3개여야 합니다.",
+                                "detail": null
+                              }
+                            }
+                            """))),
+    @ApiResponse(
         responseCode = "404",
         description = "리플랜 대상 투두를 찾을 수 없음",
         content =
@@ -201,6 +221,26 @@ public interface ReplanControllerDocs {
                           """)
                 })),
     @ApiResponse(
+        responseCode = "400",
+        description = "실패 이유 개수가 올바르지 않음",
+        content =
+            @Content(
+                examples =
+                    @ExampleObject(
+                        value =
+                            """
+                            {
+                              "status": 400,
+                              "success": false,
+                              "data": null,
+                              "error": {
+                                "code": "REPLAN_INVALID_REASON",
+                                "message": "실패 이유는 최소 1개, 최대 3개여야 합니다.",
+                                "detail": null
+                              }
+                            }
+                            """))),
+    @ApiResponse(
         responseCode = "404",
         description = "리플랜 대상 투두를 찾을 수 없음",
         content =
@@ -318,24 +358,41 @@ public interface ReplanControllerDocs {
                 })),
     @ApiResponse(
         responseCode = "400",
-        description = "수락한 작업의 형식이 올바르지 않음",
+        description = "요청 형식 오류 — 실패 이유 개수 또는 작업 형식",
         content =
             @Content(
-                examples =
-                    @ExampleObject(
-                        value =
-                            """
-                            {
-                              "status": 400,
-                              "success": false,
-                              "data": null,
-                              "error": {
-                                "code": "REPLAN_INVALID_OPERATION",
-                                "message": "수락한 작업의 형식이 올바르지 않습니다.",
-                                "detail": null
-                              }
+                examples = {
+                  @ExampleObject(
+                      name = "실패 이유 개수 오류",
+                      value =
+                          """
+                          {
+                            "status": 400,
+                            "success": false,
+                            "data": null,
+                            "error": {
+                              "code": "REPLAN_INVALID_REASON",
+                              "message": "실패 이유는 최소 1개, 최대 3개여야 합니다.",
+                              "detail": null
                             }
-                            """))),
+                          }
+                          """),
+                  @ExampleObject(
+                      name = "작업 형식 오류",
+                      value =
+                          """
+                          {
+                            "status": 400,
+                            "success": false,
+                            "data": null,
+                            "error": {
+                              "code": "REPLAN_INVALID_OPERATION",
+                              "message": "수락한 작업의 형식이 올바르지 않습니다.",
+                              "detail": null
+                            }
+                          }
+                          """)
+                })),
     @ApiResponse(
         responseCode = "404",
         description = "리플랜 대상 투두 또는 태그를 찾을 수 없음",
