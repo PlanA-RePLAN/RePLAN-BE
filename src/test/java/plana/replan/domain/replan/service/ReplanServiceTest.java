@@ -501,4 +501,97 @@ class ReplanServiceTest {
             CustomException.class,
             e -> assertThat(e.getErrorCode()).isEqualTo(ReplanErrorCode.REPLAN_INVALID_REASON));
   }
+
+  @Test
+  void MODIFY_ROUTINE_위클리인데_요일없으면_400() {
+    Todo todo = ownedTodo(42L, 1L);
+    Routine routine = org.mockito.Mockito.mock(Routine.class);
+    given(todo.getRoutine()).willReturn(routine);
+    given(todoRepository.findById(42L)).willReturn(Optional.of(todo));
+    given(replanRepository.save(any(Replan.class))).willAnswer(inv -> inv.getArgument(0));
+    // op에 routineType="WEEKLY"이고 routineDate=null → 유효성 검사에서 즉시 실패
+    // effectiveRoutineDate는 op.routineDate()(null) → routine.getRoutineDate() fallback 필요
+    given(routine.getRoutineDate()).willReturn(null);
+
+    ReplanOperation op =
+        new ReplanOperation(
+            ReplanAction.MODIFY_ROUTINE,
+            42L,
+            null,
+            null,
+            null,
+            null,
+            "WEEKLY",
+            null, // routineDate 없음 — 유효하지 않음
+            List.of());
+    ReplanSaveRequest req = new ReplanSaveRequest(42L, List.of("GOAL_NO_PRIORITY"), List.of(op));
+
+    assertThatThrownBy(() -> replanService.save(1L, req))
+        .isInstanceOfSatisfying(
+            CustomException.class,
+            e -> assertThat(e.getErrorCode()).isEqualTo(ReplanErrorCode.REPLAN_INVALID_OPERATION));
+  }
+
+  @Test
+  void CREATE_ROUTINE_먼슬리인데_날짜범위밖이면_400() {
+    Todo todo = ownedTodo(42L, 1L);
+    given(todoRepository.findById(42L)).willReturn(Optional.of(todo));
+    given(replanRepository.save(any(Replan.class))).willAnswer(inv -> inv.getArgument(0));
+
+    ReplanOperation op =
+        new ReplanOperation(
+            ReplanAction.CREATE_ROUTINE,
+            null,
+            "매월 루틴",
+            null,
+            null,
+            null,
+            "MONTHLY",
+            40, // 31 초과 — 유효하지 않음
+            List.of());
+    ReplanSaveRequest req = new ReplanSaveRequest(42L, List.of("GOAL_NO_PRIORITY"), List.of(op));
+
+    assertThatThrownBy(() -> replanService.save(1L, req))
+        .isInstanceOfSatisfying(
+            CustomException.class,
+            e -> assertThat(e.getErrorCode()).isEqualTo(ReplanErrorCode.REPLAN_INVALID_OPERATION));
+  }
+
+  @Test
+  void MODIFY_ROUTINE_태그변경은_미완료_현재투두에도_반영된다() {
+    // ownedTodo가 내부적으로 User mock(getId()→1L)을 anchor.getUser()에 연결해 둔다
+    Todo anchor = ownedTodo(42L, 1L);
+    Routine routine = org.mockito.Mockito.mock(Routine.class);
+    given(anchor.getRoutine()).willReturn(routine);
+    given(anchor.isCompleted()).willReturn(false);
+    given(todoRepository.findById(42L)).willReturn(Optional.of(anchor));
+    given(replanRepository.save(any(Replan.class))).willAnswer(inv -> inv.getArgument(0));
+    given(routine.getRoutineType()).willReturn(RoutineType.DAILY);
+    given(routine.getRoutineDate()).willReturn(null);
+    given(routine.getRoutineTime()).willReturn(null);
+
+    // tag의 소유자 id가 anchor와 동일한 1L이어야 resolveTag 통과
+    Tag tag = org.mockito.Mockito.mock(Tag.class);
+    User tagOwner = org.mockito.Mockito.mock(User.class);
+    given(tagOwner.getId()).willReturn(1L);
+    given(tag.getUser()).willReturn(tagOwner);
+    given(tagRepository.findById(10L)).willReturn(Optional.of(tag));
+
+    ReplanOperation op =
+        new ReplanOperation(
+            ReplanAction.MODIFY_ROUTINE,
+            42L,
+            null,
+            null,
+            null,
+            10L, // tagId 지정
+            null,
+            null,
+            List.of());
+    ReplanSaveRequest req = new ReplanSaveRequest(42L, List.of("GOAL_NO_PRIORITY"), List.of(op));
+
+    replanService.save(1L, req);
+
+    then(anchor).should().updateTag(tag);
+  }
 }

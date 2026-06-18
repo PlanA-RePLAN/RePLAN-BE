@@ -280,10 +280,15 @@ public class ReplanService {
     }
     Tag tag =
         op.tagId() != null ? resolveTag(op.tagId(), anchor.getUser().getId()) : routine.getTag();
+    RoutineType effectiveType =
+        op.routineType() != null ? parseRoutineType(op.routineType()) : routine.getRoutineType();
+    Integer effectiveRoutineDate =
+        op.routineDate() != null ? op.routineDate() : routine.getRoutineDate();
+    validateRecurrence(effectiveType, effectiveRoutineDate);
     routine.update(
         op.title() != null ? op.title() : routine.getTitle(),
-        op.routineType() != null ? parseRoutineType(op.routineType()) : routine.getRoutineType(),
-        op.routineDate() != null ? op.routineDate() : routine.getRoutineDate(),
+        effectiveType,
+        effectiveRoutineDate,
         op.dueTime() != null ? parseTime(op.dueTime()) : routine.getRoutineTime(),
         tag);
     routine.linkReplan(replan);
@@ -296,6 +301,9 @@ public class ReplanService {
       if (op.dueDate() != null || op.dueTime() != null) {
         anchor.updateDueDate(resolveModifiedDueDate(anchor, op));
       }
+      if (op.tagId() != null) {
+        anchor.updateTag(tag);
+      }
       anchor.linkReplan(replan);
     }
   }
@@ -304,13 +312,15 @@ public class ReplanService {
     if (op.routineType() == null) {
       throw new CustomException(ReplanErrorCode.REPLAN_INVALID_OPERATION);
     }
+    RoutineType type = parseRoutineType(op.routineType());
+    validateRecurrence(type, op.routineDate());
     User user = anchor.getUser();
     Tag tag = resolveTag(op.tagId(), user.getId());
     Routine routine =
         Routine.builder()
             .title(op.title())
             .routineTime(parseTime(op.dueTime()))
-            .routineType(parseRoutineType(op.routineType()))
+            .routineType(type)
             .routineDate(op.routineDate())
             .user(user)
             .tag(tag)
@@ -321,6 +331,17 @@ public class ReplanService {
     todoRepository
         .findFirstUpcomingMotherTodoByRoutine(routine, LocalDate.now(clock).atStartOfDay())
         .ifPresent(instanceTodo -> instanceTodo.linkReplan(replan));
+  }
+
+  private void validateRecurrence(RoutineType type, Integer routineDate) {
+    if (type == RoutineType.WEEKLY
+        && (routineDate == null || routineDate < 1 || routineDate > 127)) {
+      throw new CustomException(ReplanErrorCode.REPLAN_INVALID_OPERATION);
+    }
+    if (type == RoutineType.MONTHLY
+        && (routineDate == null || routineDate < 1 || routineDate > 31)) {
+      throw new CustomException(ReplanErrorCode.REPLAN_INVALID_OPERATION);
+    }
   }
 
   private LocalTime parseTime(String time) {
