@@ -131,21 +131,17 @@ public class GoalAiService {
   }
 
   public TodoRecommendationResponse recommendTodos(TodoRecommendationRequest request) {
-    normalizeRefreshCount(request.refreshCount());
+    validateRefreshCount(request.refreshCount());
     String prompt = buildRecommendPrompt(request);
     String raw = callGemini(prompt);
     return parseRecommendResponse(raw);
   }
 
-  /** 새로고침 횟수를 0~3로 검증하고 null은 0으로 정규화한다. */
-  private int normalizeRefreshCount(Integer refreshCount) {
-    if (refreshCount == null) {
-      return 0;
-    }
-    if (refreshCount < 0 || refreshCount > 3) {
+  /** 새로고침 횟수를 0~3 범위로 검증한다. null은 허용(첫 추천으로 취급). */
+  private void validateRefreshCount(Integer refreshCount) {
+    if (refreshCount != null && (refreshCount < 0 || refreshCount > 3)) {
       throw new CustomException(GoalErrorCode.INVALID_REFRESH_COUNT);
     }
-    return refreshCount;
   }
 
   String buildRecommendPrompt(TodoRecommendationRequest req) {
