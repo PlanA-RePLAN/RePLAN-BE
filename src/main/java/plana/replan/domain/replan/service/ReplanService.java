@@ -130,6 +130,9 @@ public class ReplanService {
     List<RecommendInput.AnswerInput> answerInputs = new ArrayList<>();
     if (answers != null) {
       for (ReplanAnswer a : answers) {
+        if (a == null) {
+          continue; // 답변 배열에 null이 섞여 와도 500으로 터지지 않도록 건너뛴다.
+        }
         List<String> todoLabels =
             resolveSelectedTodoLabels(a.selectedTodoIds(), anchor.getUser().getId());
         answerInputs.add(
@@ -368,6 +371,8 @@ public class ReplanService {
             ? op.routineDate()
             : (op.routineDate() != null ? op.routineDate() : routine.getRoutineDate());
     validateRecurrence(effectiveType, effectiveRoutineDate);
+    // DAILY는 반복 날짜가 의미 없으므로 null로 정규화한다(다른 루틴 생성 경로와 규약을 맞춘다).
+    effectiveRoutineDate = normalizeRoutineDate(effectiveType, effectiveRoutineDate);
     routine.update(
         op.title() != null ? op.title() : routine.getTitle(),
         effectiveType,
@@ -406,7 +411,8 @@ public class ReplanService {
             .dueDate(parseRoutineEndDate(op.dueDate()))
             .routineTime(parseTime(op.dueTime()))
             .routineType(type)
-            .routineDate(op.routineDate())
+            // DAILY는 반복 날짜가 의미 없으므로 null로 정규화한다(다른 루틴 생성 경로와 규약을 맞춘다).
+            .routineDate(normalizeRoutineDate(type, op.routineDate()))
             .user(user)
             .tag(tag)
             .build();
@@ -427,6 +433,11 @@ public class ReplanService {
         && (routineDate == null || routineDate < 1 || routineDate > 31)) {
       throw new CustomException(ReplanErrorCode.REPLAN_INVALID_OPERATION);
     }
+  }
+
+  /** DAILY 루틴은 반복 날짜가 의미 없으므로 항상 null로 둔다(WEEKLY/MONTHLY는 그대로). */
+  private Integer normalizeRoutineDate(RoutineType type, Integer routineDate) {
+    return type == RoutineType.DAILY ? null : routineDate;
   }
 
   private LocalTime parseTime(String time) {

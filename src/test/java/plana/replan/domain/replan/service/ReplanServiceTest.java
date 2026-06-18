@@ -366,7 +366,6 @@ class ReplanServiceTest {
     given(replanRepository.save(any(Replan.class))).willAnswer(inv -> inv.getArgument(0));
     // op에서 title만 지정, 나머지는 null → 기존 루틴 값으로 fallback
     given(routine.getRoutineType()).willReturn(RoutineType.DAILY);
-    given(routine.getRoutineDate()).willReturn(3);
     given(routine.getRoutineTime()).willReturn(LocalTime.of(7, 30));
     given(routine.getTag()).willReturn(null);
 
@@ -377,9 +376,15 @@ class ReplanServiceTest {
 
     replanService.save(1L, req);
 
+    // DAILY는 반복 날짜를 null로 정규화하므로 routineDate는 null로 들어간다
     then(routine)
         .should()
-        .update(eq("새 제목"), eq(RoutineType.DAILY), eq(3), eq(LocalTime.of(7, 30)), any());
+        .update(
+            eq("새 제목"),
+            eq(RoutineType.DAILY),
+            org.mockito.ArgumentMatchers.isNull(),
+            eq(LocalTime.of(7, 30)),
+            any());
   }
 
   @Test
@@ -436,6 +441,25 @@ class ReplanServiceTest {
     org.mockito.ArgumentCaptor<Routine> captor = org.mockito.ArgumentCaptor.forClass(Routine.class);
     then(routineRepository).should().save(captor.capture());
     assertThat(captor.getValue().getDueDate()).isEqualTo(LocalDateTime.of(2026, 12, 31, 0, 0));
+  }
+
+  @Test
+  void CREATE_ROUTINE_DAILY는_반복날짜를_null로_정규화한다() {
+    Todo todo = ownedTodo(42L, 1L);
+    given(todoRepository.findById(42L)).willReturn(Optional.of(todo));
+    given(replanRepository.save(any(Replan.class))).willAnswer(inv -> inv.getArgument(0));
+
+    // DAILY인데 routineDate가 들어와도 저장 시 null로 정규화돼야 한다
+    ReplanOperation op =
+        new ReplanOperation(
+            ReplanAction.CREATE_ROUTINE, null, "스트레칭", null, "20:00", null, "DAILY", 5, List.of());
+    ReplanSaveRequest req = new ReplanSaveRequest(42L, List.of("CONDITION_PAIN"), List.of(op));
+
+    replanService.save(1L, req);
+
+    org.mockito.ArgumentCaptor<Routine> captor = org.mockito.ArgumentCaptor.forClass(Routine.class);
+    then(routineRepository).should().save(captor.capture());
+    assertThat(captor.getValue().getRoutineDate()).isNull();
   }
 
   @Test

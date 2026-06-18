@@ -194,7 +194,8 @@ public class ReplanAiService {
       }
       return operations;
     } catch (Exception e) {
-      log.error("리플랜 추천 응답 파싱 실패: {}", raw, e);
+      // 원문(raw)에는 사용자의 투두/사유 텍스트가 들어 있어 그대로 로깅하지 않고 길이만 남긴다.
+      log.error("리플랜 추천 응답 파싱 실패 (rawLength={})", raw == null ? 0 : raw.length(), e);
       throw new CustomException(ReplanErrorCode.REPLAN_GEMINI_PARSE_ERROR);
     }
   }
@@ -203,12 +204,31 @@ public class ReplanAiService {
     return node.isNull() || node.isMissingNode() ? null : node.asText(null);
   }
 
+  // 숫자 필드는 숫자/숫자문자열만 허용한다. 그 외 값은 0으로 묵시 변환하지 않고 파싱 실패로 처리한다.
   private Long longOrNull(JsonNode node) {
-    return node.isNull() || node.isMissingNode() ? null : node.asLong();
+    if (node.isNull() || node.isMissingNode()) {
+      return null;
+    }
+    if (node.isIntegralNumber()) {
+      return node.longValue();
+    }
+    if (node.isTextual()) {
+      return Long.parseLong(node.asText().trim());
+    }
+    throw new IllegalArgumentException("숫자 필드(targetTodoId/tagId)가 숫자가 아닙니다: " + node);
   }
 
   private Integer intOrNull(JsonNode node) {
-    return node.isNull() || node.isMissingNode() ? null : node.asInt();
+    if (node.isNull() || node.isMissingNode()) {
+      return null;
+    }
+    if (node.isIntegralNumber()) {
+      return node.intValue();
+    }
+    if (node.isTextual()) {
+      return Integer.parseInt(node.asText().trim());
+    }
+    throw new IllegalArgumentException("숫자 필드(routineDate)가 숫자가 아닙니다: " + node);
   }
 
   private String extractJson(String text) {

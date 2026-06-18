@@ -81,6 +81,10 @@ public final class ReplanQuestionRegistry {
    * CONDITION_SLEEP의 질문(reschedule_date)을 상속한다.
    */
   private static ReplanQuestion resolve(String code) {
+    // null/공백 코드는 질문 없음(아래 valueOf가 null이면 NPE를 던지므로 미리 막는다).
+    if (code == null || code.isBlank()) {
+      return null;
+    }
     ReplanQuestion direct = QUESTIONS.get(code);
     if (direct != null) {
       return direct;
