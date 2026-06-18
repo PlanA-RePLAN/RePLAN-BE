@@ -18,8 +18,7 @@ import plana.replan.global.common.ApiResult;
 @Tag(name = "RePlan", description = "실패한 투두를 다시 계획하는 리플랜 API")
 public interface ReplanControllerDocs {
 
-  @Operation(summary = "추가 질문 조회",
-      description = "실패 이유에 따라 AI가 추가로 물어볼 질문을 반환합니다. 없으면 빈 배열입니다.")
+  @Operation(summary = "추가 질문 조회", description = "실패 이유에 따라 AI가 추가로 물어볼 질문을 반환합니다. 없으면 빈 배열입니다.")
   @ApiResponses({
     @ApiResponse(
         responseCode = "200",
@@ -142,8 +141,7 @@ public interface ReplanControllerDocs {
   ResponseEntity<ApiResult<List<ReplanQuestion>>> getQuestions(
       Long userId, ReplanQuestionsRequest request);
 
-  @Operation(summary = "추천 받기",
-      description = "실패 이유와 추가질문 답변으로 투두 수정안·추가안을 제안합니다. 새로고침은 재호출하세요.")
+  @Operation(summary = "추천 받기", description = "실패 이유와 추가질문 답변으로 투두 수정안·추가안을 제안합니다. 새로고침은 재호출하세요.")
   @ApiResponses({
     @ApiResponse(
         responseCode = "200",
@@ -263,8 +261,7 @@ public interface ReplanControllerDocs {
   ResponseEntity<ApiResult<ReplanRecommendResponse>> recommend(
       Long userId, ReplanRecommendRequest request);
 
-  @Operation(summary = "수락 저장",
-      description = "사용자가 수락한 작업을 반영합니다. 작업이 비어도 실패 이유는 항상 저장됩니다.")
+  @Operation(summary = "수락 저장", description = "사용자가 수락한 작업을 반영합니다. 작업이 비어도 실패 이유는 항상 저장됩니다.")
   @ApiResponses({
     @ApiResponse(
         responseCode = "200",

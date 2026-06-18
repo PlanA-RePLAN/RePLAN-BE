@@ -71,9 +71,7 @@ public class ReplanAiService {
     String answers =
         input.answers().isEmpty()
             ? "없음"
-            : input.answers().stream()
-                .map(this::formatAnswer)
-                .collect(Collectors.joining("\n"));
+            : input.answers().stream().map(this::formatAnswer).collect(Collectors.joining("\n"));
     String routineInfo =
         input.routine() ? "반복 투두(루틴). routineType=" + input.routineType() : "일반 투두";
     return """

@@ -80,7 +80,8 @@ class ReplanControllerTest {
   void 질문_엔드포인트_성공() throws Exception {
     given(replanService.getQuestions(eq(1L), any()))
         .willReturn(
-            List.of(new ReplanQuestion("priority_targets", QuestionType.TODO_SELECT, "투두 선택", null)));
+            List.of(
+                new ReplanQuestion("priority_targets", QuestionType.TODO_SELECT, "투두 선택", null)));
 
     mockMvc
         .perform(

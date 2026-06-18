@@ -172,8 +172,7 @@ public class ReplanService {
   private void deactivateIfReplacedOriginal(Todo anchor) {
     boolean basic = anchor.getRoutine() == null;
     boolean overdue =
-        anchor.getDueDate() != null
-            && anchor.getDueDate().isBefore(LocalDateTime.now(clock));
+        anchor.getDueDate() != null && anchor.getDueDate().isBefore(LocalDateTime.now(clock));
     if (basic && overdue) {
       anchor.deactivate();
     }
@@ -211,7 +210,8 @@ public class ReplanService {
     if (routine == null) {
       throw new CustomException(ReplanErrorCode.REPLAN_TODO_NOT_FOUND);
     }
-    Tag tag = op.tagId() != null ? resolveTag(op.tagId(), anchor.getUser().getId()) : routine.getTag();
+    Tag tag =
+        op.tagId() != null ? resolveTag(op.tagId(), anchor.getUser().getId()) : routine.getTag();
     routine.update(
         op.title() != null ? op.title() : routine.getTitle(),
         op.routineType() != null ? RoutineType.valueOf(op.routineType()) : routine.getRoutineType(),

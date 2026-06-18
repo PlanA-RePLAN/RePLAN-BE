@@ -33,8 +33,8 @@ import plana.replan.domain.replan.repository.ReplanRepository;
 import plana.replan.domain.routine.entity.Routine;
 import plana.replan.domain.routine.entity.RoutineType;
 import plana.replan.domain.routine.repository.RoutineRepository;
-import plana.replan.domain.tag.repository.TagRepository;
 import plana.replan.domain.tag.entity.Tag;
+import plana.replan.domain.tag.repository.TagRepository;
 import plana.replan.domain.todo.entity.Todo;
 import plana.replan.domain.todo.repository.TodoRepository;
 import plana.replan.domain.user.entity.User;
@@ -49,15 +49,15 @@ class ReplanServiceTest {
   @Mock private TagRepository tagRepository;
   @Mock private RoutineRepository routineRepository;
 
-  private final Clock clock =
-      Clock.fixed(Instant.parse("2026-06-18T00:00:00Z"), ZoneId.of("UTC"));
+  private final Clock clock = Clock.fixed(Instant.parse("2026-06-18T00:00:00Z"), ZoneId.of("UTC"));
 
   private ReplanService replanService;
 
   @BeforeEach
   void setUp() {
     replanService =
-        new ReplanService(todoRepository, replanRepository, aiService, tagRepository, clock, routineRepository);
+        new ReplanService(
+            todoRepository, replanRepository, aiService, tagRepository, clock, routineRepository);
   }
 
   private Todo ownedTodo(Long todoId, Long userId) {
@@ -76,8 +76,7 @@ class ReplanServiceTest {
     given(aiService.generateQuestions(any()))
         .willReturn(List.of(new ReplanQuestion("k", null, "질문", null)));
 
-    ReplanQuestionsRequest req =
-        new ReplanQuestionsRequest(42L, List.of("GOAL_NO_PRIORITY"), null);
+    ReplanQuestionsRequest req = new ReplanQuestionsRequest(42L, List.of("GOAL_NO_PRIORITY"), null);
 
     List<ReplanQuestion> result = replanService.getQuestions(1L, req);
 
@@ -89,8 +88,7 @@ class ReplanServiceTest {
     Todo todo = ownedTodo(42L, 999L);
     given(todoRepository.findById(42L)).willReturn(Optional.of(todo));
 
-    ReplanQuestionsRequest req =
-        new ReplanQuestionsRequest(42L, List.of("GOAL_NO_PRIORITY"), null);
+    ReplanQuestionsRequest req = new ReplanQuestionsRequest(42L, List.of("GOAL_NO_PRIORITY"), null);
 
     assertThatThrownBy(() -> replanService.getQuestions(1L, req))
         .isInstanceOf(CustomException.class);
@@ -105,8 +103,7 @@ class ReplanServiceTest {
     given(aiService.generateRecommend(any()))
         .willReturn(new ReplanRecommendResponse("요약", "팁", List.of()));
 
-    ReplanRecommendRequest req =
-        new ReplanRecommendRequest(42L, List.of("GOAL_NO_PRIORITY"), null);
+    ReplanRecommendRequest req = new ReplanRecommendRequest(42L, List.of("GOAL_NO_PRIORITY"), null);
 
     ReplanRecommendResponse res = replanService.recommend(1L, req);
 
@@ -118,8 +115,7 @@ class ReplanServiceTest {
     Todo todo = ownedTodo(42L, 1L);
     given(todoRepository.findById(42L)).willReturn(Optional.of(todo));
 
-    ReplanSaveRequest req =
-        new ReplanSaveRequest(42L, List.of("GOAL_NO_PRIORITY"), List.of());
+    ReplanSaveRequest req = new ReplanSaveRequest(42L, List.of("GOAL_NO_PRIORITY"), List.of());
 
     replanService.save(1L, req);
 
@@ -131,15 +127,20 @@ class ReplanServiceTest {
   void ADD작업은_새_투두를_만든다() {
     Todo todo = ownedTodo(42L, 1L);
     given(todoRepository.findById(42L)).willReturn(Optional.of(todo));
-    given(replanRepository.save(any(Replan.class)))
-        .willAnswer(inv -> inv.getArgument(0));
+    given(replanRepository.save(any(Replan.class))).willAnswer(inv -> inv.getArgument(0));
 
     ReplanOperation add =
         new ReplanOperation(
-            ReplanAction.ADD, null, "데이터 분석 3~4강", "2026-06-09", "23:59",
-            null, null, null, List.of());
-    ReplanSaveRequest req =
-        new ReplanSaveRequest(42L, List.of("GOAL_NO_PRIORITY"), List.of(add));
+            ReplanAction.ADD,
+            null,
+            "데이터 분석 3~4강",
+            "2026-06-09",
+            "23:59",
+            null,
+            null,
+            null,
+            List.of());
+    ReplanSaveRequest req = new ReplanSaveRequest(42L, List.of("GOAL_NO_PRIORITY"), List.of(add));
 
     replanService.save(1L, req);
 
@@ -154,8 +155,15 @@ class ReplanServiceTest {
 
     ReplanOperation modify =
         new ReplanOperation(
-            ReplanAction.MODIFY_TODO, 42L, "데이터 분석 1~2강", "2026-06-20", "23:59",
-            null, null, null, List.of());
+            ReplanAction.MODIFY_TODO,
+            42L,
+            "데이터 분석 1~2강",
+            "2026-06-20",
+            "23:59",
+            null,
+            null,
+            null,
+            List.of());
     ReplanSaveRequest req =
         new ReplanSaveRequest(42L, List.of("GOAL_NO_PRIORITY"), List.of(modify));
 
@@ -180,8 +188,15 @@ class ReplanServiceTest {
 
     ReplanOperation modifyOp =
         new ReplanOperation(
-            ReplanAction.MODIFY_TODO, 99L, "[1] 데이터 분석 1~2강", "2026-06-20", "23:59",
-            null, null, null, List.of());
+            ReplanAction.MODIFY_TODO,
+            99L,
+            "[1] 데이터 분석 1~2강",
+            "2026-06-20",
+            "23:59",
+            null,
+            null,
+            null,
+            List.of());
     ReplanSaveRequest req =
         new ReplanSaveRequest(42L, List.of("GOAL_NO_PRIORITY"), List.of(modifyOp));
 
@@ -204,13 +219,19 @@ class ReplanServiceTest {
 
     ReplanOperation modifyOp =
         new ReplanOperation(
-            ReplanAction.MODIFY_TODO, 99L, "[1] 데이터 분석 1~2강", "2026-06-20", "23:59",
-            null, null, null, List.of());
+            ReplanAction.MODIFY_TODO,
+            99L,
+            "[1] 데이터 분석 1~2강",
+            "2026-06-20",
+            "23:59",
+            null,
+            null,
+            null,
+            List.of());
     ReplanSaveRequest req =
         new ReplanSaveRequest(42L, List.of("GOAL_NO_PRIORITY"), List.of(modifyOp));
 
-    assertThatThrownBy(() -> replanService.save(1L, req))
-        .isInstanceOf(CustomException.class);
+    assertThatThrownBy(() -> replanService.save(1L, req)).isInstanceOf(CustomException.class);
   }
 
   @Test
@@ -224,16 +245,22 @@ class ReplanServiceTest {
 
     ReplanOperation op =
         new ReplanOperation(
-            ReplanAction.MODIFY_ROUTINE, 42L, "영단어 50개 암기", null, "11:15",
-            null, "WEEKLY", 62, List.of());
-    ReplanSaveRequest req =
-        new ReplanSaveRequest(42L, List.of("INTERRUPT_LATE_END"), List.of(op));
+            ReplanAction.MODIFY_ROUTINE,
+            42L,
+            "영단어 50개 암기",
+            null,
+            "11:15",
+            null,
+            "WEEKLY",
+            62,
+            List.of());
+    ReplanSaveRequest req = new ReplanSaveRequest(42L, List.of("INTERRUPT_LATE_END"), List.of(op));
 
     replanService.save(1L, req);
 
-    then(routine).should()
-        .update(eq("영단어 50개 암기"), eq(RoutineType.WEEKLY), eq(62),
-            eq(LocalTime.of(11, 15)), any());
+    then(routine)
+        .should()
+        .update(eq("영단어 50개 암기"), eq(RoutineType.WEEKLY), eq(62), eq(LocalTime.of(11, 15)), any());
     then(routine).should().linkReplan(any(Replan.class));
     then(todo).should().linkReplan(any(Replan.class));
   }
@@ -254,16 +281,14 @@ class ReplanServiceTest {
 
     ReplanOperation op =
         new ReplanOperation(
-            ReplanAction.MODIFY_ROUTINE, 42L, "새 제목", null, null,
-            null, null, null, List.of());
-    ReplanSaveRequest req =
-        new ReplanSaveRequest(42L, List.of("GOAL_NO_PRIORITY"), List.of(op));
+            ReplanAction.MODIFY_ROUTINE, 42L, "새 제목", null, null, null, null, null, List.of());
+    ReplanSaveRequest req = new ReplanSaveRequest(42L, List.of("GOAL_NO_PRIORITY"), List.of(op));
 
     replanService.save(1L, req);
 
-    then(routine).should()
-        .update(eq("새 제목"), eq(RoutineType.DAILY), eq(3),
-            eq(LocalTime.of(7, 30)), any());
+    then(routine)
+        .should()
+        .update(eq("새 제목"), eq(RoutineType.DAILY), eq(3), eq(LocalTime.of(7, 30)), any());
   }
 
   @Test
@@ -274,10 +299,16 @@ class ReplanServiceTest {
 
     ReplanOperation op =
         new ReplanOperation(
-            ReplanAction.CREATE_ROUTINE, null, "스트레칭", null, "20:00",
-            null, "DAILY", null, List.of());
-    ReplanSaveRequest req =
-        new ReplanSaveRequest(42L, List.of("CONDITION_PAIN"), List.of(op));
+            ReplanAction.CREATE_ROUTINE,
+            null,
+            "스트레칭",
+            null,
+            "20:00",
+            null,
+            "DAILY",
+            null,
+            List.of());
+    ReplanSaveRequest req = new ReplanSaveRequest(42L, List.of("CONDITION_PAIN"), List.of(op));
 
     replanService.save(1L, req);
 
@@ -294,10 +325,16 @@ class ReplanServiceTest {
 
     ReplanOperation add =
         new ReplanOperation(
-            ReplanAction.ADD, null, "데이터 분석 3~4강", "2026-06-20", "23:59",
-            null, null, null, List.of());
-    ReplanSaveRequest req =
-        new ReplanSaveRequest(42L, List.of("GOAL_NO_PRIORITY"), List.of(add));
+            ReplanAction.ADD,
+            null,
+            "데이터 분석 3~4강",
+            "2026-06-20",
+            "23:59",
+            null,
+            null,
+            null,
+            List.of());
+    ReplanSaveRequest req = new ReplanSaveRequest(42L, List.of("GOAL_NO_PRIORITY"), List.of(add));
 
     replanService.save(1L, req);
 

@@ -10,8 +10,7 @@ class RecommendInputTest {
 
   @Test
   void 필드를_올바르게_저장한다() {
-    RecommendInput.AnswerInput answer =
-        new RecommendInput.AnswerInput("free", "답변 내용", null, null);
+    RecommendInput.AnswerInput answer = new RecommendInput.AnswerInput("free", "답변 내용", null, null);
     RecommendInput input =
         new RecommendInput(
             "토익 900점",

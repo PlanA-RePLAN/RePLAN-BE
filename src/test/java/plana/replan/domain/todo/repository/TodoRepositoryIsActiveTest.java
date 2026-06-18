@@ -67,9 +67,7 @@ class TodoRepositoryIsActiveTest {
 
     List<Todo> result =
         todoRepository.findMonthlyTodos(
-            user,
-            LocalDateTime.of(2026, 6, 1, 0, 0),
-            LocalDateTime.of(2026, 7, 1, 0, 0));
+            user, LocalDateTime.of(2026, 6, 1, 0, 0), LocalDateTime.of(2026, 7, 1, 0, 0));
 
     assertThat(result).extracting(Todo::getTitle).contains("실패원본");
   }

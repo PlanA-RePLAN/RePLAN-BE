@@ -53,8 +53,9 @@ public interface TodoRepository extends JpaRepository<Todo, Long> {
         .findFirst();
   }
 
-  @Query("SELECT t FROM Todo t WHERE t.user = :user AND t.parent IS NULL AND t.isCompleted = false"
-      + " AND t.isActive = true")
+  @Query(
+      "SELECT t FROM Todo t WHERE t.user = :user AND t.parent IS NULL AND t.isCompleted = false"
+          + " AND t.isActive = true")
   List<Todo> findActiveTodosForUser(@Param("user") User user);
 
   @Query(
