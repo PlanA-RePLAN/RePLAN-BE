@@ -50,7 +50,8 @@ public class ReplanAiService {
             : input.answers().stream().map(this::formatAnswer).collect(Collectors.joining("\n"));
     String routineInfo =
         input.routine() ? "반복 투두(루틴). routineType=" + input.routineType() : "일반 투두";
-    return """
+    String prompt =
+        """
         당신은 일정 재계획(리플랜) 도우미입니다.
         사용자가 아래 투두를 끝내지 못한 이유에 맞춰, 투두 수정·추가 제안을 만드세요.
 
@@ -117,6 +118,27 @@ public class ReplanAiService {
             input.anchorTagName() != null ? input.anchorTagName() : "없음",
             String.join(", ", input.reasonLabels()),
             answers);
+    return prompt + refreshStyleBlock(input.refreshCount());
+  }
+
+  /** 새로고침 회차(1~3)에 맞는 스타일 안내 블록. 0/그 외는 빈 문자열(0회차는 프롬프트 변경 없음). */
+  static String refreshStyleBlock(int refreshCount) {
+    String line =
+        switch (refreshCount) {
+          case 1 ->
+              "1회차(여유): 기간은 기존 예상 소요의 1.5배 이상으로 넉넉히 잡고, 할 일은 아주 잘게(마이크로) 쪼개며, 가장 쉽고 만만한 것부터 시작하도록 정순으로 배치한다.";
+          case 2 ->
+              "2회차(벼락치기): 버퍼 없이 짧게(15~25분 타임박싱) 잡고, 핵심 1개(1-Pick)만 남기며, 가장 어렵고 중요한 것부터 처리하도록 역순으로 배치한다.";
+          case 3 ->
+              "3회차(환경 제약): 기간·덩어리·난이도는 적정 수준으로 두되, 시간대를 옮기거나(다른 시간/요일) 장소·환경을 통제하는(조용한 곳 이동, 방해금지 등) 방향으로 제안한다.";
+          default -> null;
+        };
+    if (line == null) {
+      return "";
+    }
+    return "\n\n[이번 새로고침 스타일]\n"
+        + line
+        + "\n위 스타일을 우선으로 적용하되, 결과는 위 공통 규칙(투두 형식·action 종류·JSON 포맷)을 그대로 따른다.";
   }
 
   private String formatAnswer(RecommendInput.AnswerInput a) {
