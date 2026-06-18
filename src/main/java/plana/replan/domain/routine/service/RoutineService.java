@@ -210,6 +210,12 @@ public class RoutineService {
             : LocalTime.of(23, 59, 59);
     LocalDateTime dueDate = nextOccurrence(motherRoutine, today).atTime(time);
 
+    // 반복 종료일(dueDate)이 설정돼 있고 다음 회차가 그 이후라면 회차 Todo를 만들지 않는다.
+    // (종료일 = "이 날짜 이후로는 반복 생성 안 됨")
+    if (motherRoutine.getDueDate() != null && dueDate.isAfter(motherRoutine.getDueDate())) {
+      return;
+    }
+
     Todo motherTodo = saveRoutineTodo(motherRoutine, dueDate, null);
     if (motherTodo == null) {
       return;

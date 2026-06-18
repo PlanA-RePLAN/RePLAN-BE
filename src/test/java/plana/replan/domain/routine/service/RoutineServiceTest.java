@@ -111,6 +111,28 @@ class RoutineServiceTest {
     verify(routineRepository, never()).save(any());
   }
 
+  // ========== 반복 종료일 ==========
+
+  @Test
+  void 루틴_생성_종료일이_지났으면_회차_Todo를_만들지_않는다() {
+    given(userRepository.findById(1L)).willReturn(Optional.of(testUser()));
+    given(routineRepository.save(any(Routine.class))).willAnswer(inv -> inv.getArgument(0));
+
+    // 종료일(2024-01-10)이 오늘(2024-01-15)보다 과거 → 다음 회차가 종료일을 넘으므로 회차 Todo 생성 안 함
+    routineService.createRoutine(
+        1L,
+        new RoutineCreateRequestDto(
+            "끝난 루틴",
+            java.time.LocalDateTime.of(2024, 1, 10, 0, 0),
+            null,
+            RoutineType.DAILY,
+            null,
+            null,
+            null));
+
+    verify(todoRepository, never()).saveAndFlush(any());
+  }
+
   // ========== DAILY ==========
 
   @Test
