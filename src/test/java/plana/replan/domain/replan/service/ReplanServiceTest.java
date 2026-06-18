@@ -3,6 +3,7 @@ package plana.replan.domain.replan.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
 import static org.mockito.Mockito.never;
@@ -11,6 +12,7 @@ import static org.mockito.Mockito.times;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.time.ZoneId;
 import java.util.List;
 import java.util.Optional;
@@ -28,6 +30,9 @@ import plana.replan.domain.replan.dto.ReplanRecommendResponse;
 import plana.replan.domain.replan.dto.ReplanSaveRequest;
 import plana.replan.domain.replan.entity.Replan;
 import plana.replan.domain.replan.repository.ReplanRepository;
+import plana.replan.domain.routine.entity.Routine;
+import plana.replan.domain.routine.entity.RoutineType;
+import plana.replan.domain.routine.repository.RoutineRepository;
 import plana.replan.domain.tag.repository.TagRepository;
 import plana.replan.domain.tag.entity.Tag;
 import plana.replan.domain.todo.entity.Todo;
@@ -42,6 +47,7 @@ class ReplanServiceTest {
   @Mock private ReplanRepository replanRepository;
   @Mock private ReplanAiService aiService;
   @Mock private TagRepository tagRepository;
+  @Mock private RoutineRepository routineRepository;
 
   private final Clock clock =
       Clock.fixed(Instant.parse("2026-06-18T00:00:00Z"), ZoneId.of("UTC"));
@@ -51,7 +57,7 @@ class ReplanServiceTest {
   @BeforeEach
   void setUp() {
     replanService =
-        new ReplanService(todoRepository, replanRepository, aiService, tagRepository, clock);
+        new ReplanService(todoRepository, replanRepository, aiService, tagRepository, clock, routineRepository);
   }
 
   private Todo ownedTodo(Long todoId, Long userId) {
@@ -205,6 +211,48 @@ class ReplanServiceTest {
 
     assertThatThrownBy(() -> replanService.save(1L, req))
         .isInstanceOf(CustomException.class);
+  }
+
+  @Test
+  void MODIFY_ROUTINE은_루틴_규칙을_수정한다() {
+    Todo todo = ownedTodo(42L, 1L);
+    Routine routine = org.mockito.Mockito.mock(Routine.class);
+    given(todo.getRoutine()).willReturn(routine);
+    given(todo.isCompleted()).willReturn(false);
+    given(todoRepository.findById(42L)).willReturn(Optional.of(todo));
+    given(replanRepository.save(any(Replan.class))).willAnswer(inv -> inv.getArgument(0));
+
+    ReplanOperation op =
+        new ReplanOperation(
+            ReplanAction.MODIFY_ROUTINE, 42L, "영단어 50개 암기", null, "11:15",
+            null, "WEEKLY", 62, List.of());
+    ReplanSaveRequest req =
+        new ReplanSaveRequest(42L, List.of("INTERRUPT_LATE_END"), List.of(op));
+
+    replanService.save(1L, req);
+
+    then(routine).should()
+        .update(eq("영단어 50개 암기"), eq(RoutineType.WEEKLY), eq(62),
+            eq(LocalTime.of(11, 15)), any());
+    then(routine).should().linkReplan(any(Replan.class));
+  }
+
+  @Test
+  void CREATE_ROUTINE은_새_루틴을_만든다() {
+    Todo todo = ownedTodo(42L, 1L);
+    given(todoRepository.findById(42L)).willReturn(Optional.of(todo));
+    given(replanRepository.save(any(Replan.class))).willAnswer(inv -> inv.getArgument(0));
+
+    ReplanOperation op =
+        new ReplanOperation(
+            ReplanAction.CREATE_ROUTINE, null, "스트레칭", null, "20:00",
+            null, "DAILY", null, List.of());
+    ReplanSaveRequest req =
+        new ReplanSaveRequest(42L, List.of("CONDITION_PAIN"), List.of(op));
+
+    replanService.save(1L, req);
+
+    then(routineRepository).should(times(1)).save(any(Routine.class));
   }
 
   @Test
