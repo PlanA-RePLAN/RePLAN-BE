@@ -8,10 +8,13 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import java.time.LocalDate;
+import java.util.List;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestParam;
 import plana.replan.domain.routine.dto.RoutineCreateRequestDto;
 import plana.replan.domain.routine.dto.RoutineResponseDto;
 import plana.replan.domain.routine.dto.SubRoutineCreateRequestDto;
@@ -21,6 +24,177 @@ import plana.replan.global.common.ApiResult;
 
 @Tag(name = "Routine", description = "루틴 관련 API. 모든 요청에 JWT 인증 필수.")
 public interface RoutineControllerDocs {
+
+  @Operation(
+      summary = "날짜별 루틴 조회",
+      description =
+          """
+          특정 날짜에 해당하는 루틴 목록을 반환합니다.
+
+          - `DAILY` 루틴: 항상 포함
+          - `WEEKLY` 루틴: 해당 날짜의 요일이 `routineDate` 비트마스크에 포함된 경우 반환
+          - `MONTHLY` 루틴: 해당 날짜의 일(day)이 `routineDate`와 일치하는 경우 반환
+
+          미래 날짜도 조회 가능합니다. 오늘 이후 날짜는 아직 Todo가 생성되지 않았을 수 있으므로, 이 API로 루틴 정보를 확인하세요.
+
+          ---
+
+          ### Request Headers
+
+          | 헤더명 | 필수 여부 | 타입 | 설명 |
+          |--------|-----------|------|------|
+          | Authorization | ✅ 필수 | string | `Bearer {accessToken}` 형식의 JWT 액세스 토큰 |
+
+          ---
+
+          ### Query Parameters
+
+          | 파라미터명 | 필수 여부 | 타입 | 설명 | 예시 |
+          |-----------|-----------|------|------|------|
+          | date | ✅ 필수 | string | 조회할 날짜 (yyyy-MM-dd 형식) | `2025-06-20` |
+
+          ---
+
+          ### Response Elements
+
+          | 필드명 | 타입 | 설명 |
+          |--------|------|------|
+          | routineId | integer | 루틴 ID |
+          | title | string | 루틴 제목 |
+          | dueDate | string | 반복 종료 마감일 (ISO 8601 형식). 없으면 null |
+          | routineTime | string | 마감 시각 (HH:mm:ss 형식). 없으면 null |
+          | routineType | string | 반복 유형 (`DAILY` / `WEEKLY` / `MONTHLY`) |
+          | routineDate | integer | 반복 날짜 설정값. DAILY는 null, WEEKLY는 요일 비트마스크, MONTHLY는 일자 |
+          | tagId | integer | 태그 ID. 없으면 null |
+          | tagTitle | string | 태그 제목. 없으면 null |
+          | tagColor | string | 태그 색상. 없으면 null |
+          | goalId | integer | 목표 ID. 없으면 null |
+          """,
+      security = @SecurityRequirement(name = "Bearer Authentication"))
+  @ApiResponses({
+    @ApiResponse(
+        responseCode = "200",
+        description = "조회 성공",
+        content =
+            @Content(
+                examples =
+                    @ExampleObject(
+                        value =
+                            """
+                            {
+                              "status": 200,
+                              "success": true,
+                              "data": [
+                                {
+                                  "routineId": 1,
+                                  "title": "아침 스트레칭",
+                                  "dueDate": null,
+                                  "routineTime": "08:00:00",
+                                  "routineType": "DAILY",
+                                  "routineDate": null,
+                                  "tagId": null,
+                                  "tagTitle": null,
+                                  "tagColor": null,
+                                  "goalId": null
+                                },
+                                {
+                                  "routineId": 2,
+                                  "title": "영어 단어 외우기",
+                                  "dueDate": "2025-12-31T00:00:00",
+                                  "routineTime": "09:00:00",
+                                  "routineType": "WEEKLY",
+                                  "routineDate": 21,
+                                  "tagId": 3,
+                                  "tagTitle": "영어",
+                                  "tagColor": "BLUE",
+                                  "goalId": 2
+                                }
+                              ],
+                              "error": null
+                            }
+                            """))),
+    @ApiResponse(
+        responseCode = "400",
+        description = "date 파라미터 누락 또는 형식 오류",
+        content =
+            @Content(
+                examples =
+                    @ExampleObject(
+                        value =
+                            """
+                            {
+                              "status": 400,
+                              "success": false,
+                              "data": null,
+                              "error": {
+                                "code": "INVALID_INPUT",
+                                "message": "잘못된 입력입니다.",
+                                "detail": null
+                              }
+                            }
+                            """))),
+    @ApiResponse(
+        responseCode = "401",
+        description = "인증 실패 — 토큰 없음 또는 만료",
+        content =
+            @Content(
+                examples = {
+                  @ExampleObject(
+                      name = "토큰 없음",
+                      value =
+                          """
+                          {
+                            "status": 401,
+                            "success": false,
+                            "data": null,
+                            "error": {
+                              "code": "EMPTY_TOKEN",
+                              "message": "토큰이 없습니다.",
+                              "detail": null
+                            }
+                          }
+                          """),
+                  @ExampleObject(
+                      name = "만료된 토큰",
+                      value =
+                          """
+                          {
+                            "status": 401,
+                            "success": false,
+                            "data": null,
+                            "error": {
+                              "code": "EXPIRED_TOKEN",
+                              "message": "만료된 토큰입니다.",
+                              "detail": null
+                            }
+                          }
+                          """)
+                })),
+    @ApiResponse(
+        responseCode = "404",
+        description = "유저를 찾을 수 없음",
+        content =
+            @Content(
+                examples =
+                    @ExampleObject(
+                        value =
+                            """
+                            {
+                              "status": 404,
+                              "success": false,
+                              "data": null,
+                              "error": {
+                                "code": "USER_NOT_FOUND",
+                                "message": "유저를 찾을 수 없습니다.",
+                                "detail": null
+                              }
+                            }
+                            """)))
+  })
+  ResponseEntity<ApiResult<List<RoutineResponseDto>>> getRoutinesByDate(
+      @AuthenticationPrincipal Long userId,
+      @Parameter(description = "조회할 날짜 (yyyy-MM-dd)", example = "2025-06-20") @RequestParam
+          LocalDate date);
 
   @Operation(
       summary = "루틴 생성",
@@ -95,6 +269,8 @@ public interface RoutineControllerDocs {
                                 "routineType": "WEEKLY",
                                 "routineDate": 21,
                                 "tagId": 1,
+                                "tagTitle": "영어",
+                                "tagColor": "BLUE",
                                 "goalId": 2
                               },
                               "error": null
