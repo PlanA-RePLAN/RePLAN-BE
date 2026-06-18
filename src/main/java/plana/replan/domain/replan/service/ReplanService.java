@@ -16,7 +16,6 @@ import plana.replan.domain.replan.dto.ReplanAction;
 import plana.replan.domain.replan.dto.ReplanAnswer;
 import plana.replan.domain.replan.dto.ReplanOperation;
 import plana.replan.domain.replan.dto.ReplanQuestion;
-import plana.replan.domain.replan.dto.ReplanQuestionsRequest;
 import plana.replan.domain.replan.dto.ReplanRecommendRequest;
 import plana.replan.domain.replan.dto.ReplanRecommendResponse;
 import plana.replan.domain.replan.dto.ReplanSaveRequest;
@@ -48,16 +47,22 @@ public class ReplanService {
   private final RoutineRepository routineRepository;
   private final RoutineService routineService;
 
-  public List<ReplanQuestion> getQuestions(Long userId, ReplanQuestionsRequest req) {
-    validateReasonCodesForQuestions(req.reasonCodes(), req.directInput());
-    Todo anchor = findOwnedTodo(userId, req.anchorTodoId());
-    RecommendInput input = buildInput(anchor, req.reasonCodes(), req.directInput(), null);
-    return aiService.generateQuestions(input);
-  }
-
+  /**
+   * 2단계 선택(+선택적 추가질문 답변)을 받아, 추가 질문이 필요하면 질문을, 충분하면 추천을 반환한다. 질문이 필요한지는 {@link
+   * ReplanQuestionRegistry}가 결정론적으로 판단한다(LLM/프론트가 아님). 답변이 이미 있으면 질문 단계를 건너뛰고 곧바로 추천을 생성한다.
+   */
   public ReplanRecommendResponse recommend(Long userId, ReplanRecommendRequest req) {
     validateReasonCodes(req.reasonCodes());
     Todo anchor = findOwnedTodo(userId, req.anchorTodoId());
+
+    boolean noAnswers = req.answers() == null || req.answers().isEmpty();
+    if (noAnswers) {
+      List<ReplanQuestion> questions = ReplanQuestionRegistry.forReasonCodes(req.reasonCodes());
+      if (!questions.isEmpty()) {
+        return ReplanRecommendResponse.askQuestions(questions);
+      }
+    }
+
     RecommendInput input = buildInput(anchor, req.reasonCodes(), null, req.answers());
     return aiService.generateRecommend(input);
   }
@@ -162,7 +167,7 @@ public class ReplanService {
   }
 
   private Replan buildReplan(Todo anchor, List<String> reasonCodes) {
-    // validateReasonCodes는 save/recommend/getQuestions 진입 시점에 이미 호출됨 — 여기서는 보장된 1~3개
+    // validateReasonCodes는 save/recommend 진입 시점에 이미 호출됨 — 여기서는 보장된 1~3개
     String r1 = reasonCodes.get(0);
     String r2 = reasonCodes.size() > 1 ? reasonCodes.get(1) : null;
     String r3 = reasonCodes.size() > 2 ? reasonCodes.get(2) : null;
@@ -190,18 +195,6 @@ public class ReplanService {
 
   private void validateReasonCodes(List<String> codes) {
     if (codes == null || codes.size() < 1 || codes.size() > 3) {
-      throw new CustomException(ReplanErrorCode.REPLAN_INVALID_REASON);
-    }
-  }
-
-  /** getQuestions 전용: 코드 목록이 없어도 directInput이 있으면 통과. 단, 코드가 있을 경우 최대 3개. */
-  private void validateReasonCodesForQuestions(List<String> codes, String directInput) {
-    boolean hasDirectInput = directInput != null && !directInput.isBlank();
-    boolean hasCodes = codes != null && !codes.isEmpty();
-    if (!hasCodes && !hasDirectInput) {
-      throw new CustomException(ReplanErrorCode.REPLAN_INVALID_REASON);
-    }
-    if (codes != null && codes.size() > 3) {
       throw new CustomException(ReplanErrorCode.REPLAN_INVALID_REASON);
     }
   }

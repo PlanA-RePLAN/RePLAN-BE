@@ -6,10 +6,7 @@ import io.swagger.v3.oas.annotations.media.ExampleObject;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import java.util.List;
 import org.springframework.http.ResponseEntity;
-import plana.replan.domain.replan.dto.ReplanQuestion;
-import plana.replan.domain.replan.dto.ReplanQuestionsRequest;
 import plana.replan.domain.replan.dto.ReplanRecommendRequest;
 import plana.replan.domain.replan.dto.ReplanRecommendResponse;
 import plana.replan.domain.replan.dto.ReplanSaveRequest;
@@ -18,171 +15,62 @@ import plana.replan.global.common.ApiResult;
 @Tag(name = "RePlan", description = "실패한 투두를 다시 계획하는 리플랜 API")
 public interface ReplanControllerDocs {
 
-  @Operation(summary = "추가 질문 조회", description = "실패 이유에 따라 AI가 추가로 물어볼 질문을 반환합니다. 없으면 빈 배열입니다.")
+  @Operation(
+      summary = "추천 받기 (질문 또는 추천)",
+      description =
+          "2단계로 선택한 실패 이유(reasonCodes)를 보냅니다. 서버가 그 이유에 추가 질문이 필요한지 결정합니다.\n"
+              + "- 추가 질문이 필요하면 needsMoreInfo=true와 questions가 옵니다. 사용자가 답한 뒤 answers를 채워 다시 호출하세요.\n"
+              + "- 질문이 필요 없거나 answers가 있으면 needsMoreInfo=false와 추천(summary/tipNote/operations)이 옵니다.\n"
+              + "- 새로고침은 같은 요청을 그대로 다시 호출하면 됩니다.")
   @ApiResponses({
     @ApiResponse(
         responseCode = "200",
-        description = "성공",
+        description = "성공 (추가 질문 또는 추천)",
         content =
             @Content(
-                examples =
-                    @ExampleObject(
-                        value =
-                            """
-                            {
-                              "status": 200,
-                              "success": true,
-                              "data": [
+                examples = {
+                  @ExampleObject(
+                      name = "추가 질문이 필요한 경우",
+                      value =
+                          """
+                          {
+                            "status": 200,
+                            "success": true,
+                            "data": {
+                              "needsMoreInfo": true,
+                              "questions": [
                                 {
                                   "key": "priority_targets",
                                   "type": "TODO_SELECT",
-                                  "title": "투두 선택",
+                                  "title": "우선순위를 매길 투두를 선택하세요",
                                   "chips": null
                                 }
                               ],
-                              "error": null
-                            }
-                            """))),
-    @ApiResponse(
-        responseCode = "401",
-        description = "인증 실패 — 토큰 없음 또는 만료",
-        content =
-            @Content(
-                examples = {
-                  @ExampleObject(
-                      name = "토큰 없음",
-                      value =
-                          """
-                          {
-                            "status": 401,
-                            "success": false,
-                            "data": null,
-                            "error": {
-                              "code": "EMPTY_TOKEN",
-                              "message": "토큰이 없습니다.",
-                              "detail": null
-                            }
+                              "summary": null,
+                              "tipNote": null,
+                              "operations": []
+                            },
+                            "error": null
                           }
                           """),
                   @ExampleObject(
-                      name = "만료된 토큰",
+                      name = "추천이 바로 나온 경우",
                       value =
                           """
                           {
-                            "status": 401,
-                            "success": false,
-                            "data": null,
-                            "error": {
-                              "code": "EXPIRED_TOKEN",
-                              "message": "만료된 토큰입니다.",
-                              "detail": null
-                            }
+                            "status": 200,
+                            "success": true,
+                            "data": {
+                              "needsMoreInfo": false,
+                              "questions": [],
+                              "summary": "일정이 촉박했습니다. 마감을 늘리고 단계를 나눴습니다.",
+                              "tipNote": "작은 단위로 쪼개면 성공률이 올라갑니다.",
+                              "operations": []
+                            },
+                            "error": null
                           }
                           """)
                 })),
-    @ApiResponse(
-        responseCode = "400",
-        description = "실패 이유 개수가 올바르지 않음",
-        content =
-            @Content(
-                examples =
-                    @ExampleObject(
-                        value =
-                            """
-                            {
-                              "status": 400,
-                              "success": false,
-                              "data": null,
-                              "error": {
-                                "code": "REPLAN_INVALID_REASON",
-                                "message": "실패 이유는 최소 1개, 최대 3개여야 합니다.",
-                                "detail": null
-                              }
-                            }
-                            """))),
-    @ApiResponse(
-        responseCode = "404",
-        description = "리플랜 대상 투두를 찾을 수 없음",
-        content =
-            @Content(
-                examples =
-                    @ExampleObject(
-                        value =
-                            """
-                            {
-                              "status": 404,
-                              "success": false,
-                              "data": null,
-                              "error": {
-                                "code": "REPLAN_TODO_NOT_FOUND",
-                                "message": "리플랜 대상 투두를 찾을 수 없습니다.",
-                                "detail": null
-                              }
-                            }
-                            """))),
-    @ApiResponse(
-        responseCode = "502",
-        description = "AI 서비스 오류",
-        content =
-            @Content(
-                examples = {
-                  @ExampleObject(
-                      name = "Gemini API 오류",
-                      value =
-                          """
-                          {
-                            "status": 502,
-                            "success": false,
-                            "data": null,
-                            "error": {
-                              "code": "REPLAN_GEMINI_API_ERROR",
-                              "message": "AI 추천 서비스에 일시적인 오류가 발생했습니다.",
-                              "detail": null
-                            }
-                          }
-                          """),
-                  @ExampleObject(
-                      name = "응답 파싱 오류",
-                      value =
-                          """
-                          {
-                            "status": 502,
-                            "success": false,
-                            "data": null,
-                            "error": {
-                              "code": "REPLAN_GEMINI_PARSE_ERROR",
-                              "message": "AI 응답을 처리하는 중 오류가 발생했습니다.",
-                              "detail": null
-                            }
-                          }
-                          """)
-                }))
-  })
-  ResponseEntity<ApiResult<List<ReplanQuestion>>> getQuestions(
-      Long userId, ReplanQuestionsRequest request);
-
-  @Operation(summary = "추천 받기", description = "실패 이유와 추가질문 답변으로 투두 수정안·추가안을 제안합니다. 새로고침은 재호출하세요.")
-  @ApiResponses({
-    @ApiResponse(
-        responseCode = "200",
-        description = "성공",
-        content =
-            @Content(
-                examples =
-                    @ExampleObject(
-                        value =
-                            """
-                            {
-                              "status": 200,
-                              "success": true,
-                              "data": {
-                                "summary": "일정이 너무 촉박했습니다. 마감 기한을 늘리고 단계를 나눠보세요.",
-                                "tipNote": "작은 단위로 쪼개면 성공률이 올라갑니다.",
-                                "operations": []
-                              },
-                              "error": null
-                            }
-                            """))),
     @ApiResponse(
         responseCode = "401",
         description = "인증 실패 — 토큰 없음 또는 만료",

@@ -41,9 +41,33 @@ class ReplanControllerTest {
   }
 
   @Test
-  void 추천_엔드포인트_성공() throws Exception {
+  void 추천_엔드포인트_추천반환() throws Exception {
     given(replanService.recommend(eq(1L), any()))
-        .willReturn(new ReplanRecommendResponse("요약", "팁", List.of()));
+        .willReturn(ReplanRecommendResponse.recommendation("요약", "팁", List.of()));
+
+    mockMvc
+        .perform(
+            post("/api/replans/recommend")
+                .with(authentication(authToken(1L)))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """
+                    {"anchorTodoId":42,"reasonCodes":["INTERRUPT_SUDDEN"],"answers":[]}
+                    """))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.success").value(true))
+        .andExpect(jsonPath("$.data.needsMoreInfo").value(false))
+        .andExpect(jsonPath("$.data.summary").value("요약"));
+  }
+
+  @Test
+  void 추천_엔드포인트_질문반환() throws Exception {
+    given(replanService.recommend(eq(1L), any()))
+        .willReturn(
+            ReplanRecommendResponse.askQuestions(
+                List.of(
+                    new ReplanQuestion(
+                        "priority_targets", QuestionType.TODO_SELECT, "투두 선택", null))));
 
     mockMvc
         .perform(
@@ -56,7 +80,9 @@ class ReplanControllerTest {
                     """))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.success").value(true))
-        .andExpect(jsonPath("$.data.summary").value("요약"));
+        .andExpect(jsonPath("$.data.needsMoreInfo").value(true))
+        .andExpect(jsonPath("$.data.questions[0].type").value("TODO_SELECT"))
+        .andExpect(jsonPath("$.data.questions[0].key").value("priority_targets"));
   }
 
   @Test
@@ -74,27 +100,5 @@ class ReplanControllerTest {
                     """))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.success").value(true));
-  }
-
-  @Test
-  void 질문_엔드포인트_성공() throws Exception {
-    given(replanService.getQuestions(eq(1L), any()))
-        .willReturn(
-            List.of(
-                new ReplanQuestion("priority_targets", QuestionType.TODO_SELECT, "투두 선택", null)));
-
-    mockMvc
-        .perform(
-            post("/api/replans/questions")
-                .with(authentication(authToken(1L)))
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(
-                    """
-                    {"anchorTodoId":42,"reasonCodes":["GOAL_NO_PRIORITY"],"directInput":null}
-                    """))
-        .andExpect(status().isOk())
-        .andExpect(jsonPath("$.success").value(true))
-        .andExpect(jsonPath("$.data[0].type").value("TODO_SELECT"))
-        .andExpect(jsonPath("$.data[0].key").value("priority_targets"));
   }
 }

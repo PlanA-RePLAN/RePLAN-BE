@@ -18,6 +18,7 @@ public enum FailureReasonCode {
   MENTAL_NO_MOTIVATION("동기가 부족했어요", MENTAL_RESISTANCE),
   MENTAL_PROCRASTINATION("어렵거나 오래걸릴 것 같아 미뤘어요", MENTAL_RESISTANCE),
   MENTAL_PERFECTIONISM("잘하고 싶어 부담을 가지다 미뤘어요", MENTAL_RESISTANCE),
+  MENTAL_DISTRACTION("딴짓을 하다가 미뤘어요", MENTAL_RESISTANCE),
 
   // depth 2 — 컨디션 난조
   CONDITION_EXHAUSTED("체력 방전/에너지 모두 소모 상태에요", BAD_CONDITION),
@@ -30,12 +31,17 @@ public enum FailureReasonCode {
   GOAL_TOO_MUCH("목표가 과했어요", GOAL_NEEDS_IMPROVEMENT),
   GOAL_NO_PRIORITY("우선 순위를 정하지 못했어요", GOAL_NEEDS_IMPROVEMENT),
   GOAL_UNDERESTIMATED("시간이 예측보다 더 소요됐어요", GOAL_NEEDS_IMPROVEMENT),
+  GOAL_TOO_MANY_TODOS("하루에 계획한 할 일 개수가 많았어요", GOAL_NEEDS_IMPROVEMENT),
+  GOAL_TOO_MUCH_VOLUME("특정 할 일의 분량이 많았어요", GOAL_NEEDS_IMPROVEMENT),
+  GOAL_UNFAMILIAR("처음 해보거나 익숙하지 않아 예측이 빗나갔어요", GOAL_NEEDS_IMPROVEMENT),
+  GOAL_BLOCKED("중간에 예상치 못한 문제나 막히는 부분이 생겼어요", GOAL_NEEDS_IMPROVEMENT),
 
   // depth 2 — 예상치 못한 방해 발생
   INTERRUPT_SUDDEN("돌발 상황이 발생했어요", UNEXPECTED_INTERRUPTION),
   INTERRUPT_ENVIRONMENT("집중할 수 있는 환경이 아니었어요", UNEXPECTED_INTERRUPTION),
   INTERRUPT_URGENT("더 급한 일이 생겼어요", UNEXPECTED_INTERRUPTION),
   INTERRUPT_LATE_END("다른 일정이 늦게 끝났어요", UNEXPECTED_INTERRUPTION),
+  INTERRUPT_CONTACT("타인의 요청이나 연락이 계속 들어왔어요", UNEXPECTED_INTERRUPTION),
 
   // depth 3 — 수면부족 세분화
   CONDITION_SLEEP_3H_UNDER("3시간 이하", CONDITION_SLEEP),

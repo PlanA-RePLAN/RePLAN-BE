@@ -22,9 +22,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import plana.replan.domain.replan.dto.ReplanAction;
+import plana.replan.domain.replan.dto.ReplanAnswer;
 import plana.replan.domain.replan.dto.ReplanOperation;
-import plana.replan.domain.replan.dto.ReplanQuestion;
-import plana.replan.domain.replan.dto.ReplanQuestionsRequest;
 import plana.replan.domain.replan.dto.ReplanRecommendRequest;
 import plana.replan.domain.replan.dto.ReplanRecommendResponse;
 import plana.replan.domain.replan.dto.ReplanSaveRequest;
@@ -79,44 +78,67 @@ class ReplanServiceTest {
   }
 
   @Test
-  void 추가질문_조회_성공() {
+  void 추가질문_필요한_사유는_질문을_반환하고_AI를_부르지_않는다() {
     Todo todo = ownedTodo(42L, 1L);
     given(todoRepository.findById(42L)).willReturn(Optional.of(todo));
-    given(aiService.generateQuestions(any()))
-        .willReturn(List.of(new ReplanQuestion("k", null, "질문", null)));
 
-    ReplanQuestionsRequest req = new ReplanQuestionsRequest(42L, List.of("GOAL_NO_PRIORITY"), null);
+    // GOAL_NO_PRIORITY는 우선순위 투두 선택 질문이 필요한 사유
+    ReplanRecommendRequest req = new ReplanRecommendRequest(42L, List.of("GOAL_NO_PRIORITY"), null);
 
-    List<ReplanQuestion> result = replanService.getQuestions(1L, req);
+    ReplanRecommendResponse res = replanService.recommend(1L, req);
 
-    assertThat(result).hasSize(1);
+    assertThat(res.needsMoreInfo()).isTrue();
+    assertThat(res.questions()).hasSize(1);
+    assertThat(res.questions().get(0).key()).isEqualTo("priority_targets");
+    then(aiService).should(never()).generateRecommend(any());
   }
 
   @Test
-  void 남의_투두면_조회_실패() {
+  void 남의_투두면_거부() {
     Todo todo = ownedTodo(42L, 999L);
     given(todoRepository.findById(42L)).willReturn(Optional.of(todo));
 
-    ReplanQuestionsRequest req = new ReplanQuestionsRequest(42L, List.of("GOAL_NO_PRIORITY"), null);
+    ReplanRecommendRequest req = new ReplanRecommendRequest(42L, List.of("GOAL_NO_PRIORITY"), null);
 
-    assertThatThrownBy(() -> replanService.getQuestions(1L, req))
-        .isInstanceOf(CustomException.class);
+    assertThatThrownBy(() -> replanService.recommend(1L, req)).isInstanceOf(CustomException.class);
   }
 
   @Test
-  void 추천_성공() {
+  void 질문_불필요한_사유는_바로_추천을_생성한다() {
     Todo todo = ownedTodo(42L, 1L);
     given(todo.getDueDate()).willReturn(LocalDateTime.of(2026, 6, 7, 10, 0));
     given(todo.getTag()).willReturn(org.mockito.Mockito.mock(Tag.class));
     given(todoRepository.findById(42L)).willReturn(Optional.of(todo));
     given(aiService.generateRecommend(any()))
-        .willReturn(new ReplanRecommendResponse("요약", "팁", List.of()));
+        .willReturn(ReplanRecommendResponse.recommendation("요약", "팁", List.of()));
 
-    ReplanRecommendRequest req = new ReplanRecommendRequest(42L, List.of("GOAL_NO_PRIORITY"), null);
+    // INTERRUPT_SUDDEN(돌발 상황)은 추가 질문 없이 바로 추천
+    ReplanRecommendRequest req = new ReplanRecommendRequest(42L, List.of("INTERRUPT_SUDDEN"), null);
 
     ReplanRecommendResponse res = replanService.recommend(1L, req);
 
+    assertThat(res.needsMoreInfo()).isFalse();
     assertThat(res.summary()).isEqualTo("요약");
+  }
+
+  @Test
+  void 답변이_있으면_질문단계를_건너뛰고_추천을_생성한다() {
+    Todo todo = ownedTodo(42L, 1L);
+    given(todoRepository.findById(42L)).willReturn(Optional.of(todo));
+    given(aiService.generateRecommend(any()))
+        .willReturn(ReplanRecommendResponse.recommendation("요약", "팁", List.of()));
+
+    // GOAL_NO_PRIORITY는 원래 질문이 필요하지만, 답변이 있으면 곧바로 추천
+    ReplanRecommendRequest req =
+        new ReplanRecommendRequest(
+            42L,
+            List.of("GOAL_NO_PRIORITY"),
+            List.of(new ReplanAnswer("priority_targets", null, List.of(11L), null)));
+
+    ReplanRecommendResponse res = replanService.recommend(1L, req);
+
+    assertThat(res.needsMoreInfo()).isFalse();
+    then(aiService).should(times(1)).generateRecommend(any());
   }
 
   @Test
