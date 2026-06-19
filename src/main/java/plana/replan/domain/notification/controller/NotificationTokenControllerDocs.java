@@ -70,12 +70,39 @@ public interface NotificationTokenControllerDocs {
       summary = "기기 토큰 삭제",
       description =
           "로그아웃 시 해당 기기의 FCM 토큰을 삭제한다.\n\n"
+              + "### Request Headers\n"
+              + "| 헤더명 | 필수 여부 | 타입 | 설명 |\n"
+              + "|--------|-----------|------|------|\n"
+              + "| Authorization | ✅ 필수 | string | `Bearer {accessToken}` |\n"
+              + "| Content-Type | ✅ 필수 | string | `application/json` |\n\n"
               + "### Request Body\n"
               + "| 필드명 | 필수 여부 | 타입 | 설명 | 예시 |\n"
               + "|--------|-----------|------|------|------|\n"
               + "| token | ✅ 필수 | string | 삭제할 FCM 토큰 | `\"fcm-token-xyz\"` |")
   @ApiResponses({
-    @ApiResponse(responseCode = "200", description = "삭제 성공"),
+    @ApiResponse(
+        responseCode = "200",
+        description = "삭제 성공",
+        content =
+            @Content(
+                examples =
+                    @ExampleObject(
+                        value = "{\"status\":200,\"success\":true,\"data\":null,\"error\":null}"))),
+    @ApiResponse(
+        responseCode = "401",
+        description = "인증 실패",
+        content =
+            @Content(
+                examples = {
+                  @ExampleObject(
+                      name = "토큰 없음",
+                      value =
+                          "{\"status\":401,\"success\":false,\"data\":null,\"error\":{\"code\":\"EMPTY_TOKEN\",\"message\":\"인증 토큰이 없습니다.\"}}"),
+                  @ExampleObject(
+                      name = "만료된 토큰",
+                      value =
+                          "{\"status\":401,\"success\":false,\"data\":null,\"error\":{\"code\":\"EXPIRED_TOKEN\",\"message\":\"만료된 토큰입니다.\"}}")
+                })),
     @ApiResponse(
         responseCode = "404",
         description = "토큰 없음",
