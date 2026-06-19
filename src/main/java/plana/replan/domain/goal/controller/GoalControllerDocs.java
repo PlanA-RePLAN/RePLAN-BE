@@ -21,9 +21,9 @@ import plana.replan.domain.goal.dto.common.GoalSingleResponse;
 import plana.replan.domain.goal.dto.create.GoalCreateRequest;
 import plana.replan.domain.goal.dto.create.GoalWithTodosCreateRequest;
 import plana.replan.domain.goal.dto.create.GoalWithTodosCreateResponse;
-import plana.replan.domain.goal.dto.list.GoalsByDateResponse;
 import plana.replan.domain.goal.dto.explore.GoalExploreRequest;
 import plana.replan.domain.goal.dto.explore.GoalExploreResponse;
+import plana.replan.domain.goal.dto.list.GoalsByDateResponse;
 import plana.replan.domain.goal.dto.recommend.TodoRecommendationRequest;
 import plana.replan.domain.goal.dto.recommend.TodoRecommendationResponse;
 import plana.replan.domain.goal.dto.refine.GoalRefinementRequest;
@@ -1215,7 +1215,8 @@ public interface GoalControllerDocs {
                                 """),
                         @ExampleObject(
                             name = "솔루션·종료일정 생략 (goal만)",
-                            summary = "goal만 필수. solutions, deadlineDate, deadlineTime, refreshCount는 생략하면 null로 처리됩니다.",
+                            summary =
+                                "goal만 필수. solutions, deadlineDate, deadlineTime, refreshCount는 생략하면 null로 처리됩니다.",
                             value =
                                 """
                                 {
