@@ -1,0 +1,4 @@
+ALTER TABLE users
+    ADD COLUMN notify_todo_due    BOOLEAN NOT NULL DEFAULT TRUE,
+    ADD COLUMN notify_todo_failed BOOLEAN NOT NULL DEFAULT TRUE,
+    ADD COLUMN notify_report      BOOLEAN NOT NULL DEFAULT TRUE;
