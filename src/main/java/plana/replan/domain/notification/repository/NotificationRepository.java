@@ -4,6 +4,7 @@ import java.util.List;
 import java.util.Optional;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import plana.replan.domain.notification.entity.Notification;
@@ -16,7 +17,9 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
 
   long countByUserAndIsReadFalse(User user);
 
-  List<Notification> findByUserAndIsReadFalse(User user);
+  @Modifying
+  @Query("UPDATE Notification n SET n.isRead = true WHERE n.user = :user AND n.isRead = false")
+  int markAllReadByUser(@Param("user") User user);
 
   // 전체 목록 (cursor = 직전 응답의 마지막 id, 없으면 Long.MAX_VALUE 전달)
   @Query("SELECT n FROM Notification n WHERE n.user = :user AND n.id < :cursor ORDER BY n.id DESC")

@@ -1,6 +1,7 @@
 package plana.replan.domain.notification.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.BDDMockito.given;
 
 import java.util.Optional;
@@ -16,6 +17,7 @@ import plana.replan.domain.user.entity.Provider;
 import plana.replan.domain.user.entity.Role;
 import plana.replan.domain.user.entity.User;
 import plana.replan.domain.user.repository.UserRepository;
+import plana.replan.global.exception.CustomException;
 
 @ExtendWith(MockitoExtension.class)
 class NotificationSettingServiceTest {
@@ -56,5 +58,12 @@ class NotificationSettingServiceTest {
     assertThat(res.todoDue()).isFalse();
     assertThat(res.todoFailed()).isTrue();
     assertThat(res.report()).isTrue();
+  }
+
+  @Test
+  @DisplayName("존재하지 않는 사용자 조회 시 예외")
+  void getThrowsWhenUserNotFound() {
+    given(userRepository.findById(99L)).willReturn(java.util.Optional.empty());
+    assertThatThrownBy(() -> settingService.get(99L)).isInstanceOf(CustomException.class);
   }
 }

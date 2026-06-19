@@ -84,16 +84,17 @@ public class NotificationService {
   public NotificationListResponse getList(
       Long userId, NotificationCategory category, Long cursor, int size) {
     User user = findUser(userId);
+    int safeSize = Math.min(Math.max(size, 1), 100);
     long effectiveCursor = cursor == null ? Long.MAX_VALUE : cursor;
-    Pageable pageable = PageRequest.of(0, size + 1);
+    Pageable pageable = PageRequest.of(0, safeSize + 1);
 
     List<Notification> rows =
         category == null
             ? notificationRepository.findPage(user, effectiveCursor, pageable)
             : notificationRepository.findPageByCategory(user, category, effectiveCursor, pageable);
 
-    boolean hasNext = rows.size() > size;
-    List<Notification> page = hasNext ? rows.subList(0, size) : rows;
+    boolean hasNext = rows.size() > safeSize;
+    List<Notification> page = hasNext ? rows.subList(0, safeSize) : rows;
     Long nextCursor = page.isEmpty() ? null : page.get(page.size() - 1).getId();
 
     return new NotificationListResponse(
@@ -121,7 +122,7 @@ public class NotificationService {
   @Transactional
   public void markAllRead(Long userId) {
     User user = findUser(userId);
-    notificationRepository.findByUserAndIsReadFalse(user).forEach(Notification::markRead);
+    notificationRepository.markAllReadByUser(user);
   }
 
   private User findUser(Long userId) {
