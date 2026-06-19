@@ -41,4 +41,8 @@ public class DeviceToken extends BaseTimeEntity {
   public void updatePlatform(Platform platform) {
     this.platform = Objects.requireNonNull(platform, "플랫폼은 필수입니다.");
   }
+
+  public void changeOwner(User user) {
+    this.user = user;
+  }
 }
