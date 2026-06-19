@@ -56,14 +56,16 @@ class DeviceTokenServiceTest {
   @Test
   @DisplayName("이미 있는 토큰이면 새로 저장하지 않고 플랫폼만 갱신한다")
   void registerExistingTokenUpserts() {
+    User newUser = user();
     DeviceToken existing =
         DeviceToken.builder().user(user()).token("t1").platform(Platform.WEB).build();
-    given(userRepository.findById(1L)).willReturn(Optional.of(user()));
+    given(userRepository.findById(1L)).willReturn(Optional.of(newUser));
     given(deviceTokenRepository.findByToken("t1")).willReturn(Optional.of(existing));
 
     deviceTokenService.register(1L, new DeviceTokenRegisterRequest("t1", Platform.ANDROID));
 
     assertThat(existing.getPlatform()).isEqualTo(Platform.ANDROID);
+    assertThat(existing.getUser()).isSameAs(newUser);
     verify(deviceTokenRepository, never()).save(any(DeviceToken.class));
   }
 

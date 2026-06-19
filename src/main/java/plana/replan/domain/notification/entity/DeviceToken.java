@@ -43,6 +43,6 @@ public class DeviceToken extends BaseTimeEntity {
   }
 
   public void changeOwner(User user) {
-    this.user = user;
+    this.user = Objects.requireNonNull(user, "사용자는 필수입니다.");
   }
 }
