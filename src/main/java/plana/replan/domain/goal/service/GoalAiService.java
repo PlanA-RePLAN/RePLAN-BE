@@ -14,15 +14,20 @@ import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
+import plana.replan.domain.goal.dto.explore.ExploreQuestion;
+import plana.replan.domain.goal.dto.explore.GoalExploreRequest;
+import plana.replan.domain.goal.dto.explore.GoalExploreResponse;
 import plana.replan.domain.goal.dto.recommend.RecommendedTodo;
+import plana.replan.domain.goal.dto.recommend.SolutionInput;
 import plana.replan.domain.goal.dto.recommend.TodoRecommendationRequest;
 import plana.replan.domain.goal.dto.recommend.TodoRecommendationResponse;
 import plana.replan.domain.goal.dto.refine.GoalRefinementRequest;
 import plana.replan.domain.goal.dto.refine.GoalRefinementResponse;
 import plana.replan.domain.goal.dto.refine.RefinedDeadline;
 import plana.replan.domain.goal.dto.refine.RefinedField;
+import plana.replan.domain.goal.dto.refine.QuestionAnswer;
 import plana.replan.domain.goal.dto.refine.RefinedNoteItem;
-import plana.replan.domain.goal.dto.refine.RefinedNotes;
+import plana.replan.domain.goal.dto.refine.RefinedSolution;
 import plana.replan.domain.goal.exception.GoalErrorCode;
 import plana.replan.global.exception.CustomException;
 
@@ -40,6 +45,72 @@ public class GoalAiService {
   @Value("${gemini.api-key}")
   private String apiKey;
 
+  public GoalExploreResponse exploreGoal(GoalExploreRequest request) {
+    String today = LocalDate.now().format(DateTimeFormatter.ISO_LOCAL_DATE);
+    String prompt = buildExplorePrompt(request, today);
+    String raw = callGemini(prompt);
+    return parseExploreResponse(raw);
+  }
+
+  String buildExplorePrompt(GoalExploreRequest req, String today) {
+    return """
+        당신은 목표 달성 플래닝 전문가입니다.
+        사용자가 입력한 목표를 보고, 투두 리스트를 만들기 위해 추가로 물어볼 질문을 생성하세요.
+
+        입력:
+        목표: %s
+        종료 날짜: %s
+        종료 시간: %s
+        오늘 날짜: %s
+
+        [1단계 — 목표 유효성 판단]
+        입력이 '달성할 수 있는 실제 목표'인지 판단한다.
+        - 종료 날짜가 입력되어 있고 그 날짜(또는 종료 날짜·시간)가 오늘 날짜보다 과거이면
+          valid를 false로, message에 "종료 일정이 이미 지났어요. 미래 날짜로 다시 설정해주세요."를 넣고 questions는 빈 배열로 둔다.
+        - 목표가 아니거나(예: 무의미한 문자열, 욕설, 목표와 무관한 잡담), 너무 모호해 어떤 계획도 세울 수 없으면
+          valid를 false로, message에 "달성할 수 있는 목표를 입력해주세요."를 넣고 questions는 빈 배열로 둔다.
+        - 정상 목표면 valid를 true, message는 null로 둔다.
+
+        [2단계 — 질문 생성 (valid=true일 때만)]
+        1. 목표 달성 계획에 꼭 필요한 질문을 정확히 3개 생성한다.
+        2. 질문은 목표에 맞게 동적으로 만든다(고정 문구 금지). 예: 어학 목표면 현재 실력/성적/수준을 묻는 질문,
+           운동 목표면 현재 체력·운동 경험을 묻는 질문 등 목표에 맞춰 워딩을 바꾼다.
+        3. question은 짧은 라벨 형태로 쓴다(예: "현재 영어 실력", "투자 가능 시간", "특이사항").
+        4. 각 질문마다 사용자가 바로 누를 수 있는 예시 답변(chips)을 2~3개 생성한다(짧은 단어·구).
+        5. 모든 텍스트는 서술형/명사형으로 쓰고 "~하세요" 같은 명령형은 쓰지 않는다.
+
+        반드시 아래 JSON만 출력하세요 (다른 설명 없이):
+        {"valid":true,"message":null,"questions":[{"question":"","chips":["",""]}]}
+        """
+        .formatted(
+            req.goal(),
+            req.deadlineDate() != null ? req.deadlineDate() : "미입력",
+            req.deadlineTime() != null ? req.deadlineTime() : "미입력",
+            today);
+  }
+
+  GoalExploreResponse parseExploreResponse(String raw) {
+    try {
+      String json = extractJson(raw);
+      JsonNode root = objectMapper.readTree(json);
+      boolean valid = root.path("valid").asBoolean(false);
+      String message = root.path("message").isNull() ? null : root.path("message").asText(null);
+
+      List<ExploreQuestion> questions = new ArrayList<>();
+      for (JsonNode q : root.path("questions")) {
+        List<String> chips = new ArrayList<>();
+        for (JsonNode c : q.path("chips")) {
+          chips.add(c.asText());
+        }
+        questions.add(new ExploreQuestion(q.path("question").asText(), chips));
+      }
+      return new GoalExploreResponse(valid, message, questions);
+    } catch (Exception e) {
+      log.error("Gemini explore 응답 파싱 실패: {}", raw, e);
+      throw new CustomException(GoalErrorCode.GEMINI_PARSE_ERROR);
+    }
+  }
+
   public GoalRefinementResponse refineGoal(GoalRefinementRequest request) {
     String today = LocalDate.now().format(DateTimeFormatter.ISO_LOCAL_DATE);
     String prompt = buildRefinePrompt(request, today);
@@ -47,51 +118,50 @@ public class GoalAiService {
     return parseRefineResponse(raw);
   }
 
-  private String buildRefinePrompt(GoalRefinementRequest req, String today) {
+  String buildRefinePrompt(GoalRefinementRequest req, String today) {
+    StringBuilder qa = new StringBuilder();
+    for (QuestionAnswer a : req.answers()) {
+      qa.append("- ").append(a.question()).append(": ")
+        .append(a.answer() != null && !a.answer().isBlank() ? a.answer() : "미입력").append("\n");
+    }
     return """
         당신은 목표 달성 플래닝 전문가입니다.
-        사용자가 제공한 목표 초안을 분석하고, 투두 리스트 생성에 최적화되도록 정제하세요.
+        사용자의 목표와 질문 답변을 분석하고, 투두 리스트 생성에 최적화되도록 정제하세요.
 
         입력:
         목표: %s
-        마감기한: %s
-        현재수준: %s
-        투자가능시간: %s
-        특이사항:
+        종료 날짜: %s
+        종료 시간: %s
+        질문/답변:
         %s
 
         정제 규칙:
-        1. 사용자가 변경 불가한 제약(특정 요일, 교재, 장소 등)은 반드시 그대로 유지
-        2. goal: 막연한 표현을 제거하고 측정 가능한 수치·기준을 포함해 구체화. 섹션별 목표가 있으면 명시 (예: "토익 900점" → "토익 900점 달성 (LC 450·RC 450 이상)"). 투자 가능 시간 대비 과도하면 현실적으로 조정하고 이유 명시
-        3. currentLevel: 구체적 수치·단계로 표현하고, 현재 수준에서 목표까지의 격차와 달성 난이도를 한 줄로 평가
-        4. availableTime: 일/주/월 단위로 환산하고, 총 가용 학습 시간을 합산한 뒤 목표 달성 가능성을 한 줄로 평가
-        5. deadline: 오늘 날짜(%s) 기준으로 date(yyyy-MM-dd), time(HH:mm)으로 분리 변환. 사용자가 "기한 없음", "마감기한 설정 안할래요" 등을 명시하면 date와 time 모두 null
-        6. 목표 달성에 교재·강의가 필요하지만 사용자가 언급하지 않았다면 Google Search로 사용자 수준에 맞는 교재·강의를 검색하여 notes에 추가
-        7. [교재·강의 포함 필수 조건 — 아래 3가지를 모두 충족해야만 포함 가능]
-           (a) Google Search로 실제 인터넷에 존재함이 확인될 것
-           (b) 책: 저자명·출판사·실제 구매 링크(인터넷 서점 URL 등)를 검색으로 확인할 것
-               강의: 강사명·플랫폼명·강의 링크(플랫폼 강의 페이지 URL)를 검색으로 확인할 것
-           (c) 링크를 확인할 수 없으면 해당 교재·강의는 반드시 제외할 것 (링크 없이 포함 절대 금지)
-           예시 형식: "해커스 토익 기출 VOCA (저자: 해커스어학연구소 / 출판사: 해커스어학원 / 링크: https://www.yes24.com/...)"
-                      "스프링 핵심 원리 기본편 (강사: 김영한 / 플랫폼: 인프런 / 링크: https://www.inflearn.com/...)"
-        8. notes.value는 목표에 맞는 카테고리(교재/학습전략/루틴/마무리 등, 고정 아님)로 3~5개 항목을 구조화. 각 항목 content는 투두 생성에 바로 쓸 수 있도록 교재명·전략·루틴 방식을 구체적으로 서술
-        9. notes.reason은 notes 전체에 대한 이유를 1문장으로 작성
-        10. 각 필드 reason은 1~2문장으로 구체적으로 작성 (변경 없으면 "사용자 입력을 그대로 유지했습니다."로 작성)
-        11. 모든 텍스트는 "~합니다", "~했습니다" 등 서술형으로 작성. "~하세요", "~하시기 바랍니다" 등 조언·명령형 말투 절대 금지
+        1. 사용자가 변경 불가한 제약(특정 요일·교재·장소 등)은 반드시 그대로 유지한다.
+        2. goal: 막연한 표현을 제거하고 측정 가능한 수치·기준을 포함해 구체화한다.
+           (예: "토익 900점" → "토익 900점 달성 (LC 450·RC 450 이상)")
+        3. deadline: 입력으로 받은 종료 날짜(date, yyyy-MM-dd)·종료 시간(time, HH:mm)을 그대로 둔다(임의 변경 금지).
+           입력이 없으면 null. reason에는 일정 기준 한 줄 평가를 적는다.
+        4. solutions: 입력된 '질문/답변' 각각에 대해 정제 결과를 1개씩 만든다(질문 수와 동일).
+           - question: 입력 질문을 그대로 또는 자연스러운 라벨로 정리
+           - items: 그 질문에 대한 정제 내용을 {title, content} 항목 1~5개로 구조화.
+             유저 답변을 그대로 옮기지 말고, 답변 + 목표 달성에 필요한 보강(영역별 평가·전략·루틴 등)을 포함한다.
+             title은 항목 소제목(예: "교재 및 컨텐츠"), content는 투두 생성에 바로 쓸 수 있게 구체적으로 서술.
+           - reason: 그 질문 정제에 대한 근거 1~2문장
+        5. 목표 달성에 교재·강의가 필요하지만 답변에 없으면 Google Search로 실제 존재가 확인되는 것만 items에 추가한다.
+           링크를 확인할 수 없으면 포함하지 않는다.
+        6. 모든 텍스트는 "~합니다", "~했습니다" 서술형으로 쓰고 "~하세요" 명령형은 금지한다.
 
         반드시 아래 JSON만 출력하세요 (다른 설명 없이):
-        {"goal":{"value":"","reason":""},"deadline":{"date":null,"time":null,"reason":""},"currentLevel":{"value":"","reason":""},"availableTime":{"value":"","reason":""},"notes":{"value":[{"title":"","content":""}],"reason":""}}
+        {"goal":{"value":"","reason":""},"deadline":{"date":null,"time":null,"reason":""},"solutions":[{"question":"","items":[{"title":"","content":""}],"reason":""}]}
         """
         .formatted(
             req.goal(),
-            req.deadline(),
-            req.currentLevel() != null ? req.currentLevel() : "미입력",
-            req.availableTime() != null ? req.availableTime() : "미입력",
-            req.notes() != null ? req.notes() : "미입력",
-            today);
+            req.deadlineDate() != null ? req.deadlineDate() : "미입력",
+            req.deadlineTime() != null ? req.deadlineTime() : "미입력",
+            qa.toString());
   }
 
-  private GoalRefinementResponse parseRefineResponse(String raw) {
+  GoalRefinementResponse parseRefineResponse(String raw) {
     try {
       String json = extractJson(raw);
       JsonNode root = objectMapper.readTree(json);
@@ -105,25 +175,15 @@ public class GoalAiService {
       String dlTime = dl.path("time").isNull() ? null : dl.path("time").asText(null);
       RefinedDeadline deadline = new RefinedDeadline(dlDate, dlTime, dl.path("reason").asText());
 
-      RefinedField currentLevel =
-          new RefinedField(
-              root.path("currentLevel").path("value").asText(),
-              root.path("currentLevel").path("reason").asText());
-
-      RefinedField availableTime =
-          new RefinedField(
-              root.path("availableTime").path("value").asText(),
-              root.path("availableTime").path("reason").asText());
-
-      JsonNode notesNode = root.path("notes");
-      List<RefinedNoteItem> noteItems = new ArrayList<>();
-      for (JsonNode item : notesNode.path("value")) {
-        noteItems.add(
-            new RefinedNoteItem(item.path("title").asText(), item.path("content").asText()));
+      List<RefinedSolution> solutions = new ArrayList<>();
+      for (JsonNode s : root.path("solutions")) {
+        List<RefinedNoteItem> items = new ArrayList<>();
+        for (JsonNode item : s.path("items")) {
+          items.add(new RefinedNoteItem(item.path("title").asText(), item.path("content").asText()));
+        }
+        solutions.add(new RefinedSolution(s.path("question").asText(), items, s.path("reason").asText()));
       }
-      RefinedNotes notes = new RefinedNotes(noteItems, notesNode.path("reason").asText());
-
-      return new GoalRefinementResponse(goal, deadline, currentLevel, availableTime, notes);
+      return new GoalRefinementResponse(goal, deadline, solutions);
     } catch (Exception e) {
       log.error("Gemini refine 응답 파싱 실패: {}", raw, e);
       throw new CustomException(GoalErrorCode.GEMINI_PARSE_ERROR);
@@ -152,14 +212,12 @@ public class GoalAiService {
 
         목표: %s
         마감기한: %s
-        현재수준: %s
-        투자가능시간: %s
-        특이사항:
+        솔루션:
         %s
 
         [1단계 — 교재·강의 정보 수집, 투두 생성 전 반드시 먼저 수행]
-        notes에 교재·강의명이 하나라도 있으면:
-        - notes에 언급된 교재·강의를 빠짐없이 목록화한다
+        솔루션에 교재·강의명이 하나라도 있으면:
+        - 솔루션에 언급된 교재·강의를 빠짐없이 목록화한다
         - 강의인 경우 플랫폼(인프런, freeCodeCamp, 해커스, 패스트캠퍼스, Udemy 등)을 파악한다. 플랫폼이 명시되지 않았으면 Google Search로 해당 강의가 어느 플랫폼에 있는지 먼저 검색한다
         - 유튜브 강의는 목차 검색 대상에서 제외한다. 유튜브 강의는 강수·목차 없이 주제 단위로 투두를 생성한다
         - 유튜브 외 플랫폼 강의와 교재는 Google Search로 아래 정보를 검색한다:
@@ -171,12 +229,12 @@ public class GoalAiService {
         - 검색으로 확인되지 않으면 투두 제목에 "(목차 미확인)"을 명시하고 주제 단위로 생성한다. 절대 임의로 강수나 페이지를 채워넣지 않는다
 
         [2단계 — 투두 생성 규칙]
-        1. notes에 언급된 모든 교재·강의를 빠짐없이 커버한다 (일부만 반영 금지)
+        1. 솔루션에 언급된 모든 교재·강의를 빠짐없이 커버한다 (일부만 반영 금지)
         2. 총 분량 ÷ 남은 기간 ÷ 하루 투자시간으로 1회 투두 분량을 계산하여 배분한다
         3. 투두 제목에 검색으로 확인된 실제 강의 제목 또는 챕터명을 포함한다
            예) "인프런 - 한입 리액트 13강 컴포넌트 만들기 수강" (검색으로 확인된 실제 제목)
         4. 1회 투두 분량은 하루 투자시간의 50%%를 초과하지 않는다
-        5. 교재·강의가 없으면 notes에 제공된 정보만으로 투두 생성 (새 교재·강의 검색·추천 금지)
+        5. 교재·강의가 없으면 솔루션에 제공된 정보만으로 투두 생성 (새 교재·강의 검색·추천 금지)
         6. RECURRING 투두는 매번 내용이 동일한 작업만 해당 (예: 매일 단어 암기, 매일 운동)
         7. 인강 수강처럼 매번 다른 내용을 학습하는 것은 ONE_TIME 투두 여러 개로 생성
         8. 이론 나열 금지. '수기 복습', '문제 풀이', '오답 노트' 등 아웃풋 태스크 반드시 중간에 배치
@@ -189,7 +247,7 @@ public class GoalAiService {
         15. routineType은 "DAILY", "WEEKLY", "MONTHLY" 중 하나 (ONE_TIME이면 null)
         16. overallReason: 이 추천 전체에 대한 총평을 서술체("~합니다", "~했습니다")로 작성. 조언·명령형("~하세요") 절대 금지.
             - 어떤 기준으로 투두를 구성했는지, 핵심 전략이 무엇인지 서술
-            - 교재·강의가 포함된 경우 각 항목마다 아래 형식으로 출처 정보를 포함:
+            - 솔루션에 교재·강의가 포함된 경우 각 항목마다 아래 형식으로 출처 정보를 포함:
               · 책: "교재명 (저자: OOO / 출판사: OOO / 링크: https://...)"
               · 강의: "강의명 (강사: OOO / 플랫폼: OOO / 링크: https://...)"
             - 링크는 Google Search로 확인된 실제 URL만 사용. 확인 불가 시 링크 생략
@@ -200,9 +258,7 @@ public class GoalAiService {
             .formatted(
                 req.goal(),
                 deadlineInfo,
-                req.currentLevel() != null ? req.currentLevel() : "미입력",
-                req.availableTime() != null ? req.availableTime() : "미입력",
-                req.notes() != null ? req.notes() : "미입력");
+                buildSolutionInfo(req.solutions()));
     return prompt + refreshStyleBlock(req.refreshCount() == null ? 0 : req.refreshCount());
   }
 
@@ -223,6 +279,20 @@ public class GoalAiService {
     return "\n\n[이번 새로고침 스타일]\n"
         + line
         + "\n위 스타일을 우선으로 적용하되, 결과는 위 공통 규칙(투두 형식·JSON 포맷)을 그대로 따른다.";
+  }
+
+  private String buildSolutionInfo(List<SolutionInput> solutions) {
+    if (solutions == null || solutions.isEmpty()) return "미입력";
+    StringBuilder sb = new StringBuilder();
+    for (SolutionInput s : solutions) {
+      sb.append("[").append(s.question()).append("]\n");
+      if (s.items() != null) {
+        for (RefinedNoteItem item : s.items()) {
+          sb.append("- ").append(item.title()).append(": ").append(item.content()).append("\n");
+        }
+      }
+    }
+    return sb.toString();
   }
 
   private String buildDeadlineInfo(String deadlineDate, String deadlineTime) {
