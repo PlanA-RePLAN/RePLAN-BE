@@ -22,6 +22,8 @@ import plana.replan.domain.goal.dto.create.GoalCreateRequest;
 import plana.replan.domain.goal.dto.create.GoalWithTodosCreateRequest;
 import plana.replan.domain.goal.dto.create.GoalWithTodosCreateResponse;
 import plana.replan.domain.goal.dto.list.GoalsByDateResponse;
+import plana.replan.domain.goal.dto.explore.GoalExploreRequest;
+import plana.replan.domain.goal.dto.explore.GoalExploreResponse;
 import plana.replan.domain.goal.dto.recommend.TodoRecommendationRequest;
 import plana.replan.domain.goal.dto.recommend.TodoRecommendationResponse;
 import plana.replan.domain.goal.dto.refine.GoalRefinementRequest;
@@ -1182,4 +1184,213 @@ public interface GoalControllerDocs {
           @Valid
           @RequestBody
           TodoRecommendationRequest request);
+
+  @Operation(
+      summary = "AI 목표 탐색",
+      description =
+          """
+          사용자가 입력한 목표를 AI가 분석하여 목표 달성에 필요한 추가 정보를 수집하기 위한 질문 목록을 반환합니다.
+          목표가 달성 불가능하다고 판단되면 valid=false와 안내 메시지를 반환합니다.
+
+          ---
+
+          ### Request Headers
+
+          | 헤더명 | 필수 여부 | 타입 | 설명 |
+          |--------|-----------|------|------|
+          | Authorization | ✅ 필수 | string | `Bearer {accessToken}` 형식의 JWT 액세스 토큰 |
+          | Content-Type | ✅ 필수 | string | `application/json` |
+
+          ---
+
+          ### Request Body
+
+          | 필드명 | 필수 여부 | 타입 | 설명 | 예시 |
+          |--------|-----------|------|------|------|
+          | goal | ✅ 필수 | string | 목표 (자연어). 공백만 있으면 유효성 오류 | `"토익 850점 이상 달성"` |
+          | deadlineDate | ❌ 선택 | string | 종료 날짜 (yyyy-MM-dd 형식) | `"2026-05-01"` |
+          | deadlineTime | ❌ 선택 | string | 종료 시간 (HH:mm 형식) | `"23:59"` |
+
+          > ❌ 선택 필드는 생략하거나 null로 전달해도 동일하게 처리됩니다.
+
+          ---
+
+          ### Response Elements
+
+          | 필드명 | 타입 | 설명 |
+          |--------|------|------|
+          | valid | boolean | 달성 가능한 목표인지 여부. false면 questions는 빈 배열 |
+          | message | string | valid=false일 때 사용자에게 보여줄 안내 메시지. valid=true면 null |
+          | questions | array | AI가 생성한 질문 목록 (valid=true일 때 3개) |
+          | questions[].question | string | 질문 본문 |
+          | questions[].chips | array | 질문에 대한 선택지 목록 (string 배열) |
+
+          ---
+
+          ### 주의사항
+          - valid=false는 오류가 아니라 정상 200 응답입니다. 이 경우 message를 사용자에게 안내하세요.
+          - 응답 시간이 일반 API보다 길 수 있습니다 (최대 30초).
+          - AI 서비스 장애 시 502 반환.
+          """,
+      security = @SecurityRequirement(name = "Bearer Authentication"))
+  @ApiResponses({
+    @ApiResponse(
+        responseCode = "200",
+        description = "목표 탐색 성공 (valid=true: 질문 반환 / valid=false: 안내 메시지 반환)",
+        content =
+            @Content(
+                examples = {
+                  @ExampleObject(
+                      name = "탐색 성공 — 질문 3개 반환 (valid=true)",
+                      value =
+                          """
+                          {
+                            "status": 200,
+                            "success": true,
+                            "data": {
+                              "valid": true,
+                              "message": null,
+                              "questions": [
+                                {
+                                  "question": "현재 토익 점수가 어떻게 되시나요?",
+                                  "chips": ["아직 없어요", "600점대", "700점대", "800점 이상"]
+                                },
+                                {
+                                  "question": "하루에 투자할 수 있는 시간이 얼마나 되나요?",
+                                  "chips": ["30분 미만", "30분~1시간", "1~2시간", "2시간 이상"]
+                                },
+                                {
+                                  "question": "어떤 교재나 학습 방법을 선호하시나요?",
+                                  "chips": ["해커스", "YBM", "온라인 강의", "상관없어요"]
+                                }
+                              ]
+                            },
+                            "error": null
+                          }
+                          """),
+                  @ExampleObject(
+                      name = "달성 불가 목표 — 안내 메시지 반환 (valid=false)",
+                      value =
+                          """
+                          {
+                            "status": 200,
+                            "success": true,
+                            "data": {
+                              "valid": false,
+                              "message": "달성할 수 있는 구체적인 목표를 입력해주세요. 예: '토익 850점 달성', '체중 5kg 감량'",
+                              "questions": []
+                            },
+                            "error": null
+                          }
+                          """)
+                })),
+    @ApiResponse(
+        responseCode = "400",
+        description = "goal 누락 또는 공백",
+        content =
+            @Content(
+                examples =
+                    @ExampleObject(
+                        value =
+                            """
+                            {
+                              "status": 400,
+                              "success": false,
+                              "data": null,
+                              "error": {
+                                "code": "INVALID_INPUT",
+                                "message": "목표는 필수입니다.",
+                                "detail": null
+                              }
+                            }
+                            """))),
+    @ApiResponse(
+        responseCode = "401",
+        description = "인증 실패 — 토큰 없음 또는 만료",
+        content =
+            @Content(
+                examples = {
+                  @ExampleObject(
+                      name = "토큰 없음",
+                      value =
+                          """
+                          {
+                            "status": 401,
+                            "success": false,
+                            "data": null,
+                            "error": { "code": "EMPTY_TOKEN", "message": "토큰이 없습니다.", "detail": null }
+                          }
+                          """),
+                  @ExampleObject(
+                      name = "만료된 토큰",
+                      value =
+                          """
+                          {
+                            "status": 401,
+                            "success": false,
+                            "data": null,
+                            "error": { "code": "EXPIRED_TOKEN", "message": "만료된 토큰입니다.", "detail": null }
+                          }
+                          """)
+                })),
+    @ApiResponse(
+        responseCode = "502",
+        description = "AI 서비스 오류",
+        content =
+            @Content(
+                examples = {
+                  @ExampleObject(
+                      name = "Gemini API 오류",
+                      value =
+                          """
+                          {
+                            "status": 502,
+                            "success": false,
+                            "data": null,
+                            "error": { "code": "GEMINI_API_ERROR", "message": "AI 추천 서비스에 일시적인 오류가 발생했습니다.", "detail": null }
+                          }
+                          """),
+                  @ExampleObject(
+                      name = "응답 파싱 오류",
+                      value =
+                          """
+                          {
+                            "status": 502,
+                            "success": false,
+                            "data": null,
+                            "error": { "code": "GEMINI_PARSE_ERROR", "message": "AI 응답을 처리하는 중 오류가 발생했습니다.", "detail": null }
+                          }
+                          """)
+                }))
+  })
+  ResponseEntity<ApiResult<GoalExploreResponse>> exploreGoal(
+      @AuthenticationPrincipal Long userId,
+      @io.swagger.v3.oas.annotations.parameters.RequestBody(
+              content =
+                  @Content(
+                      mediaType = "application/json",
+                      examples = {
+                        @ExampleObject(
+                            name = "전체 필드 포함",
+                            value =
+                                """
+                                {
+                                  "goal": "토익 850점 이상 달성",
+                                  "deadlineDate": "2026-05-01",
+                                  "deadlineTime": "23:59"
+                                }
+                                """),
+                        @ExampleObject(
+                            name = "필수 필드만 (선택 필드 생략)",
+                            summary = "deadlineDate, deadlineTime을 생략하면 null로 처리됩니다.",
+                            value =
+                                """
+                                {
+                                  "goal": "토익 850점 이상 달성"
+                                }
+                                """)
+                      }))
+          @Valid
+          @RequestBody
+          GoalExploreRequest request);
 }

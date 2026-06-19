@@ -13,6 +13,8 @@ import plana.replan.domain.goal.dto.create.GoalWithTodosCreateResponse;
 import plana.replan.domain.goal.dto.list.GoalsByDateResponse;
 import plana.replan.domain.goal.dto.recommend.TodoRecommendationRequest;
 import plana.replan.domain.goal.dto.recommend.TodoRecommendationResponse;
+import plana.replan.domain.goal.dto.explore.GoalExploreRequest;
+import plana.replan.domain.goal.dto.explore.GoalExploreResponse;
 import plana.replan.domain.goal.dto.refine.GoalRefinementRequest;
 import plana.replan.domain.goal.dto.refine.GoalRefinementResponse;
 import plana.replan.domain.goal.service.GoalAiService;
@@ -73,5 +75,12 @@ public class GoalController implements GoalControllerDocs {
   public ResponseEntity<ApiResult<TodoRecommendationResponse>> recommendTodos(
       @AuthenticationPrincipal Long userId, @Valid @RequestBody TodoRecommendationRequest request) {
     return ResponseEntity.ok(ApiResult.ok(goalAiService.recommendTodos(request)));
+  }
+
+  @Override
+  @PostMapping("/ai/explore")
+  public ResponseEntity<ApiResult<GoalExploreResponse>> exploreGoal(
+      @AuthenticationPrincipal Long userId, @Valid @RequestBody GoalExploreRequest request) {
+    return ResponseEntity.ok(ApiResult.ok(goalAiService.exploreGoal(request)));
   }
 }
