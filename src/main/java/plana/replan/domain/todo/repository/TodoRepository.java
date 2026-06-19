@@ -106,14 +106,14 @@ public interface TodoRepository extends JpaRepository<Todo, Long> {
       @Param("end") LocalDateTime end);
 
   @Query(
-      "SELECT t FROM Todo t WHERE t.parent IS NULL AND t.isCompleted = false"
+      "SELECT t FROM Todo t JOIN FETCH t.user WHERE t.parent IS NULL AND t.isCompleted = false"
           + " AND t.isPinned = true AND t.isActive = true"
           + " AND t.dueDate >= :start AND t.dueDate < :end")
   List<Todo> findPinnedDueBetween(
       @Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
 
   @Query(
-      "SELECT t FROM Todo t WHERE t.parent IS NULL AND t.isCompleted = false"
+      "SELECT t FROM Todo t JOIN FETCH t.user WHERE t.parent IS NULL AND t.isCompleted = false"
           + " AND t.isActive = true AND t.replan IS NULL"
           + " AND t.dueDate >= :start AND t.dueDate < :end")
   List<Todo> findFailedBetween(

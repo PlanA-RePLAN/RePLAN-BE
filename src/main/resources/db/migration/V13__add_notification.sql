@@ -3,7 +3,7 @@ CREATE TABLE notification (
     user_id     BIGINT NOT NULL REFERENCES users (id),
     category    VARCHAR(16) NOT NULL,
     type        VARCHAR(32) NOT NULL,
-    title       VARCHAR(255) NOT NULL,
+    title       VARCHAR(512) NOT NULL,
     body        VARCHAR(255) NOT NULL,
     target_type VARCHAR(16),
     target_id   BIGINT,
