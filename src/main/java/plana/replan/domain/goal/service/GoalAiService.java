@@ -18,6 +18,7 @@ import plana.replan.domain.goal.dto.explore.ExploreQuestion;
 import plana.replan.domain.goal.dto.explore.GoalExploreRequest;
 import plana.replan.domain.goal.dto.explore.GoalExploreResponse;
 import plana.replan.domain.goal.dto.recommend.RecommendedTodo;
+import plana.replan.domain.goal.dto.recommend.SolutionInput;
 import plana.replan.domain.goal.dto.recommend.TodoRecommendationRequest;
 import plana.replan.domain.goal.dto.recommend.TodoRecommendationResponse;
 import plana.replan.domain.goal.dto.refine.GoalRefinementRequest;
@@ -209,14 +210,12 @@ public class GoalAiService {
 
         목표: %s
         마감기한: %s
-        현재수준: %s
-        투자가능시간: %s
-        특이사항:
+        솔루션:
         %s
 
         [1단계 — 교재·강의 정보 수집, 투두 생성 전 반드시 먼저 수행]
-        notes에 교재·강의명이 하나라도 있으면:
-        - notes에 언급된 교재·강의를 빠짐없이 목록화한다
+        솔루션에 교재·강의명이 하나라도 있으면:
+        - 솔루션에 언급된 교재·강의를 빠짐없이 목록화한다
         - 강의인 경우 플랫폼(인프런, freeCodeCamp, 해커스, 패스트캠퍼스, Udemy 등)을 파악한다. 플랫폼이 명시되지 않았으면 Google Search로 해당 강의가 어느 플랫폼에 있는지 먼저 검색한다
         - 유튜브 강의는 목차 검색 대상에서 제외한다. 유튜브 강의는 강수·목차 없이 주제 단위로 투두를 생성한다
         - 유튜브 외 플랫폼 강의와 교재는 Google Search로 아래 정보를 검색한다:
@@ -228,7 +227,7 @@ public class GoalAiService {
         - 검색으로 확인되지 않으면 투두 제목에 "(목차 미확인)"을 명시하고 주제 단위로 생성한다. 절대 임의로 강수나 페이지를 채워넣지 않는다
 
         [2단계 — 투두 생성 규칙]
-        1. notes에 언급된 모든 교재·강의를 빠짐없이 커버한다 (일부만 반영 금지)
+        1. 솔루션에 언급된 모든 교재·강의를 빠짐없이 커버한다 (일부만 반영 금지)
         2. 총 분량 ÷ 남은 기간 ÷ 하루 투자시간으로 1회 투두 분량을 계산하여 배분한다
         3. 투두 제목에 검색으로 확인된 실제 강의 제목 또는 챕터명을 포함한다
            예) "인프런 - 한입 리액트 13강 컴포넌트 만들기 수강" (검색으로 확인된 실제 제목)
@@ -246,7 +245,7 @@ public class GoalAiService {
         15. routineType은 "DAILY", "WEEKLY", "MONTHLY" 중 하나 (ONE_TIME이면 null)
         16. overallReason: 이 추천 전체에 대한 총평을 서술체("~합니다", "~했습니다")로 작성. 조언·명령형("~하세요") 절대 금지.
             - 어떤 기준으로 투두를 구성했는지, 핵심 전략이 무엇인지 서술
-            - 교재·강의가 포함된 경우 각 항목마다 아래 형식으로 출처 정보를 포함:
+            - 솔루션에 교재·강의가 포함된 경우 각 항목마다 아래 형식으로 출처 정보를 포함:
               · 책: "교재명 (저자: OOO / 출판사: OOO / 링크: https://...)"
               · 강의: "강의명 (강사: OOO / 플랫폼: OOO / 링크: https://...)"
             - 링크는 Google Search로 확인된 실제 URL만 사용. 확인 불가 시 링크 생략
@@ -257,9 +256,7 @@ public class GoalAiService {
             .formatted(
                 req.goal(),
                 deadlineInfo,
-                req.currentLevel() != null ? req.currentLevel() : "미입력",
-                req.availableTime() != null ? req.availableTime() : "미입력",
-                req.notes() != null ? req.notes() : "미입력");
+                buildSolutionInfo(req.solutions()));
     return prompt + refreshStyleBlock(req.refreshCount() == null ? 0 : req.refreshCount());
   }
 
@@ -280,6 +277,20 @@ public class GoalAiService {
     return "\n\n[이번 새로고침 스타일]\n"
         + line
         + "\n위 스타일을 우선으로 적용하되, 결과는 위 공통 규칙(투두 형식·JSON 포맷)을 그대로 따른다.";
+  }
+
+  private String buildSolutionInfo(List<SolutionInput> solutions) {
+    if (solutions == null || solutions.isEmpty()) return "미입력";
+    StringBuilder sb = new StringBuilder();
+    for (SolutionInput s : solutions) {
+      sb.append("[").append(s.question()).append("]\n");
+      if (s.items() != null) {
+        for (RefinedNoteItem item : s.items()) {
+          sb.append("- ").append(item.title()).append(": ").append(item.content()).append("\n");
+        }
+      }
+    }
+    return sb.toString();
   }
 
   private String buildDeadlineInfo(String deadlineDate, String deadlineTime) {

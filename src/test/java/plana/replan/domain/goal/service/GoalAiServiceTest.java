@@ -7,10 +7,12 @@ import java.util.List;
 import org.junit.jupiter.api.Test;
 import plana.replan.domain.goal.dto.explore.GoalExploreRequest;
 import plana.replan.domain.goal.dto.explore.GoalExploreResponse;
+import plana.replan.domain.goal.dto.recommend.SolutionInput;
 import plana.replan.domain.goal.dto.recommend.TodoRecommendationRequest;
 import plana.replan.domain.goal.dto.refine.GoalRefinementRequest;
 import plana.replan.domain.goal.dto.refine.GoalRefinementResponse;
 import plana.replan.domain.goal.dto.refine.QuestionAnswer;
+import plana.replan.domain.goal.dto.refine.RefinedNoteItem;
 import plana.replan.domain.goal.exception.GoalErrorCode;
 import plana.replan.global.exception.CustomException;
 
@@ -20,7 +22,10 @@ class GoalAiServiceTest {
 
   private TodoRecommendationRequest req(Integer refreshCount) {
     return new TodoRecommendationRequest(
-        "토익 900점 달성", "2026-08-25", "08:00", "토익 600점", "평일 1시간", "해커스 보카", refreshCount);
+        "토익 900점 달성", "2026-08-25", "08:00",
+        List.of(new SolutionInput("현재 수준",
+            List.of(new RefinedNoteItem("실력", "토익 600점")))),
+        refreshCount);
   }
 
   @Test
@@ -97,6 +102,13 @@ class GoalAiServiceTest {
     assertThat(prompt).contains("[이번 새로고침 스타일]");
     assertThat(prompt).contains("벼락치기");
     assertThat(prompt).contains("todos"); // 기존 JSON 포맷 규칙 유지
+  }
+
+  @Test
+  void 추천_프롬프트에_솔루션이_들어간다() {
+    String prompt = service.buildRecommendPrompt(req(0));
+    assertThat(prompt).contains("[현재 수준]");
+    assertThat(prompt).contains("실력: 토익 600점");
   }
 
   private GoalRefinementRequest refineReq() {
