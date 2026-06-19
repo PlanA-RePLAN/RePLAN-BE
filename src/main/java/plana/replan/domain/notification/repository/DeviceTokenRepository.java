@@ -1,0 +1,15 @@
+package plana.replan.domain.notification.repository;
+
+import java.util.List;
+import java.util.Optional;
+import org.springframework.data.jpa.repository.JpaRepository;
+import plana.replan.domain.notification.entity.DeviceToken;
+import plana.replan.domain.user.entity.User;
+
+public interface DeviceTokenRepository extends JpaRepository<DeviceToken, Long> {
+  Optional<DeviceToken> findByToken(String token);
+
+  Optional<DeviceToken> findByUserAndToken(User user, String token);
+
+  List<DeviceToken> findAllByUser(User user);
+}
