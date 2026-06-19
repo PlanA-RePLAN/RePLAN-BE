@@ -14,6 +14,9 @@ import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
+import plana.replan.domain.goal.dto.explore.ExploreQuestion;
+import plana.replan.domain.goal.dto.explore.GoalExploreRequest;
+import plana.replan.domain.goal.dto.explore.GoalExploreResponse;
 import plana.replan.domain.goal.dto.recommend.RecommendedTodo;
 import plana.replan.domain.goal.dto.recommend.TodoRecommendationRequest;
 import plana.replan.domain.goal.dto.recommend.TodoRecommendationResponse;
@@ -39,6 +42,70 @@ public class GoalAiService {
 
   @Value("${gemini.api-key}")
   private String apiKey;
+
+  public GoalExploreResponse exploreGoal(GoalExploreRequest request) {
+    String today = LocalDate.now().format(DateTimeFormatter.ISO_LOCAL_DATE);
+    String prompt = buildExplorePrompt(request, today);
+    String raw = callGemini(prompt);
+    return parseExploreResponse(raw);
+  }
+
+  String buildExplorePrompt(GoalExploreRequest req, String today) {
+    return """
+        당신은 목표 달성 플래닝 전문가입니다.
+        사용자가 입력한 목표를 보고, 투두 리스트를 만들기 위해 추가로 물어볼 질문을 생성하세요.
+
+        입력:
+        목표: %s
+        종료 날짜: %s
+        종료 시간: %s
+        오늘 날짜: %s
+
+        [1단계 — 목표 유효성 판단]
+        입력이 '달성할 수 있는 실제 목표'인지 판단한다.
+        - 목표가 아니거나(예: 무의미한 문자열, 욕설, 목표와 무관한 잡담), 너무 모호해 어떤 계획도 세울 수 없으면
+          valid를 false로, message에 "달성할 수 있는 목표를 입력해주세요."를 넣고 questions는 빈 배열로 둔다.
+        - 정상 목표면 valid를 true, message는 null로 둔다.
+
+        [2단계 — 질문 생성 (valid=true일 때만)]
+        1. 목표 달성 계획에 꼭 필요한 질문을 정확히 3개 생성한다.
+        2. 질문은 목표에 맞게 동적으로 만든다(고정 문구 금지). 예: 어학 목표면 현재 실력/성적/수준을 묻는 질문,
+           운동 목표면 현재 체력·운동 경험을 묻는 질문 등 목표에 맞춰 워딩을 바꾼다.
+        3. question은 짧은 라벨 형태로 쓴다(예: "현재 영어 실력", "투자 가능 시간", "특이사항").
+        4. 각 질문마다 사용자가 바로 누를 수 있는 예시 답변(chips)을 2~3개 생성한다(짧은 단어·구).
+        5. 모든 텍스트는 서술형/명사형으로 쓰고 "~하세요" 같은 명령형은 쓰지 않는다.
+
+        반드시 아래 JSON만 출력하세요 (다른 설명 없이):
+        {"valid":true,"message":null,"questions":[{"question":"","chips":["",""]}]}
+        """
+        .formatted(
+            req.goal(),
+            req.deadlineDate() != null ? req.deadlineDate() : "미입력",
+            req.deadlineTime() != null ? req.deadlineTime() : "미입력",
+            today);
+  }
+
+  GoalExploreResponse parseExploreResponse(String raw) {
+    try {
+      String json = extractJson(raw);
+      JsonNode root = objectMapper.readTree(json);
+      boolean valid = root.path("valid").asBoolean(false);
+      String message = root.path("message").isNull() ? null : root.path("message").asText(null);
+
+      List<ExploreQuestion> questions = new ArrayList<>();
+      for (JsonNode q : root.path("questions")) {
+        List<String> chips = new ArrayList<>();
+        for (JsonNode c : q.path("chips")) {
+          chips.add(c.asText());
+        }
+        questions.add(new ExploreQuestion(q.path("question").asText(), chips));
+      }
+      return new GoalExploreResponse(valid, message, questions);
+    } catch (Exception e) {
+      log.error("Gemini explore 응답 파싱 실패: {}", raw, e);
+      throw new CustomException(GoalErrorCode.GEMINI_PARSE_ERROR);
+    }
+  }
 
   public GoalRefinementResponse refineGoal(GoalRefinementRequest request) {
     String today = LocalDate.now().format(DateTimeFormatter.ISO_LOCAL_DATE);

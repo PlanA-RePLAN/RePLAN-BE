@@ -4,6 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import org.junit.jupiter.api.Test;
+import plana.replan.domain.goal.dto.explore.GoalExploreRequest;
+import plana.replan.domain.goal.dto.explore.GoalExploreResponse;
 import plana.replan.domain.goal.dto.recommend.TodoRecommendationRequest;
 import plana.replan.domain.goal.exception.GoalErrorCode;
 import plana.replan.global.exception.CustomException;
@@ -15,6 +17,45 @@ class GoalAiServiceTest {
   private TodoRecommendationRequest req(Integer refreshCount) {
     return new TodoRecommendationRequest(
         "토익 900점 달성", "2026-08-25", "08:00", "토익 600점", "평일 1시간", "해커스 보카", refreshCount);
+  }
+
+  @Test
+  void 탐색_프롬프트에_목표와_종료일정이_들어간다() {
+    GoalExploreRequest req = new GoalExploreRequest("토익 850점 이상 달성", "2026-05-01", "23:59");
+    String prompt = service.buildExplorePrompt(req, "2026-06-20");
+    assertThat(prompt).contains("토익 850점 이상 달성");
+    assertThat(prompt).contains("2026-05-01");
+    assertThat(prompt).contains("23:59");
+  }
+
+  @Test
+  void 탐색_종료일정이_없으면_미입력으로_들어간다() {
+    GoalExploreRequest req = new GoalExploreRequest("토익 850점", null, null);
+    String prompt = service.buildExplorePrompt(req, "2026-06-20");
+    assertThat(prompt).contains("미입력");
+  }
+
+  @Test
+  void 탐색_유효한_응답을_파싱한다() {
+    String raw =
+        "{\"valid\":true,\"message\":null,\"questions\":"
+            + "[{\"question\":\"현재 영어 실력\",\"chips\":[\"토익 600점대\",\"RC 파트 취약\"]}]}";
+    GoalExploreResponse res = service.parseExploreResponse(raw);
+    assertThat(res.valid()).isTrue();
+    assertThat(res.message()).isNull();
+    assertThat(res.questions()).hasSize(1);
+    assertThat(res.questions().get(0).question()).isEqualTo("현재 영어 실력");
+    assertThat(res.questions().get(0).chips()).containsExactly("토익 600점대", "RC 파트 취약");
+  }
+
+  @Test
+  void 탐색_목표가_아니면_valid_false와_안내메시지를_파싱한다() {
+    String raw =
+        "{\"valid\":false,\"message\":\"달성할 수 있는 목표를 입력해주세요.\",\"questions\":[]}";
+    GoalExploreResponse res = service.parseExploreResponse(raw);
+    assertThat(res.valid()).isFalse();
+    assertThat(res.message()).isEqualTo("달성할 수 있는 목표를 입력해주세요.");
+    assertThat(res.questions()).isEmpty();
   }
 
   @Test
