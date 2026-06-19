@@ -152,6 +152,8 @@ String buildExplorePrompt(GoalExploreRequest req, String today) {
 
       [1단계 — 목표 유효성 판단]
       입력이 '달성할 수 있는 실제 목표'인지 판단한다.
+      - 종료 날짜가 입력되어 있고 그 날짜(또는 종료 날짜·시간)가 오늘 날짜보다 과거이면
+        valid를 false로, message에 "종료 일정이 이미 지났어요. 미래 날짜로 다시 설정해주세요."를 넣고 questions는 빈 배열로 둔다.
       - 목표가 아니거나(예: 무의미한 문자열, 욕설, 목표와 무관한 잡담), 너무 모호해 어떤 계획도 세울 수 없으면
         valid를 false로, message에 "달성할 수 있는 목표를 입력해주세요."를 넣고 questions는 빈 배열로 둔다.
       - 정상 목표면 valid를 true, message는 null로 둔다.
