@@ -26,13 +26,14 @@ class GoalAiServiceTest {
     assertThat(prompt).contains("토익 850점 이상 달성");
     assertThat(prompt).contains("2026-05-01");
     assertThat(prompt).contains("23:59");
+    assertThat(prompt).contains("2026-06-20");
   }
 
   @Test
   void 탐색_종료일정이_없으면_미입력으로_들어간다() {
     GoalExploreRequest req = new GoalExploreRequest("토익 850점", null, null);
     String prompt = service.buildExplorePrompt(req, "2026-06-20");
-    assertThat(prompt).contains("미입력");
+    assertThat(prompt).containsPattern("미입력[\\s\\S]*미입력");
   }
 
   @Test
