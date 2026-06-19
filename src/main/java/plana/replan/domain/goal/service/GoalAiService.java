@@ -23,9 +23,9 @@ import plana.replan.domain.goal.dto.recommend.TodoRecommendationRequest;
 import plana.replan.domain.goal.dto.recommend.TodoRecommendationResponse;
 import plana.replan.domain.goal.dto.refine.GoalRefinementRequest;
 import plana.replan.domain.goal.dto.refine.GoalRefinementResponse;
+import plana.replan.domain.goal.dto.refine.QuestionAnswer;
 import plana.replan.domain.goal.dto.refine.RefinedDeadline;
 import plana.replan.domain.goal.dto.refine.RefinedField;
-import plana.replan.domain.goal.dto.refine.QuestionAnswer;
 import plana.replan.domain.goal.dto.refine.RefinedNoteItem;
 import plana.replan.domain.goal.dto.refine.RefinedSolution;
 import plana.replan.domain.goal.exception.GoalErrorCode;
@@ -121,8 +121,11 @@ public class GoalAiService {
   String buildRefinePrompt(GoalRefinementRequest req, String today) {
     StringBuilder qa = new StringBuilder();
     for (QuestionAnswer a : req.answers()) {
-      qa.append("- ").append(a.question()).append(": ")
-        .append(a.answer() != null && !a.answer().isBlank() ? a.answer() : "미입력").append("\n");
+      qa.append("- ")
+          .append(a.question())
+          .append(": ")
+          .append(a.answer() != null && !a.answer().isBlank() ? a.answer() : "미입력")
+          .append("\n");
     }
     return """
         당신은 목표 달성 플래닝 전문가입니다.
@@ -179,9 +182,11 @@ public class GoalAiService {
       for (JsonNode s : root.path("solutions")) {
         List<RefinedNoteItem> items = new ArrayList<>();
         for (JsonNode item : s.path("items")) {
-          items.add(new RefinedNoteItem(item.path("title").asText(), item.path("content").asText()));
+          items.add(
+              new RefinedNoteItem(item.path("title").asText(), item.path("content").asText()));
         }
-        solutions.add(new RefinedSolution(s.path("question").asText(), items, s.path("reason").asText()));
+        solutions.add(
+            new RefinedSolution(s.path("question").asText(), items, s.path("reason").asText()));
       }
       return new GoalRefinementResponse(goal, deadline, solutions);
     } catch (Exception e) {
@@ -255,10 +260,7 @@ public class GoalAiService {
         반드시 아래 JSON만 출력하세요 (다른 설명 없이):
         {"overallReason":"","todos":[{"type":"","title":"","dueDate":null,"dueTime":null,"routineType":null,"routineDate":null}]}
         """
-            .formatted(
-                req.goal(),
-                deadlineInfo,
-                buildSolutionInfo(req.solutions()));
+            .formatted(req.goal(), deadlineInfo, buildSolutionInfo(req.solutions()));
     return prompt + refreshStyleBlock(req.refreshCount() == null ? 0 : req.refreshCount());
   }
 

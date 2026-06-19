@@ -22,9 +22,10 @@ class GoalAiServiceTest {
 
   private TodoRecommendationRequest req(Integer refreshCount) {
     return new TodoRecommendationRequest(
-        "토익 900점 달성", "2026-08-25", "08:00",
-        List.of(new SolutionInput("현재 수준",
-            List.of(new RefinedNoteItem("실력", "토익 600점")))),
+        "토익 900점 달성",
+        "2026-08-25",
+        "08:00",
+        List.of(new SolutionInput("현재 수준", List.of(new RefinedNoteItem("실력", "토익 600점")))),
         refreshCount);
   }
 
@@ -60,8 +61,7 @@ class GoalAiServiceTest {
 
   @Test
   void 탐색_목표가_아니면_valid_false와_안내메시지를_파싱한다() {
-    String raw =
-        "{\"valid\":false,\"message\":\"달성할 수 있는 목표를 입력해주세요.\",\"questions\":[]}";
+    String raw = "{\"valid\":false,\"message\":\"달성할 수 있는 목표를 입력해주세요.\",\"questions\":[]}";
     GoalExploreResponse res = service.parseExploreResponse(raw);
     assertThat(res.valid()).isFalse();
     assertThat(res.message()).isEqualTo("달성할 수 있는 목표를 입력해주세요.");
@@ -113,8 +113,7 @@ class GoalAiServiceTest {
 
   private GoalRefinementRequest refineReq() {
     return new GoalRefinementRequest(
-        "토익 850점", "2026-05-01", "23:59",
-        List.of(new QuestionAnswer("현재 영어 실력", "토익 600점대")));
+        "토익 850점", "2026-05-01", "23:59", List.of(new QuestionAnswer("현재 영어 실력", "토익 600점대")));
   }
 
   @Test
@@ -127,8 +126,7 @@ class GoalAiServiceTest {
   @Test
   void 정제_답변이_비면_미입력으로_들어간다() {
     GoalRefinementRequest req =
-        new GoalRefinementRequest("토익 850점", null, null,
-            List.of(new QuestionAnswer("특이사항", "")));
+        new GoalRefinementRequest("토익 850점", null, null, List.of(new QuestionAnswer("특이사항", "")));
     String prompt = service.buildRefinePrompt(req, "2026-06-20");
     assertThat(prompt).contains("특이사항: 미입력");
   }
