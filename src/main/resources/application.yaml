@@ -62,4 +62,5 @@ statistics:
     max-retry-count: 3
 
 firebase:
+  enabled: true
   service-account-json: ${FIREBASE_SERVICE_ACCOUNT_JSON:}

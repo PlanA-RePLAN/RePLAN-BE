@@ -40,4 +40,4 @@ gemini:
   api-key: test-gemini-api-key
 
 firebase:
-  service-account-json: "{}"
+  enabled: false

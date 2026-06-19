@@ -8,10 +8,16 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 @Configuration
+@ConditionalOnProperty(
+    prefix = "firebase",
+    name = "enabled",
+    havingValue = "true",
+    matchIfMissing = true)
 public class FirebaseConfig {
 
   /** 서비스 계정 키 JSON 전체 문자열. 환경변수/시크릿으로 주입한다(절대 커밋 금지). */

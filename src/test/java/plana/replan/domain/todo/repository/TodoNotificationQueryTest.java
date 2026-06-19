@@ -2,28 +2,25 @@ package plana.replan.domain.todo.repository;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.google.firebase.FirebaseApp;
-import com.google.firebase.messaging.FirebaseMessaging;
 import java.time.LocalDate;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.context.annotation.Import;
 import org.springframework.transaction.annotation.Transactional;
 import plana.replan.domain.todo.entity.Todo;
 import plana.replan.domain.user.entity.Provider;
 import plana.replan.domain.user.entity.Role;
 import plana.replan.domain.user.entity.User;
 import plana.replan.domain.user.repository.UserRepository;
+import plana.replan.global.config.TestFirebaseConfig;
 
 @SpringBootTest
 @Transactional
+@Import(TestFirebaseConfig.class)
 class TodoNotificationQueryTest {
-
-  @MockitoBean private FirebaseApp firebaseApp;
-  @MockitoBean private FirebaseMessaging firebaseMessaging;
 
   @Autowired private TodoRepository todoRepository;
   @Autowired private UserRepository userRepository;
