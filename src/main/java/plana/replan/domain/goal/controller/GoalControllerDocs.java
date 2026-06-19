@@ -1003,12 +1003,14 @@ public interface GoalControllerDocs {
 
           | 필드명 | 필수 여부 | 타입 | 설명 | 예시 |
           |--------|-----------|------|------|------|
-          | goal | ✅ 필수 | string | 목표 | `"토익 900점 달성"` |
+          | goal | ✅ 필수 | string | 목표. 공백만 있으면 유효성 오류 | `"토익 900점 달성 (LC 450·RC 450 이상)"` |
           | deadlineDate | ❌ 선택 | string | 마감 날짜 (yyyy-MM-dd 형식) | `"2025-08-25"` |
           | deadlineTime | ❌ 선택 | string | 마감 시간 (HH:mm 형식) | `"08:00"` |
-          | currentLevel | ❌ 선택 | string | 현재 수준 | `"토익 600점"` |
-          | availableTime | ❌ 선택 | string | 투자 가능 시간 | `"평일 1시간·주말 4시간"` |
-          | notes | ❌ 선택 | string | 특이사항 (교재·루틴·전략 포함 권장) | `"해커스 보카·RC·LC 활용"` |
+          | solutions | ❌ 선택 | array | 정제·수정이 끝난 솔루션 목록. 정제(refineGoal) 응답의 solutions를 그대로 전달 | |
+          | solutions[].question | ❌ 선택 | string | 어떤 질문에 대한 솔루션인지 | `"현재 영어 실력"` |
+          | solutions[].items | ❌ 선택 | array | 솔루션 항목 목록 | |
+          | solutions[].items[].title | ❌ 선택 | string | 항목 제목 (카테고리) | `"현재 수준"` |
+          | solutions[].items[].content | ❌ 선택 | string | 항목 내용 | `"토익 600점대 (LC 310·RC 290 추정), RC 취약"` |
           | refreshCount | ❌ 선택 | integer | 새로고침 횟수 (0~3). 0 또는 생략은 첫 추천, 1~3은 회차별 스타일로 다시 추천 | `0` |
 
           > ❌ 선택 필드는 생략하거나 null로 전달해도 동일하게 처리됩니다.
@@ -1185,37 +1187,35 @@ public interface GoalControllerDocs {
                       mediaType = "application/json",
                       examples = {
                         @ExampleObject(
-                            name = "전체 필드 포함",
+                            name = "전체 필드 포함 (솔루션·종료일정 포함)",
                             value =
                                 """
                                 {
                                   "goal": "토익 900점 달성 (LC 450·RC 450 이상)",
                                   "deadlineDate": "2025-08-25",
                                   "deadlineTime": "08:00",
-                                  "currentLevel": "토익 600점 (LC 310·RC 290 추정)",
-                                  "availableTime": "평일 1시간·주말 4시간 (주 약 13시간)",
-                                  "notes": "해커스 보카·RC·LC 활용. 주 1회 모의고사. 매주 오답 노트 정리.",
+                                  "solutions": [
+                                    {
+                                      "question": "현재 영어 실력",
+                                      "items": [
+                                        { "title": "현재 수준", "content": "토익 600점대 (LC 310·RC 290 추정), RC 취약" },
+                                        { "title": "목표와의 격차", "content": "LC 140점, RC 160점 향상 필요" }
+                                      ]
+                                    },
+                                    {
+                                      "question": "하루에 투자할 수 있는 시간",
+                                      "items": [
+                                        { "title": "학습 루틴", "content": "평일 1시간·주말 4시간 (주 약 13시간)" },
+                                        { "title": "배분 전략", "content": "평일 아침 단어 암기, 저녁 RC 파트 풀이" }
+                                      ]
+                                    }
+                                  ],
                                   "refreshCount": 0
                                 }
                                 """),
                         @ExampleObject(
-                            name = "새로고침 2회차 (벼락치기 스타일)",
-                            summary = "같은 내용에 refreshCount만 올려 다시 호출하면 다른 스타일의 추천이 옵니다.",
-                            value =
-                                """
-                                {
-                                  "goal": "토익 900점 달성 (LC 450·RC 450 이상)",
-                                  "deadlineDate": "2025-08-25",
-                                  "deadlineTime": "08:00",
-                                  "currentLevel": "토익 600점 (LC 310·RC 290 추정)",
-                                  "availableTime": "평일 1시간·주말 4시간 (주 약 13시간)",
-                                  "notes": "해커스 보카·RC·LC 활용. 주 1회 모의고사. 매주 오답 노트 정리.",
-                                  "refreshCount": 2
-                                }
-                                """),
-                        @ExampleObject(
-                            name = "필수 필드만 (선택 필드 생략)",
-                            summary = "goal만 필수. 나머지는 생략하면 미입력으로 처리됩니다.",
+                            name = "솔루션·종료일정 생략 (goal만)",
+                            summary = "goal만 필수. solutions, deadlineDate, deadlineTime, refreshCount는 생략하면 null로 처리됩니다.",
                             value =
                                 """
                                 {
