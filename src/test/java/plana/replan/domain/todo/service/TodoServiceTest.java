@@ -9,6 +9,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
 import java.time.Clock;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -607,33 +608,58 @@ class TodoServiceTest {
   }
 
   @Test
-  @DisplayName("getTodos - week 필터: 해당 주 월~일 범위의 완료/미완료 모두 조회")
+  @DisplayName("getTodos - week 필터: 기준 날짜부터 6일 후까지(총 7일) 범위의 완료/미완료 모두 조회")
   void getTodos_week_allTodosInWeekRange() {
     User user = testUser();
     given(userRepository.findById(1L)).willReturn(Optional.of(user));
     given(todoRepository.findAllTodosByDueDateRange(any(), any(), any()))
         .willReturn(List.of(activeTodo(1L, user)));
 
-    todoService.getTodos(1L, "week", "priority", null);
+    todoService.getTodos(1L, "week", "priority", LocalDate.of(2026, 6, 18));
 
-    verify(todoRepository).findAllTodosByDueDateRange(any(), any(), any());
+    ArgumentCaptor<LocalDateTime> start = ArgumentCaptor.forClass(LocalDateTime.class);
+    ArgumentCaptor<LocalDateTime> end = ArgumentCaptor.forClass(LocalDateTime.class);
+    verify(todoRepository).findAllTodosByDueDateRange(any(), start.capture(), end.capture());
+    assertThat(start.getValue()).isEqualTo(LocalDate.of(2026, 6, 18).atStartOfDay());
+    assertThat(end.getValue()).isEqualTo(LocalDate.of(2026, 6, 24).atTime(23, 59, 59, 999999999));
     verify(todoRepository, never()).findActiveTodosByDueDateRange(any(), any(), any());
     verify(todoRepository, never()).findCompletedTodosByCompletedTimeRange(any(), any(), any());
   }
 
   @Test
-  @DisplayName("getTodos - month 필터: 해당 달 1일~말일 범위의 완료/미완료 모두 조회")
+  @DisplayName("getTodos - month 필터: 기준 날짜부터 한 달 후 전날까지 범위의 완료/미완료 모두 조회")
   void getTodos_month_allTodosInMonthRange() {
     User user = testUser();
     given(userRepository.findById(1L)).willReturn(Optional.of(user));
     given(todoRepository.findAllTodosByDueDateRange(any(), any(), any()))
         .willReturn(List.of(activeTodo(1L, user)));
 
-    todoService.getTodos(1L, "month", "priority", null);
+    todoService.getTodos(1L, "month", "priority", LocalDate.of(2026, 6, 18));
 
-    verify(todoRepository).findAllTodosByDueDateRange(any(), any(), any());
+    ArgumentCaptor<LocalDateTime> start = ArgumentCaptor.forClass(LocalDateTime.class);
+    ArgumentCaptor<LocalDateTime> end = ArgumentCaptor.forClass(LocalDateTime.class);
+    verify(todoRepository).findAllTodosByDueDateRange(any(), start.capture(), end.capture());
+    assertThat(start.getValue()).isEqualTo(LocalDate.of(2026, 6, 18).atStartOfDay());
+    assertThat(end.getValue()).isEqualTo(LocalDate.of(2026, 7, 17).atTime(23, 59, 59, 999999999));
     verify(todoRepository, never()).findActiveTodosByDueDateRange(any(), any(), any());
     verify(todoRepository, never()).findCompletedTodosByCompletedTimeRange(any(), any(), any());
+  }
+
+  @Test
+  @DisplayName("getTodos - month 필터: 1월 31일 기준이면 종료일이 2월 27일로 보정됨")
+  void getTodos_month_endOfMonthDateRolloverAdjusted() {
+    User user = testUser();
+    given(userRepository.findById(1L)).willReturn(Optional.of(user));
+    given(todoRepository.findAllTodosByDueDateRange(any(), any(), any()))
+        .willReturn(List.of(activeTodo(1L, user)));
+
+    todoService.getTodos(1L, "month", "priority", LocalDate.of(2026, 1, 31));
+
+    ArgumentCaptor<LocalDateTime> start = ArgumentCaptor.forClass(LocalDateTime.class);
+    ArgumentCaptor<LocalDateTime> end = ArgumentCaptor.forClass(LocalDateTime.class);
+    verify(todoRepository).findAllTodosByDueDateRange(any(), start.capture(), end.capture());
+    assertThat(start.getValue()).isEqualTo(LocalDate.of(2026, 1, 31).atStartOfDay());
+    assertThat(end.getValue()).isEqualTo(LocalDate.of(2026, 2, 27).atTime(23, 59, 59, 999999999));
   }
 
   @Test
