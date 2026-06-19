@@ -1,22 +1,23 @@
 package plana.replan.domain.goal.dto.refine;
 
 import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotEmpty;
+import java.util.List;
 
-@Schema(description = "AI 목표 정제 요청")
+@Schema(description = "AI 목표 정제 요청 (탐색에서 받은 질문/답변을 함께 전달)")
 public record GoalRefinementRequest(
-    @Schema(
-            description = "목표 (자연어)",
-            example = "토익 900점",
+    @Schema(description = "목표 (자연어)", example = "토익 850점 이상 달성",
             requiredMode = Schema.RequiredMode.REQUIRED)
         @NotBlank(message = "목표는 필수입니다.")
         String goal,
-    @Schema(
-            description = "마감기한 (자연어). 기한 없음도 자연어로 입력 가능",
-            example = "3달 안에",
+    @Schema(description = "종료 날짜 (yyyy-MM-dd 형식). 선택", example = "2026-05-01")
+        String deadlineDate,
+    @Schema(description = "종료 시간 (HH:mm 형식). 선택", example = "23:59")
+        String deadlineTime,
+    @Schema(description = "탐색에서 받은 질문과 사용자 답변 목록",
             requiredMode = Schema.RequiredMode.REQUIRED)
-        @NotBlank(message = "마감기한은 필수입니다.")
-        String deadline,
-    @Schema(description = "현재 수준 (자연어, 선택)", example = "현재 600점") String currentLevel,
-    @Schema(description = "투자 가능 시간 (자연어, 선택)", example = "하루 1시간") String availableTime,
-    @Schema(description = "특이사항 (자유 형식, 선택)", example = "해커스 교재 쓰고 싶음") String notes) {}
+        @NotEmpty(message = "질문/답변은 최소 1개 이상이어야 합니다.")
+        @Valid
+        List<QuestionAnswer> answers) {}

@@ -24,8 +24,9 @@ import plana.replan.domain.goal.dto.refine.GoalRefinementRequest;
 import plana.replan.domain.goal.dto.refine.GoalRefinementResponse;
 import plana.replan.domain.goal.dto.refine.RefinedDeadline;
 import plana.replan.domain.goal.dto.refine.RefinedField;
+import plana.replan.domain.goal.dto.refine.QuestionAnswer;
 import plana.replan.domain.goal.dto.refine.RefinedNoteItem;
-import plana.replan.domain.goal.dto.refine.RefinedNotes;
+import plana.replan.domain.goal.dto.refine.RefinedSolution;
 import plana.replan.domain.goal.exception.GoalErrorCode;
 import plana.replan.global.exception.CustomException;
 
@@ -114,51 +115,50 @@ public class GoalAiService {
     return parseRefineResponse(raw);
   }
 
-  private String buildRefinePrompt(GoalRefinementRequest req, String today) {
+  String buildRefinePrompt(GoalRefinementRequest req, String today) {
+    StringBuilder qa = new StringBuilder();
+    for (QuestionAnswer a : req.answers()) {
+      qa.append("- ").append(a.question()).append(": ")
+        .append(a.answer() != null && !a.answer().isBlank() ? a.answer() : "미입력").append("\n");
+    }
     return """
         당신은 목표 달성 플래닝 전문가입니다.
-        사용자가 제공한 목표 초안을 분석하고, 투두 리스트 생성에 최적화되도록 정제하세요.
+        사용자의 목표와 질문 답변을 분석하고, 투두 리스트 생성에 최적화되도록 정제하세요.
 
         입력:
         목표: %s
-        마감기한: %s
-        현재수준: %s
-        투자가능시간: %s
-        특이사항:
+        종료 날짜: %s
+        종료 시간: %s
+        질문/답변:
         %s
 
         정제 규칙:
-        1. 사용자가 변경 불가한 제약(특정 요일, 교재, 장소 등)은 반드시 그대로 유지
-        2. goal: 막연한 표현을 제거하고 측정 가능한 수치·기준을 포함해 구체화. 섹션별 목표가 있으면 명시 (예: "토익 900점" → "토익 900점 달성 (LC 450·RC 450 이상)"). 투자 가능 시간 대비 과도하면 현실적으로 조정하고 이유 명시
-        3. currentLevel: 구체적 수치·단계로 표현하고, 현재 수준에서 목표까지의 격차와 달성 난이도를 한 줄로 평가
-        4. availableTime: 일/주/월 단위로 환산하고, 총 가용 학습 시간을 합산한 뒤 목표 달성 가능성을 한 줄로 평가
-        5. deadline: 오늘 날짜(%s) 기준으로 date(yyyy-MM-dd), time(HH:mm)으로 분리 변환. 사용자가 "기한 없음", "마감기한 설정 안할래요" 등을 명시하면 date와 time 모두 null
-        6. 목표 달성에 교재·강의가 필요하지만 사용자가 언급하지 않았다면 Google Search로 사용자 수준에 맞는 교재·강의를 검색하여 notes에 추가
-        7. [교재·강의 포함 필수 조건 — 아래 3가지를 모두 충족해야만 포함 가능]
-           (a) Google Search로 실제 인터넷에 존재함이 확인될 것
-           (b) 책: 저자명·출판사·실제 구매 링크(인터넷 서점 URL 등)를 검색으로 확인할 것
-               강의: 강사명·플랫폼명·강의 링크(플랫폼 강의 페이지 URL)를 검색으로 확인할 것
-           (c) 링크를 확인할 수 없으면 해당 교재·강의는 반드시 제외할 것 (링크 없이 포함 절대 금지)
-           예시 형식: "해커스 토익 기출 VOCA (저자: 해커스어학연구소 / 출판사: 해커스어학원 / 링크: https://www.yes24.com/...)"
-                      "스프링 핵심 원리 기본편 (강사: 김영한 / 플랫폼: 인프런 / 링크: https://www.inflearn.com/...)"
-        8. notes.value는 목표에 맞는 카테고리(교재/학습전략/루틴/마무리 등, 고정 아님)로 3~5개 항목을 구조화. 각 항목 content는 투두 생성에 바로 쓸 수 있도록 교재명·전략·루틴 방식을 구체적으로 서술
-        9. notes.reason은 notes 전체에 대한 이유를 1문장으로 작성
-        10. 각 필드 reason은 1~2문장으로 구체적으로 작성 (변경 없으면 "사용자 입력을 그대로 유지했습니다."로 작성)
-        11. 모든 텍스트는 "~합니다", "~했습니다" 등 서술형으로 작성. "~하세요", "~하시기 바랍니다" 등 조언·명령형 말투 절대 금지
+        1. 사용자가 변경 불가한 제약(특정 요일·교재·장소 등)은 반드시 그대로 유지한다.
+        2. goal: 막연한 표현을 제거하고 측정 가능한 수치·기준을 포함해 구체화한다.
+           (예: "토익 900점" → "토익 900점 달성 (LC 450·RC 450 이상)")
+        3. deadline: 입력으로 받은 종료 날짜(date, yyyy-MM-dd)·종료 시간(time, HH:mm)을 그대로 둔다(임의 변경 금지).
+           입력이 없으면 null. reason에는 일정 기준 한 줄 평가를 적는다.
+        4. solutions: 입력된 '질문/답변' 각각에 대해 정제 결과를 1개씩 만든다(질문 수와 동일).
+           - question: 입력 질문을 그대로 또는 자연스러운 라벨로 정리
+           - items: 그 질문에 대한 정제 내용을 {title, content} 항목 1~5개로 구조화.
+             유저 답변을 그대로 옮기지 말고, 답변 + 목표 달성에 필요한 보강(영역별 평가·전략·루틴 등)을 포함한다.
+             title은 항목 소제목(예: "교재 및 컨텐츠"), content는 투두 생성에 바로 쓸 수 있게 구체적으로 서술.
+           - reason: 그 질문 정제에 대한 근거 1~2문장
+        5. 목표 달성에 교재·강의가 필요하지만 답변에 없으면 Google Search로 실제 존재가 확인되는 것만 items에 추가한다.
+           링크를 확인할 수 없으면 포함하지 않는다.
+        6. 모든 텍스트는 "~합니다", "~했습니다" 서술형으로 쓰고 "~하세요" 명령형은 금지한다.
 
         반드시 아래 JSON만 출력하세요 (다른 설명 없이):
-        {"goal":{"value":"","reason":""},"deadline":{"date":null,"time":null,"reason":""},"currentLevel":{"value":"","reason":""},"availableTime":{"value":"","reason":""},"notes":{"value":[{"title":"","content":""}],"reason":""}}
+        {"goal":{"value":"","reason":""},"deadline":{"date":null,"time":null,"reason":""},"solutions":[{"question":"","items":[{"title":"","content":""}],"reason":""}]}
         """
         .formatted(
             req.goal(),
-            req.deadline(),
-            req.currentLevel() != null ? req.currentLevel() : "미입력",
-            req.availableTime() != null ? req.availableTime() : "미입력",
-            req.notes() != null ? req.notes() : "미입력",
-            today);
+            req.deadlineDate() != null ? req.deadlineDate() : "미입력",
+            req.deadlineTime() != null ? req.deadlineTime() : "미입력",
+            qa.toString());
   }
 
-  private GoalRefinementResponse parseRefineResponse(String raw) {
+  GoalRefinementResponse parseRefineResponse(String raw) {
     try {
       String json = extractJson(raw);
       JsonNode root = objectMapper.readTree(json);
@@ -172,25 +172,15 @@ public class GoalAiService {
       String dlTime = dl.path("time").isNull() ? null : dl.path("time").asText(null);
       RefinedDeadline deadline = new RefinedDeadline(dlDate, dlTime, dl.path("reason").asText());
 
-      RefinedField currentLevel =
-          new RefinedField(
-              root.path("currentLevel").path("value").asText(),
-              root.path("currentLevel").path("reason").asText());
-
-      RefinedField availableTime =
-          new RefinedField(
-              root.path("availableTime").path("value").asText(),
-              root.path("availableTime").path("reason").asText());
-
-      JsonNode notesNode = root.path("notes");
-      List<RefinedNoteItem> noteItems = new ArrayList<>();
-      for (JsonNode item : notesNode.path("value")) {
-        noteItems.add(
-            new RefinedNoteItem(item.path("title").asText(), item.path("content").asText()));
+      List<RefinedSolution> solutions = new ArrayList<>();
+      for (JsonNode s : root.path("solutions")) {
+        List<RefinedNoteItem> items = new ArrayList<>();
+        for (JsonNode item : s.path("items")) {
+          items.add(new RefinedNoteItem(item.path("title").asText(), item.path("content").asText()));
+        }
+        solutions.add(new RefinedSolution(s.path("question").asText(), items, s.path("reason").asText()));
       }
-      RefinedNotes notes = new RefinedNotes(noteItems, notesNode.path("reason").asText());
-
-      return new GoalRefinementResponse(goal, deadline, currentLevel, availableTime, notes);
+      return new GoalRefinementResponse(goal, deadline, solutions);
     } catch (Exception e) {
       log.error("Gemini refine 응답 파싱 실패: {}", raw, e);
       throw new CustomException(GoalErrorCode.GEMINI_PARSE_ERROR);

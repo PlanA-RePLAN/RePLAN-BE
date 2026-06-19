@@ -3,10 +3,14 @@ package plana.replan.domain.goal.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import java.util.List;
 import org.junit.jupiter.api.Test;
 import plana.replan.domain.goal.dto.explore.GoalExploreRequest;
 import plana.replan.domain.goal.dto.explore.GoalExploreResponse;
 import plana.replan.domain.goal.dto.recommend.TodoRecommendationRequest;
+import plana.replan.domain.goal.dto.refine.GoalRefinementRequest;
+import plana.replan.domain.goal.dto.refine.GoalRefinementResponse;
+import plana.replan.domain.goal.dto.refine.QuestionAnswer;
 import plana.replan.domain.goal.exception.GoalErrorCode;
 import plana.replan.global.exception.CustomException;
 
@@ -93,5 +97,42 @@ class GoalAiServiceTest {
     assertThat(prompt).contains("[이번 새로고침 스타일]");
     assertThat(prompt).contains("벼락치기");
     assertThat(prompt).contains("todos"); // 기존 JSON 포맷 규칙 유지
+  }
+
+  private GoalRefinementRequest refineReq() {
+    return new GoalRefinementRequest(
+        "토익 850점", "2026-05-01", "23:59",
+        List.of(new QuestionAnswer("현재 영어 실력", "토익 600점대")));
+  }
+
+  @Test
+  void 정제_프롬프트에_목표와_질문답변이_들어간다() {
+    String prompt = service.buildRefinePrompt(refineReq(), "2026-06-20");
+    assertThat(prompt).contains("토익 850점");
+    assertThat(prompt).contains("현재 영어 실력: 토익 600점대");
+  }
+
+  @Test
+  void 정제_답변이_비면_미입력으로_들어간다() {
+    GoalRefinementRequest req =
+        new GoalRefinementRequest("토익 850점", null, null,
+            List.of(new QuestionAnswer("특이사항", "")));
+    String prompt = service.buildRefinePrompt(req, "2026-06-20");
+    assertThat(prompt).contains("특이사항: 미입력");
+  }
+
+  @Test
+  void 정제_응답을_질문별_솔루션으로_파싱한다() {
+    String raw =
+        "{\"goal\":{\"value\":\"토익 850점 달성\",\"reason\":\"구체화함\"},"
+            + "\"deadline\":{\"date\":\"2026-05-01\",\"time\":\"23:59\",\"reason\":\"유지\"},"
+            + "\"solutions\":[{\"question\":\"현재 수준\",\"items\":"
+            + "[{\"title\":\"독해\",\"content\":\"실전풀이 필요\"}],\"reason\":\"격차 정리\"}]}";
+    GoalRefinementResponse res = service.parseRefineResponse(raw);
+    assertThat(res.goal().value()).isEqualTo("토익 850점 달성");
+    assertThat(res.deadline().date()).isEqualTo("2026-05-01");
+    assertThat(res.solutions()).hasSize(1);
+    assertThat(res.solutions().get(0).question()).isEqualTo("현재 수준");
+    assertThat(res.solutions().get(0).items().get(0).title()).isEqualTo("독해");
   }
 }
