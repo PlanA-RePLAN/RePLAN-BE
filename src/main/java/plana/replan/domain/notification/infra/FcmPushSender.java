@@ -23,7 +23,7 @@ public class FcmPushSender implements PushSender {
         Message.builder()
             .setToken(token)
             .setNotification(Notification.builder().setTitle(title).setBody(body).build())
-            .putAllData(data)
+            .putAllData(data == null ? java.util.Map.of() : data)
             .build();
     try {
       firebaseMessaging.send(message);
@@ -36,7 +36,7 @@ public class FcmPushSender implements PushSender {
     }
   }
 
-  static PushResult classify(MessagingErrorCode code) {
+  public static PushResult classify(MessagingErrorCode code) {
     if (code == MessagingErrorCode.UNREGISTERED || code == MessagingErrorCode.INVALID_ARGUMENT) {
       return PushResult.DEAD_TOKEN;
     }

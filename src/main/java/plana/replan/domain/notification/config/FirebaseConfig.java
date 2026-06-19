@@ -23,6 +23,9 @@ public class FirebaseConfig {
     if (!FirebaseApp.getApps().isEmpty()) {
       return FirebaseApp.getInstance();
     }
+    if (serviceAccountJson == null || serviceAccountJson.isBlank()) {
+      throw new IllegalStateException("FIREBASE_SERVICE_ACCOUNT_JSON 환경변수가 설정되지 않았습니다.");
+    }
     GoogleCredentials credentials =
         GoogleCredentials.fromStream(
             new ByteArrayInputStream(serviceAccountJson.getBytes(StandardCharsets.UTF_8)));
