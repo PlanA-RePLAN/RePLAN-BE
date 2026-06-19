@@ -7,5 +7,4 @@ import java.util.List;
 public record RefinedSolution(
     @Schema(description = "어떤 질문에 대한 정제인지", example = "현재 수준") String question,
     @Schema(description = "정제된 항목 목록 (제목 + 내용)") List<RefinedNoteItem> items,
-    @Schema(description = "AI 정제 근거", example = "현재 실력과 목표 사이 격차를 영역별로 정리했습니다.")
-        String reason) {}
+    @Schema(description = "AI 정제 근거", example = "현재 실력과 목표 사이 격차를 영역별로 정리했습니다.") String reason) {}
