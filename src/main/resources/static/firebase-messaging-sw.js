@@ -23,15 +23,9 @@ firebase.initializeApp(firebaseConfig);
 
 const messaging = firebase.messaging();
 
+// 주의: 메시지에 notification 페이로드가 있으면 브라우저가 자동으로 1개를 표시한다.
+// 여기서 showNotification 을 또 호출하면 '2개씩' 뜨므로, 표시는 하지 않고 로그만 남긴다.
+// (데이터 처리만 필요하면 여기서 한다)
 messaging.onBackgroundMessage((payload) => {
   console.log("[firebase-messaging-sw.js] 백그라운드 메시지 수신:", payload);
-
-  const notification = payload.notification || {};
-  const title = notification.title || "replan 알림";
-  const body  = notification.body  || "";
-
-  self.registration.showNotification(title, {
-    body,
-    icon: "/icon-192.png", // 없으면 무시됨
-  });
 });

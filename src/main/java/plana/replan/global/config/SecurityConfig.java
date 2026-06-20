@@ -56,7 +56,8 @@ public class SecurityConfig {
                         "/api/auth/**", // 로그인, 회원가입은 인증 없이 허용
                         "/api/s3/**", // tempToken 검증은 서비스 레이어에서 수동으로
                         "/fcm-test.html", // 로컬 FCM 토큰 테스트용 정적 파일
-                        "/firebase-messaging-sw.js" // 로컬 FCM 토큰 테스트용 정적 파일
+                        "/firebase-messaging-sw.js", // 로컬 FCM 토큰 테스트용 정적 파일
+                        "/manifest.webmanifest" // 로컬 FCM 토큰 테스트용 PWA manifest
                         )
                     .permitAll()
                     .anyRequest()
