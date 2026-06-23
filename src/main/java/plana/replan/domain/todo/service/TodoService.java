@@ -193,8 +193,8 @@ public class TodoService {
     List<Todo> todos;
     switch (filter.toLowerCase()) {
       case "all" -> {
-        todos = new ArrayList<>(todoRepository.findActiveTodosForUser(user));
-        todos.sort(sortComparator);
+        todos = new ArrayList<>(todoRepository.findAllActiveTodosForUser(user));
+        todos.sort(Comparator.comparing(Todo::isCompleted).thenComparing(sortComparator));
       }
       case "day" -> {
         List<Todo> active =

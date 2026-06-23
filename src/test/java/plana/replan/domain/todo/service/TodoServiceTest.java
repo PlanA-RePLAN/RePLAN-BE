@@ -567,17 +567,19 @@ class TodoServiceTest {
   }
 
   @Test
-  @DisplayName("getTodos - all 필터: 미완료 투두 전체 반환")
+  @DisplayName("getTodos - all 필터: 완료/미완료 투두 모두 반환, 미완료가 먼저")
   void getTodos_all_returnsActiveTodos() {
     User user = testUser();
     given(userRepository.findById(1L)).willReturn(Optional.of(user));
-    given(todoRepository.findActiveTodosForUser(user))
-        .willReturn(List.of(activeTodo(1L, user), activeTodo(2L, user)));
+    given(todoRepository.findAllActiveTodosForUser(user))
+        .willReturn(List.of(activeTodo(1L, user), activeTodo(2L, user), completedTodo(3L, user)));
 
     List<TodoListResponseDto> result = todoService.getTodos(1L, "all", "priority", null);
 
-    assertThat(result).hasSize(2);
-    assertThat(result).extracting("isCompleted").containsOnly(false);
+    assertThat(result).hasSize(3);
+    assertThat(result.get(0).isCompleted()).isFalse();
+    assertThat(result.get(1).isCompleted()).isFalse();
+    assertThat(result.get(2).isCompleted()).isTrue();
   }
 
   @Test
@@ -585,7 +587,7 @@ class TodoServiceTest {
   void getTodos_all_emptyList() {
     User user = testUser();
     given(userRepository.findById(1L)).willReturn(Optional.of(user));
-    given(todoRepository.findActiveTodosForUser(user)).willReturn(List.of());
+    given(todoRepository.findAllActiveTodosForUser(user)).willReturn(List.of());
 
     assertThat(todoService.getTodos(1L, "all", "priority", null)).isEmpty();
   }
@@ -685,7 +687,7 @@ class TodoServiceTest {
     Todo t2 = activeTodoWithSort(2L, user, false, 500.0);
     Todo t3 = activeTodoWithSort(3L, user, true, 9999.0);
 
-    given(todoRepository.findActiveTodosForUser(user)).willReturn(List.of(t1, t3, t2));
+    given(todoRepository.findAllActiveTodosForUser(user)).willReturn(List.of(t1, t3, t2));
 
     List<TodoListResponseDto> result = todoService.getTodos(1L, "all", "priority", null);
 
@@ -707,7 +709,7 @@ class TodoServiceTest {
     Todo earlyDate = activeTodoWithDueDate(3L, user, true, early);
     Todo midDate = activeTodoWithDueDate(4L, user, false, mid);
 
-    given(todoRepository.findActiveTodosForUser(user))
+    given(todoRepository.findAllActiveTodosForUser(user))
         .willReturn(List.of(noDate, lateDate, earlyDate, midDate));
 
     List<TodoListResponseDto> result = todoService.getTodos(1L, "all", "dueDate", null);
@@ -733,7 +735,7 @@ class TodoServiceTest {
   void getTodos_filterCaseInsensitive() {
     User user = testUser();
     given(userRepository.findById(1L)).willReturn(Optional.of(user));
-    given(todoRepository.findActiveTodosForUser(any())).willReturn(List.of());
+    given(todoRepository.findAllActiveTodosForUser(any())).willReturn(List.of());
 
     assertThatCode(() -> todoService.getTodos(1L, "ALL", "priority", null))
         .doesNotThrowAnyException();
@@ -759,7 +761,7 @@ class TodoServiceTest {
     Todo overdue = activeTodoWithDueDate(1L, user, false, LocalDateTime.of(2020, 1, 1, 0, 0));
 
     given(userRepository.findById(1L)).willReturn(Optional.of(user));
-    given(todoRepository.findActiveTodosForUser(any())).willReturn(List.of(overdue));
+    given(todoRepository.findAllActiveTodosForUser(any())).willReturn(List.of(overdue));
 
     List<TodoListResponseDto> result = todoService.getTodos(1L, "all", "priority", null);
 
@@ -788,7 +790,8 @@ class TodoServiceTest {
   void getTodos_noDueDate_isOverdueFalse() {
     User user = testUser();
     given(userRepository.findById(1L)).willReturn(Optional.of(user));
-    given(todoRepository.findActiveTodosForUser(any())).willReturn(List.of(activeTodo(1L, user)));
+    given(todoRepository.findAllActiveTodosForUser(any()))
+        .willReturn(List.of(activeTodo(1L, user)));
 
     List<TodoListResponseDto> result = todoService.getTodos(1L, "all", "priority", null);
 
@@ -809,7 +812,7 @@ class TodoServiceTest {
     ReflectionTestUtils.setField(todo, "id", 1L);
 
     given(userRepository.findById(1L)).willReturn(Optional.of(user));
-    given(todoRepository.findActiveTodosForUser(any())).willReturn(List.of(todo));
+    given(todoRepository.findAllActiveTodosForUser(any())).willReturn(List.of(todo));
 
     TodoListResponseDto dto = todoService.getTodos(1L, "all", "priority", null).get(0);
 
