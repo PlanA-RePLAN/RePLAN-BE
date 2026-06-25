@@ -26,6 +26,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.client.RestClient;
 import plana.replan.domain.auth.dto.LoginResponseDto;
 import plana.replan.domain.auth.dto.OAuthRegisterRequestDto;
+import plana.replan.domain.tag.service.TagService;
 import plana.replan.domain.user.entity.Provider;
 import plana.replan.domain.user.entity.Role;
 import plana.replan.domain.user.entity.User;
@@ -46,6 +47,7 @@ class AuthServiceRegisterTest {
   @Mock private GoogleIdTokenVerifier googleIdTokenVerifier;
   @Mock private RestClient restClient;
   @Mock private S3Service s3Service;
+  @Mock private TagService tagService;
 
   @InjectMocks private AuthService authService;
 
