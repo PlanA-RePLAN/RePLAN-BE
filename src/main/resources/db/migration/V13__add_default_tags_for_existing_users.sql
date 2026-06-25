@@ -9,4 +9,10 @@ CROSS JOIN (VALUES
     ('Health', '#E4F5EE'),
     ('Other', '#E5EDFF')
 ) AS v(title, color)
-WHERE u.deleted_at IS NULL;
+WHERE u.deleted_at IS NULL
+  AND NOT EXISTS (
+    SELECT 1 FROM tag t
+    WHERE t.user_id = u.id
+      AND t.title = v.title
+      AND t.deleted_at IS NULL
+  );
