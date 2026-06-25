@@ -22,6 +22,7 @@ import plana.replan.domain.auth.dto.NaverLoginRequestDto;
 import plana.replan.domain.auth.dto.OAuthLoginResponseDto;
 import plana.replan.domain.auth.dto.OAuthRegisterRequestDto;
 import plana.replan.domain.auth.dto.SignUpRequestDto;
+import plana.replan.domain.tag.service.TagService;
 import plana.replan.domain.user.entity.Provider;
 import plana.replan.domain.user.entity.Role;
 import plana.replan.domain.user.entity.User;
@@ -43,6 +44,7 @@ public class AuthService {
   private final GoogleIdTokenVerifier googleIdTokenVerifier;
   private final RestClient restClient;
   private final S3Service s3Service;
+  private final TagService tagService;
 
   @Transactional
   public void signUp(SignUpRequestDto request) {
@@ -66,6 +68,7 @@ public class AuthService {
             .build();
 
     userRepository.save(user);
+    tagService.createDefaultTags(user);
   }
 
   @Transactional(readOnly = true)
@@ -160,6 +163,7 @@ public class AuthService {
                 .provider(provider)
                 .profileImage(profileImageUrl)
                 .build());
+    tagService.createDefaultTags(user);
 
     // 6. tempToken 삭제
     redisTemplate.delete("oauth-temp:" + tempToken);
