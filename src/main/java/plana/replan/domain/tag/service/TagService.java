@@ -25,6 +25,15 @@ public class TagService {
 
   private static final Pattern HEX_COLOR = Pattern.compile("^#[0-9A-Fa-f]{6}$");
 
+  private static final List<DefaultTag> DEFAULT_TAGS =
+      List.of(
+          new DefaultTag("Study", "#FFEBE7"),
+          new DefaultTag("Project", "#F9ECF8"),
+          new DefaultTag("Health", "#E4F5EE"),
+          new DefaultTag("Other", "#E5EDFF"));
+
+  private record DefaultTag(String title, String color) {}
+
   private final TagRepository tagRepository;
   private final UserRepository userRepository;
   private final TodoRepository todoRepository;
@@ -86,6 +95,21 @@ public class TagService {
 
     tag.update(request.getTitle(), request.getColor());
     return TagResponseDto.from(tag);
+  }
+
+  @Transactional
+  public void createDefaultTags(User user) {
+    List<Tag> tags =
+        DEFAULT_TAGS.stream()
+            .map(
+                defaultTag ->
+                    Tag.builder()
+                        .title(defaultTag.title())
+                        .color(defaultTag.color())
+                        .user(user)
+                        .build())
+            .toList();
+    tagRepository.saveAll(tags);
   }
 
   private void validateColor(String color) {
