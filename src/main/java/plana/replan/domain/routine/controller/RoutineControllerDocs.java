@@ -59,7 +59,7 @@ public interface RoutineControllerDocs {
           **filter 범위 기준**
           - `day`: date 당일 1일치
           - `week`: date 포함 7일 (date ~ date+6)
-          - `month`: date 포함 ~30일 (date ~ date+1개월-1일)
+          - `month`: date부터 정확히 1개월 전날까지 (28~31일, 시작 월에 따라 다름)
 
           ---
 
