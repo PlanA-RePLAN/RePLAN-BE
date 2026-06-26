@@ -18,7 +18,6 @@ import plana.replan.domain.routine.entity.Routine;
 import plana.replan.domain.routine.entity.RoutineType;
 import plana.replan.domain.routine.exception.RoutineErrorCode;
 import plana.replan.domain.routine.repository.RoutineRepository;
-import plana.replan.domain.routine.service.RoutineService;
 import plana.replan.domain.tag.entity.Tag;
 import plana.replan.domain.tag.exception.TagErrorCode;
 import plana.replan.domain.tag.repository.TagRepository;
@@ -50,7 +49,6 @@ public class TodoService {
   private final UserRepository userRepository;
   private final TagRepository tagRepository;
   private final RoutineRepository routineRepository;
-  private final RoutineService routineService;
   private final GoalRepository goalRepository;
 
   @Transactional
@@ -267,10 +265,6 @@ public class TodoService {
       throw new CustomException(GlobalErrorCode.INVALID_INPUT);
     }
 
-    if (request.getRoutineType() != null) {
-      validateRoutineDate(request.getRoutineType(), request.getRoutineDate());
-    }
-
     if (request.getTitle() != null) {
       todo.updateTitle(request.getTitle());
     }
@@ -282,35 +276,25 @@ public class TodoService {
   }
 
   private void handleRoutineUpdate(Todo todo, TodoUpdateRequestDto request, Tag tag) {
-    Routine existingRoutine = todo.getRoutine();
-
-    if (request.getRoutineType() == null) {
-      if (existingRoutine != null) {
-        routineService.cascadeSoftDelete(existingRoutine);
-        todo.updateRoutine(null);
-      }
+    // 이미 반복에 연결된 Todo의 루틴 속성은 이 API에서 건드리지 않음.
+    // 반복 스케줄 전체를 바꾸려면 PUT /api/routines/{id} 사용.
+    if (todo.getRoutine() != null || request.getRoutineType() == null) {
       return;
     }
-
+    validateRoutineDate(request.getRoutineType(), request.getRoutineDate());
     Integer routineDate =
         request.getRoutineType() == RoutineType.DAILY ? null : request.getRoutineDate();
-
-    if (existingRoutine != null) {
-      existingRoutine.update(
-          todo.getTitle(), request.getRoutineType(), routineDate, request.getRoutineTime(), tag);
-    } else {
-      Routine newRoutine =
-          routineRepository.save(
-              Routine.builder()
-                  .title(todo.getTitle())
-                  .routineType(request.getRoutineType())
-                  .routineDate(routineDate)
-                  .routineTime(request.getRoutineTime())
-                  .user(todo.getUser())
-                  .tag(tag)
-                  .build());
-      todo.updateRoutine(newRoutine);
-    }
+    Routine newRoutine =
+        routineRepository.save(
+            Routine.builder()
+                .title(todo.getTitle())
+                .routineType(request.getRoutineType())
+                .routineDate(routineDate)
+                .routineTime(request.getRoutineTime())
+                .user(todo.getUser())
+                .tag(tag)
+                .build());
+    todo.updateRoutine(newRoutine);
   }
 
   private void validateRoutineDate(RoutineType routineType, Integer routineDate) {

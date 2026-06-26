@@ -21,6 +21,7 @@ public class RoutineResponseDto {
   private String tagTitle;
   private String tagColor;
   private Long goalId;
+  private Long todoId;
 
   public static RoutineResponseDto from(Routine routine) {
     return new RoutineResponseDto(
@@ -33,7 +34,8 @@ public class RoutineResponseDto {
         routine.getTag() != null ? routine.getTag().getId() : null,
         routine.getTag() != null ? routine.getTag().getTitle() : null,
         routine.getTag() != null ? routine.getTag().getColor() : null,
-        routine.getGoal() != null ? routine.getGoal().getId() : null);
+        routine.getGoal() != null ? routine.getGoal().getId() : null,
+        null);
   }
 
   public static RoutineResponseDto from(RoutineDateProjection p) {
@@ -47,6 +49,7 @@ public class RoutineResponseDto {
         p.getTagId(),
         p.getTagTitle(),
         p.getTagColor(),
-        p.getGoalId());
+        p.getGoalId(),
+        p.getTodoId());
   }
 }
