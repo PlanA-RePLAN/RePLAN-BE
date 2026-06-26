@@ -24,7 +24,7 @@ public class DeviceToken extends BaseTimeEntity {
   @JoinColumn(name = "user_id", nullable = false)
   private User user;
 
-  // FCM 토큰. 같은 토큰 중복 저장 금지(DB 유니크는 V13 마이그레이션에서 관리).
+  // FCM 토큰. 같은 토큰 중복 저장 금지(DB 유니크는 V14 마이그레이션에서 관리).
   @Column(nullable = false, columnDefinition = "TEXT")
   private String token;
 
