@@ -263,8 +263,7 @@ public class RoutineService {
   private boolean isOccurrenceDay(Routine routine, LocalDate today) {
     return switch (routine.getRoutineType()) {
       case DAILY -> true;
-      case WEEKLY ->
-          (routine.getRoutineDate() & (1 << (today.getDayOfWeek().getValue() - 1))) != 0;
+      case WEEKLY -> (routine.getRoutineDate() & (1 << (today.getDayOfWeek().getValue() - 1))) != 0;
       case MONTHLY -> routine.getRoutineDate().equals(today.getDayOfMonth());
     };
   }

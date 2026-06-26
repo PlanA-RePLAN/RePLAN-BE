@@ -738,5 +738,4 @@ class RoutineServiceTest {
                 assertThat(((CustomException) e).getErrorCode())
                     .isEqualTo(RoutineErrorCode.ROUTINE_NOT_FOUND));
   }
-
 }

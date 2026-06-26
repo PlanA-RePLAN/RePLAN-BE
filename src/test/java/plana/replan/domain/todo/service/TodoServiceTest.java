@@ -1715,7 +1715,9 @@ class TodoServiceTest {
 
     TodoDetailResponseDto result =
         todoService.updateTodo(
-            1L, 1L, updateTodoRequest("제목", LocalDateTime.of(2026, 6, 27, 23, 59), null, null, null));
+            1L,
+            1L,
+            updateTodoRequest("제목", LocalDateTime.of(2026, 6, 27, 23, 59), null, null, null));
 
     assertThat(result.getDueDate()).isEqualTo(originalDueDate);
   }
