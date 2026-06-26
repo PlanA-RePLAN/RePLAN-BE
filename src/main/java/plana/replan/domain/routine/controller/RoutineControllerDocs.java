@@ -17,6 +17,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 import plana.replan.domain.routine.dto.RoutineCreateRequestDto;
 import plana.replan.domain.routine.dto.RoutineResponseDto;
+import plana.replan.domain.routine.dto.RoutineUpdateRequestDto;
 import plana.replan.domain.routine.dto.SubRoutineCreateRequestDto;
 import plana.replan.domain.routine.dto.SubRoutineResponseDto;
 import plana.replan.domain.routine.dto.SubRoutineUpdateRequestDto;
@@ -588,6 +589,248 @@ public interface RoutineControllerDocs {
                               """)))
           @RequestBody
           SubRoutineCreateRequestDto request);
+
+  @Operation(
+      summary = "엄마 루틴 수정",
+      description =
+          """
+          엄마 루틴의 스케줄, 제목, 태그, 종료일을 전체 수정합니다. goalId는 수정할 수 없습니다.
+
+          - 이미 생성된 과거/오늘 Todo row는 변경되지 않습니다. 미래에 생성될 Todo부터 새 값을 따라갑니다.
+          - 하위 루틴 ID를 넘기면 400(ROUTINE_INVALID_TARGET) — 하위 루틴 제목 변경은 `PATCH /api/routines/children/{id}` 사용.
+
+          ---
+
+          ### Request Headers
+
+          | 헤더명 | 필수 여부 | 타입 | 설명 |
+          |--------|-----------|------|------|
+          | Authorization | ✅ 필수 | string | `Bearer {accessToken}` 형식의 JWT 액세스 토큰 |
+          | Content-Type | ✅ 필수 | string | `application/json` |
+
+          ---
+
+          ### Path Variable
+
+          | 파라미터명 | 필수 여부 | 타입 | 설명 | 예시 |
+          |-----------|-----------|------|------|------|
+          | id | ✅ 필수 | integer | 엄마 루틴 ID | `1` |
+
+          ---
+
+          ### Request Body
+
+          | 필드명 | 필수 여부 | 타입 | 설명 | 예시 |
+          |--------|-----------|------|------|------|
+          | title | ✅ 필수 | string | 루틴 제목 | `"영어 단어 외우기"` |
+          | routineType | ✅ 필수 | string | 반복 유형 (`DAILY` / `WEEKLY` / `MONTHLY`) | `"WEEKLY"` |
+          | dueDate | ❌ 선택 | string | 반복 종료 마감일 (ISO 8601 형식). null이면 종료일 제거 | `"2025-12-31T00:00:00"` |
+          | routineTime | ❌ 선택 | string | 반복되는 날의 마감 시각 (HH:mm:ss 형식). null이면 23:59:59로 처리 | `"09:00:00"` |
+          | routineDate | ❌ 선택 | integer | 반복 날짜. WEEKLY: 요일 bitmask (월=1~일=64). MONTHLY: 일자 (1~31). DAILY: 불필요 | `21` |
+          | tagId | ❌ 선택 | integer | 태그 ID. null이면 태그 제거 | `1` |
+
+          > ❌ 선택 필드는 생략하거나 null로 전달해도 동일하게 처리됩니다.
+
+          ---
+
+          ### routineDate 규칙
+
+          | routineType | routineDate 의미 | 유효 범위 |
+          |-------------|-----------------|-----------|
+          | `DAILY` | 사용 안 함 (무시) | — |
+          | `WEEKLY` | 요일 bitmask (월=1, 화=2, 수=4, 목=8, 금=16, 토=32, 일=64) | 1 ~ 127 |
+          | `MONTHLY` | 반복할 일자 | 1 ~ 31 |
+          """,
+      security = @SecurityRequirement(name = "Bearer Authentication"))
+  @ApiResponses({
+    @ApiResponse(
+        responseCode = "200",
+        description = "수정 성공",
+        content =
+            @Content(
+                examples =
+                    @ExampleObject(
+                        value =
+                            """
+                            {
+                              "status": 200,
+                              "success": true,
+                              "data": {
+                                "routineId": 1,
+                                "title": "영어 단어 외우기",
+                                "dueDate": "2025-12-31T00:00:00",
+                                "routineTime": "09:00:00",
+                                "routineType": "WEEKLY",
+                                "routineDate": 21,
+                                "tagId": 1,
+                                "tagTitle": "영어",
+                                "tagColor": "BLUE",
+                                "goalId": 2
+                              },
+                              "error": null
+                            }
+                            """))),
+    @ApiResponse(
+        responseCode = "400",
+        description = "입력값 오류 (title/routineType 누락, 또는 routineDate 범위 오류, 또는 하위 루틴 ID 사용)",
+        content =
+            @Content(
+                examples = {
+                  @ExampleObject(
+                      name = "title 누락",
+                      value =
+                          """
+                          {
+                            "status": 400,
+                            "success": false,
+                            "data": null,
+                            "error": {
+                              "code": "INVALID_INPUT",
+                              "message": "제목은 필수입니다.",
+                              "detail": null
+                            }
+                          }
+                          """),
+                  @ExampleObject(
+                      name = "routineDate 범위 오류",
+                      value =
+                          """
+                          {
+                            "status": 400,
+                            "success": false,
+                            "data": null,
+                            "error": {
+                              "code": "ROUTINE_INVALID_DATE",
+                              "message": "유효하지 않은 반복 날짜입니다.",
+                              "detail": null
+                            }
+                          }
+                          """),
+                  @ExampleObject(
+                      name = "하위 루틴 ID 사용",
+                      value =
+                          """
+                          {
+                            "status": 400,
+                            "success": false,
+                            "data": null,
+                            "error": {
+                              "code": "ROUTINE_INVALID_TARGET",
+                              "message": "이 API는 해당 루틴 종류(엄마/하위)에만 사용할 수 있습니다.",
+                              "detail": null
+                            }
+                          }
+                          """)
+                })),
+    @ApiResponse(
+        responseCode = "401",
+        description = "인증 실패 — 토큰 없음 또는 만료",
+        content =
+            @Content(
+                examples = {
+                  @ExampleObject(
+                      name = "토큰 없음",
+                      value =
+                          """
+                          {
+                            "status": 401,
+                            "success": false,
+                            "data": null,
+                            "error": {
+                              "code": "EMPTY_TOKEN",
+                              "message": "토큰이 없습니다.",
+                              "detail": null
+                            }
+                          }
+                          """),
+                  @ExampleObject(
+                      name = "만료된 토큰",
+                      value =
+                          """
+                          {
+                            "status": 401,
+                            "success": false,
+                            "data": null,
+                            "error": {
+                              "code": "EXPIRED_TOKEN",
+                              "message": "만료된 토큰입니다.",
+                              "detail": null
+                            }
+                          }
+                          """)
+                })),
+    @ApiResponse(
+        responseCode = "404",
+        description = "루틴을 찾을 수 없거나 본인 소유가 아님, 또는 태그를 찾을 수 없음",
+        content =
+            @Content(
+                examples = {
+                  @ExampleObject(
+                      name = "루틴 없음",
+                      value =
+                          """
+                          {
+                            "status": 404,
+                            "success": false,
+                            "data": null,
+                            "error": {
+                              "code": "ROUTINE_NOT_FOUND",
+                              "message": "루틴을 찾을 수 없습니다.",
+                              "detail": null
+                            }
+                          }
+                          """),
+                  @ExampleObject(
+                      name = "태그 없음",
+                      value =
+                          """
+                          {
+                            "status": 404,
+                            "success": false,
+                            "data": null,
+                            "error": {
+                              "code": "TAG_NOT_FOUND",
+                              "message": "태그를 찾을 수 없습니다.",
+                              "detail": null
+                            }
+                          }
+                          """)
+                }))
+  })
+  ResponseEntity<ApiResult<RoutineResponseDto>> updateMotherRoutine(
+      @AuthenticationPrincipal Long userId,
+      @Parameter(description = "엄마 루틴 ID", example = "1") @PathVariable Long id,
+      @io.swagger.v3.oas.annotations.parameters.RequestBody(
+              content =
+                  @Content(
+                      mediaType = "application/json",
+                      examples = {
+                        @ExampleObject(
+                            name = "WEEKLY — 전체 필드",
+                            value =
+                                """
+                                {
+                                  "title": "영어 단어 외우기",
+                                  "dueDate": "2025-12-31T00:00:00",
+                                  "routineTime": "09:00:00",
+                                  "routineType": "WEEKLY",
+                                  "routineDate": 21,
+                                  "tagId": 1
+                                }
+                                """),
+                        @ExampleObject(
+                            name = "DAILY — 필수 필드만",
+                            summary = "DAILY는 routineDate 불필요, optional 필드 생략",
+                            value =
+                                """
+                                {
+                                  "title": "아침 스트레칭",
+                                  "routineType": "DAILY"
+                                }
+                                """)
+                      }))
+          @RequestBody
+          RoutineUpdateRequestDto request);
 
   @Operation(
       summary = "엄마 루틴 삭제",

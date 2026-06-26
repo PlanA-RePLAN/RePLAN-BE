@@ -392,6 +392,7 @@ public class ReplanService {
     effectiveRoutineDate = normalizeRoutineDate(effectiveType, effectiveRoutineDate);
     routine.update(
         op.title() != null ? op.title() : routine.getTitle(),
+        routine.getDueDate(),
         effectiveType,
         effectiveRoutineDate,
         op.dueTime() != null ? parseTime(op.dueTime()) : routine.getRoutineTime(),
