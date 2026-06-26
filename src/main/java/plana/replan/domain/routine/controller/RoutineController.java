@@ -3,6 +3,7 @@ package plana.replan.domain.routine.controller;
 import jakarta.validation.Valid;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -35,9 +36,12 @@ public class RoutineController implements RoutineControllerDocs {
 
   @Override
   @GetMapping
-  public ResponseEntity<ApiResult<List<RoutineResponseDto>>> getRoutinesByDate(
-      @AuthenticationPrincipal Long userId, @RequestParam LocalDate date) {
-    return ResponseEntity.ok(ApiResult.ok(routineService.getRoutinesByDate(userId, date)));
+  public ResponseEntity<ApiResult<Map<String, List<RoutineResponseDto>>>> getRoutinesByFilter(
+      @AuthenticationPrincipal Long userId,
+      @RequestParam(defaultValue = "day") String filter,
+      @RequestParam LocalDate date) {
+    return ResponseEntity.ok(
+        ApiResult.ok(routineService.getRoutinesByFilter(userId, filter, date)));
   }
 
   @Override

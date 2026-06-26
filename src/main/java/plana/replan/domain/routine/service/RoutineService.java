@@ -4,7 +4,9 @@ import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
@@ -23,6 +25,7 @@ import plana.replan.domain.routine.dto.SubRoutineUpdateRequestDto;
 import plana.replan.domain.routine.entity.Routine;
 import plana.replan.domain.routine.entity.RoutineType;
 import plana.replan.domain.routine.exception.RoutineErrorCode;
+import plana.replan.global.exception.GlobalErrorCode;
 import plana.replan.domain.routine.repository.RoutineRepository;
 import plana.replan.domain.tag.entity.Tag;
 import plana.replan.domain.tag.exception.TagErrorCode;
@@ -165,7 +168,8 @@ public class RoutineService {
   }
 
   @Transactional(readOnly = true)
-  public List<RoutineResponseDto> getRoutinesByDate(Long userId, LocalDate date) {
+  public Map<String, List<RoutineResponseDto>> getRoutinesByFilter(
+      Long userId, String filter, LocalDate date) {
     if (userId == null) {
       throw new CustomException(UserErrorCode.USER_NOT_FOUND);
     }
@@ -173,11 +177,26 @@ public class RoutineService {
         .findById(userId)
         .orElseThrow(() -> new CustomException(UserErrorCode.USER_NOT_FOUND));
 
+    List<LocalDate> dates =
+        switch (filter.toLowerCase()) {
+          case "day" -> List.of(date);
+          case "week" -> date.datesUntil(date.plusWeeks(1)).collect(Collectors.toList());
+          case "month" -> date.datesUntil(date.plusMonths(1)).collect(Collectors.toList());
+          default -> throw new CustomException(GlobalErrorCode.INVALID_INPUT);
+        };
+
+    Map<String, List<RoutineResponseDto>> result = new LinkedHashMap<>();
+    for (LocalDate d : dates) {
+      result.put(d.toString(), getRoutinesForDate(userId, d));
+    }
+    return result;
+  }
+
+  private List<RoutineResponseDto> getRoutinesForDate(Long userId, LocalDate date) {
     int dayBit = 1 << (date.getDayOfWeek().getValue() - 1);
     int dayOfMonth = date.getDayOfMonth();
-
-    return routineRepository.findMotherRoutinesByDate(userId, dayBit, dayOfMonth).stream()
-        .map(p -> RoutineResponseDto.from(p))
+    return routineRepository.findMotherRoutinesByDate(userId, dayBit, dayOfMonth, date).stream()
+        .map(RoutineResponseDto::from)
         .collect(Collectors.toList());
   }
 

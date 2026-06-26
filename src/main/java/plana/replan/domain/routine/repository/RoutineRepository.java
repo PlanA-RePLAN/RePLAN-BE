@@ -1,5 +1,6 @@
 package plana.replan.domain.routine.repository;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -39,9 +40,14 @@ public interface RoutineRepository extends JpaRepository<Routine, Long> {
                  t.id           AS tagId,
                  t.title        AS tagTitle,
                  t.color        AS tagColor,
-                 r.goal_id      AS goalId
+                 r.goal_id      AS goalId,
+                 td.id          AS todoId
           FROM routine r
           LEFT JOIN tag t ON r.tag_id = t.id AND t.deleted_at IS NULL
+          LEFT JOIN todo td ON td.routine_id = r.id
+                            AND td.deleted_at IS NULL
+                            AND td.parent_id IS NULL
+                            AND CAST(td.due_date AS date) = :targetDate
           WHERE r.user_id = :userId
             AND r.deleted_at IS NULL
             AND r.parent_id IS NULL
@@ -54,5 +60,6 @@ public interface RoutineRepository extends JpaRepository<Routine, Long> {
   List<RoutineDateProjection> findMotherRoutinesByDate(
       @Param("userId") Long userId,
       @Param("dayBit") int dayBit,
-      @Param("dayOfMonth") int dayOfMonth);
+      @Param("dayOfMonth") int dayOfMonth,
+      @Param("targetDate") LocalDate targetDate);
 }
