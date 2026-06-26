@@ -254,12 +254,19 @@ public class RoutineService {
 
   @Transactional
   public void generateDailyTodos() {
-    LocalDate yesterday = LocalDate.now(clock).minusDays(1);
-    LocalDateTime start = yesterday.atStartOfDay();
-    LocalDateTime end = yesterday.atTime(23, 59, 59);
-    todoRepository
-        .findMotherRoutineTodosForRollover(start, end)
-        .forEach(todo -> createTodoTreeFromMother(todo.getRoutine()));
+    LocalDate today = LocalDate.now(clock);
+    routineRepository.findAllActiveMotherRoutines().stream()
+        .filter(r -> isOccurrenceDay(r, today))
+        .forEach(this::createTodoTreeFromMother);
+  }
+
+  private boolean isOccurrenceDay(Routine routine, LocalDate today) {
+    return switch (routine.getRoutineType()) {
+      case DAILY -> true;
+      case WEEKLY ->
+          (routine.getRoutineDate() & (1 << (today.getDayOfWeek().getValue() - 1))) != 0;
+      case MONTHLY -> routine.getRoutineDate().equals(today.getDayOfMonth());
+    };
   }
 
   /**
