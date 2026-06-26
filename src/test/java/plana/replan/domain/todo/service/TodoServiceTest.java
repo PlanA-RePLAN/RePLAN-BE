@@ -1702,43 +1702,39 @@ class TodoServiceTest {
   }
 
   @Test
-  @DisplayName("updateTodo - 루틴 있음 + dueDate 변경 시도: ROUTINE_TODO_DUE_DATE_CHANGE_NOT_ALLOWED 예외")
-  void updateTodo_routineTodo_dueDateChange_throws() {
+  @DisplayName("updateTodo - 루틴 있음: dueDate 요청값(non-null) 무시, 기존 마감일 보존")
+  void updateTodo_routineTodo_dueDateIgnored_preservesExisting() {
     User user = testUser();
     Todo todo = testTodo(1L, user);
+    LocalDateTime originalDueDate = LocalDateTime.of(2026, 6, 25, 23, 59, 59);
+    ReflectionTestUtils.setField(todo, "dueDate", originalDueDate);
     Routine routine = testRoutine(user, RoutineType.DAILY);
     ReflectionTestUtils.setField(todo, "routine", routine);
 
     given(todoRepository.findById(1L)).willReturn(Optional.of(todo));
 
-    assertThatThrownBy(
-            () ->
-                todoService.updateTodo(
-                    1L,
-                    1L,
-                    updateTodoRequest(
-                        "제목", LocalDateTime.of(2026, 6, 27, 23, 59), null, null, null)))
-        .isInstanceOf(CustomException.class)
-        .satisfies(
-            e ->
-                assertThat(((CustomException) e).getErrorCode())
-                    .isEqualTo(TodoErrorCode.ROUTINE_TODO_DUE_DATE_CHANGE_NOT_ALLOWED));
+    TodoDetailResponseDto result =
+        todoService.updateTodo(
+            1L, 1L, updateTodoRequest("제목", LocalDateTime.of(2026, 6, 27, 23, 59), null, null, null));
+
+    assertThat(result.getDueDate()).isEqualTo(originalDueDate);
   }
 
   @Test
-  @DisplayName("updateTodo - 루틴 있음 + dueDate=null: 마감일 변경 없이 성공")
-  void updateTodo_routineTodo_nullDueDate_success() {
+  @DisplayName("updateTodo - 루틴 있음: dueDate=null 요청도 무시, 기존 마감일 보존")
+  void updateTodo_routineTodo_nullDueDateIgnored_preservesExisting() {
     User user = testUser();
     Todo todo = testTodo(1L, user);
+    LocalDateTime originalDueDate = LocalDateTime.of(2026, 6, 25, 23, 59, 59);
+    ReflectionTestUtils.setField(todo, "dueDate", originalDueDate);
     Routine routine = testRoutine(user, RoutineType.DAILY);
     ReflectionTestUtils.setField(todo, "routine", routine);
 
     given(todoRepository.findById(1L)).willReturn(Optional.of(todo));
 
-    assertThatCode(
-            () ->
-                todoService.updateTodo(
-                    1L, 1L, updateTodoRequest("수정된 제목", null, null, null, null)))
-        .doesNotThrowAnyException();
+    TodoDetailResponseDto result =
+        todoService.updateTodo(1L, 1L, updateTodoRequest("수정된 제목", null, null, null, null));
+
+    assertThat(result.getDueDate()).isEqualTo(originalDueDate);
   }
 }

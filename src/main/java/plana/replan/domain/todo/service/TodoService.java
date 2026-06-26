@@ -268,10 +268,9 @@ public class TodoService {
     if (request.getTitle() != null) {
       todo.updateTitle(request.getTitle());
     }
-    if (todo.getRoutine() != null && request.getDueDate() != null) {
-      throw new CustomException(TodoErrorCode.ROUTINE_TODO_DUE_DATE_CHANGE_NOT_ALLOWED);
+    if (todo.getRoutine() == null) {
+      todo.updateDueDate(request.getDueDate());
     }
-    todo.updateDueDate(request.getDueDate());
     todo.updateTag(tag);
     handleRoutineUpdate(todo, request, tag);
 
