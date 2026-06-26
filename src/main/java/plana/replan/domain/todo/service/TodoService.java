@@ -268,7 +268,9 @@ public class TodoService {
     if (request.getTitle() != null) {
       todo.updateTitle(request.getTitle());
     }
-    todo.updateDueDate(request.getDueDate());
+    if (todo.getRoutine() == null) {
+      todo.updateDueDate(request.getDueDate());
+    }
     todo.updateTag(tag);
     handleRoutineUpdate(todo, request, tag);
 

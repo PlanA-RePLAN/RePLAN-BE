@@ -505,7 +505,7 @@ class RoutineServiceTest {
 
   // ========== generateDailyTodos (배치) ==========
 
-  // TEST_DATE = 2024-01-15 (월요일), 어제 = 2024-01-14 (일요일)
+  // TEST_DATE = 2024-01-15 (월요일, DayOfWeek=1, bit=1), day of month = 15
 
   private Routine buildRoutine(RoutineType type, Integer routineDate) {
     return Routine.builder()
@@ -516,19 +516,9 @@ class RoutineServiceTest {
         .build();
   }
 
-  private Todo buildTodoWithRoutine(Routine routine, LocalDateTime dueDate) {
-    return Todo.builder()
-        .title(routine.getTitle())
-        .dueDate(dueDate)
-        .isPinned(false)
-        .user(routine.getUser())
-        .routine(routine)
-        .build();
-  }
-
   @Test
-  void generateDailyTodos_어제_마감_반복Todo_없으면_생성_안됨() {
-    given(todoRepository.findMotherRoutineTodosForRollover(any(), any())).willReturn(List.of());
+  void generateDailyTodos_활성루틴_없으면_생성_안됨() {
+    given(routineRepository.findAllActiveMotherRoutines()).willReturn(List.of());
 
     routineService.generateDailyTodos();
 
@@ -536,13 +526,10 @@ class RoutineServiceTest {
   }
 
   @Test
-  void generateDailyTodos_DAILY_어제_마감_반복Todo_있으면_오늘_dueDate로_생성됨() {
-    // 어제(2024-01-14) dueDate DAILY 반복 Todo → nextOccurrence(오늘=2024-01-15) = 2024-01-15
+  void generateDailyTodos_DAILY_오늘_투두_생성됨() {
+    // DAILY → isOccurrenceDay = 항상 true → 오늘(2024-01-15) 투두 생성
     Routine routine = buildRoutine(RoutineType.DAILY, null);
-    Todo yesterdayTodo =
-        buildTodoWithRoutine(routine, LocalDate.of(2024, 1, 14).atTime(23, 59, 59));
-    given(todoRepository.findMotherRoutineTodosForRollover(any(), any()))
-        .willReturn(List.of(yesterdayTodo));
+    given(routineRepository.findAllActiveMotherRoutines()).willReturn(List.of(routine));
 
     routineService.generateDailyTodos();
 
@@ -553,37 +540,81 @@ class RoutineServiceTest {
   }
 
   @Test
-  void generateDailyTodos_WEEKLY_어제_마감_반복Todo_있으면_다음_반복일_dueDate로_생성됨() {
-    // 어제(2024-01-14, 일) dueDate WEEKLY(화=2) → nextOccurrence(오늘=월) = 2024-01-16(화)
-    Routine routine = buildRoutine(RoutineType.WEEKLY, 2);
-    Todo yesterdayTodo =
-        buildTodoWithRoutine(routine, LocalDate.of(2024, 1, 14).atTime(23, 59, 59));
-    given(todoRepository.findMotherRoutineTodosForRollover(any(), any()))
-        .willReturn(List.of(yesterdayTodo));
+  void generateDailyTodos_WEEKLY_오늘이_해당요일_투두_생성됨() {
+    // 오늘=월요일(bit=1), WEEKLY(mask=1) → isOccurrenceDay = true → 오늘 투두 생성
+    Routine routine = buildRoutine(RoutineType.WEEKLY, 1);
+    given(routineRepository.findAllActiveMotherRoutines()).willReturn(List.of(routine));
 
     routineService.generateDailyTodos();
 
     ArgumentCaptor<Todo> captor = ArgumentCaptor.forClass(Todo.class);
     verify(todoRepository).saveAndFlush(captor.capture());
     assertThat(captor.getValue().getDueDate())
-        .isEqualTo(LocalDate.of(2024, 1, 16).atTime(23, 59, 59));
+        .isEqualTo(LocalDate.of(2024, 1, 15).atTime(23, 59, 59));
   }
 
   @Test
-  void generateDailyTodos_MONTHLY_어제_마감_반복Todo_있으면_다음_반복일_dueDate로_생성됨() {
-    // 어제(2024-01-14) dueDate MONTHLY(16일) → nextOccurrence(오늘=15일) = 2024-01-16
-    Routine routine = buildRoutine(RoutineType.MONTHLY, 16);
-    Todo yesterdayTodo =
-        buildTodoWithRoutine(routine, LocalDate.of(2024, 1, 14).atTime(23, 59, 59));
-    given(todoRepository.findMotherRoutineTodosForRollover(any(), any()))
-        .willReturn(List.of(yesterdayTodo));
+  void generateDailyTodos_WEEKLY_오늘이_해당요일_아님_생성_안됨() {
+    // 오늘=월요일(bit=1), WEEKLY(mask=2, 화요일) → isOccurrenceDay = false
+    Routine routine = buildRoutine(RoutineType.WEEKLY, 2);
+    given(routineRepository.findAllActiveMotherRoutines()).willReturn(List.of(routine));
+
+    routineService.generateDailyTodos();
+
+    verify(todoRepository, never()).saveAndFlush(any(Todo.class));
+  }
+
+  @Test
+  void generateDailyTodos_MONTHLY_오늘이_해당일_투두_생성됨() {
+    // 오늘=15일, MONTHLY(15일) → isOccurrenceDay = true → 오늘 투두 생성
+    Routine routine = buildRoutine(RoutineType.MONTHLY, 15);
+    given(routineRepository.findAllActiveMotherRoutines()).willReturn(List.of(routine));
 
     routineService.generateDailyTodos();
 
     ArgumentCaptor<Todo> captor = ArgumentCaptor.forClass(Todo.class);
     verify(todoRepository).saveAndFlush(captor.capture());
     assertThat(captor.getValue().getDueDate())
-        .isEqualTo(LocalDate.of(2024, 1, 16).atTime(23, 59, 59));
+        .isEqualTo(LocalDate.of(2024, 1, 15).atTime(23, 59, 59));
+  }
+
+  @Test
+  void generateDailyTodos_MONTHLY_오늘이_해당일_아님_생성_안됨() {
+    // 오늘=15일, MONTHLY(16일) → isOccurrenceDay = false
+    Routine routine = buildRoutine(RoutineType.MONTHLY, 16);
+    given(routineRepository.findAllActiveMotherRoutines()).willReturn(List.of(routine));
+
+    routineService.generateDailyTodos();
+
+    verify(todoRepository, never()).saveAndFlush(any(Todo.class));
+  }
+
+  @Test
+  void generateDailyTodos_종료일_지난_루틴_생성_안됨() {
+    // DAILY, 종료일 = 2024-01-14 → 오늘(Jan 15)이 종료일 이후 → 생성 안 함
+    Routine routine =
+        Routine.builder()
+            .title("테스트 루틴")
+            .routineType(RoutineType.DAILY)
+            .dueDate(LocalDate.of(2024, 1, 14).atStartOfDay())
+            .user(testUser())
+            .build();
+    given(routineRepository.findAllActiveMotherRoutines()).willReturn(List.of(routine));
+
+    routineService.generateDailyTodos();
+
+    verify(todoRepository, never()).saveAndFlush(any(Todo.class));
+  }
+
+  @Test
+  void generateDailyTodos_오늘_투두_이미_존재시_중복_생성_안됨() {
+    Routine routine = buildRoutine(RoutineType.DAILY, null);
+    given(routineRepository.findAllActiveMotherRoutines()).willReturn(List.of(routine));
+    given(todoRepository.existsByRoutineAndDueDate(any(), any())).willReturn(true);
+
+    routineService.generateDailyTodos();
+
+    verify(todoRepository, never()).saveAndFlush(any(Todo.class));
   }
 
   // ========== updateMotherRoutine ==========
@@ -706,19 +737,5 @@ class RoutineServiceTest {
             e ->
                 assertThat(((CustomException) e).getErrorCode())
                     .isEqualTo(RoutineErrorCode.ROUTINE_NOT_FOUND));
-  }
-
-  @Test
-  void generateDailyTodos_다음_반복일_Todo_이미_존재시_중복_생성_안됨() {
-    Routine routine = buildRoutine(RoutineType.DAILY, null);
-    Todo yesterdayTodo =
-        buildTodoWithRoutine(routine, LocalDate.of(2024, 1, 14).atTime(23, 59, 59));
-    given(todoRepository.findMotherRoutineTodosForRollover(any(), any()))
-        .willReturn(List.of(yesterdayTodo));
-    given(todoRepository.existsByRoutineAndDueDate(any(), any())).willReturn(true);
-
-    routineService.generateDailyTodos();
-
-    verify(todoRepository, never()).saveAndFlush(any(Todo.class));
   }
 }
