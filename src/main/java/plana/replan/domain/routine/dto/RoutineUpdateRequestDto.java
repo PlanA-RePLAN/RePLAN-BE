@@ -15,9 +15,7 @@ public record RoutineUpdateRequestDto(
             requiredMode = Schema.RequiredMode.REQUIRED)
         @NotBlank(message = "제목은 필수입니다.")
         String title,
-    @Schema(
-            description = "반복 종료 마감일 (ISO 8601 형식). null이면 종료일 제거",
-            example = "2025-12-31T00:00:00")
+    @Schema(description = "반복 종료 마감일 (ISO 8601 형식). null이면 종료일 제거", example = "2025-12-31T00:00:00")
         LocalDateTime dueDate,
     @Schema(
             description = "반복 시각 (HH:mm:ss). 반복되는 날의 마감 시각. null이면 23:59:59로 처리",

@@ -601,7 +601,9 @@ class RoutineServiceTest {
 
     RoutineResponseDto result =
         routineService.updateMotherRoutine(
-            1L, 10L, new RoutineUpdateRequestDto("수정된 루틴", null, null, RoutineType.DAILY, null, null));
+            1L,
+            10L,
+            new RoutineUpdateRequestDto("수정된 루틴", null, null, RoutineType.DAILY, null, null));
 
     assertThat(result.getTitle()).isEqualTo("수정된 루틴");
     assertThat(result.getRoutineType()).isEqualTo(RoutineType.DAILY);
@@ -619,7 +621,9 @@ class RoutineServiceTest {
 
     RoutineResponseDto result =
         routineService.updateMotherRoutine(
-            1L, 10L, new RoutineUpdateRequestDto("수정된 루틴", dueDate, null, RoutineType.WEEKLY, 21, 5L));
+            1L,
+            10L,
+            new RoutineUpdateRequestDto("수정된 루틴", dueDate, null, RoutineType.WEEKLY, 21, 5L));
 
     assertThat(result.getTitle()).isEqualTo("수정된 루틴");
     assertThat(result.getRoutineType()).isEqualTo(RoutineType.WEEKLY);

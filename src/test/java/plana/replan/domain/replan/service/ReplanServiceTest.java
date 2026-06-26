@@ -355,7 +355,13 @@ class ReplanServiceTest {
 
     then(routine)
         .should()
-        .update(eq("영단어 50개 암기"), any(), eq(RoutineType.WEEKLY), eq(62), eq(LocalTime.of(11, 15)), any());
+        .update(
+            eq("영단어 50개 암기"),
+            any(),
+            eq(RoutineType.WEEKLY),
+            eq(62),
+            eq(LocalTime.of(11, 15)),
+            any());
     then(routine).should().linkReplan(any(Replan.class));
     then(todo).should().linkReplan(any(Replan.class));
   }

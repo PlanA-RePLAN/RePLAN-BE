@@ -141,8 +141,7 @@ public class RoutineService {
               .orElseThrow(() -> new CustomException(TagErrorCode.TAG_NOT_FOUND));
     }
 
-    Integer routineDate =
-        request.routineType() == RoutineType.DAILY ? null : request.routineDate();
+    Integer routineDate = request.routineType() == RoutineType.DAILY ? null : request.routineDate();
     routine.update(
         request.title(),
         request.dueDate(),
