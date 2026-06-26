@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<!--
+  FCM 토큰 발급 테스트 페이지 (로컬 전용)
+  =========================================
+  사용법:
+  1. 아래 firebaseConfig 와 vapidKey 를 실제 값으로 채운다.
+  2. firebase-messaging-sw.js 의 firebaseConfig 도 동일하게 채운다.
+  3. 서버 실행 후 http://localhost:8080/fcm-test.html 접속.
+  4. "알림 허용" 버튼 클릭 → 화면에 FCM 토큰이 표시됨.
+  5. 표시된 토큰을 복사해 POST /api/notifications/tokens 으로 등록
+     (Authorization: Bearer {accessToken} 헤더 필요).
+  6. 로그인 후 POST /api/notifications/dev/trigger-due-soon 또는
+     /trigger-failed-replan 을 호출하면 실제 푸시 알림이 온다.
+
+  각 설정값을 구하는 방법
+  -----------------------
+  firebaseConfig (apiKey, authDomain, projectId, storageBucket, messagingSenderId, appId)
+    → Firebase Console → ⚙️ 프로젝트 설정 → 일반(General)
+      → "내 앱" 섹션의 웹 앱 → SDK 설정 및 구성(firebaseConfig 블록)
+
+  vapidKey
+    → Firebase Console → ⚙️ 프로젝트 설정 → 클라우드 메시징(Cloud Messaging)
+      → 웹 구성(Web configuration) → 웹 푸시 인증서(Web Push certificates)
+      → 키 쌍(Key pair) 값
+-->
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FCM 토큰 테스트 (로컬)</title>
+  <!-- 아이폰에서 '홈 화면에 추가' 시 앱처럼(standalone) 실행되게 하는 설정 (iOS 웹푸시 조건) -->
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="replan 알림" />
+  <style>
+    body { font-family: sans-serif; max-width: 700px; margin: 40px auto; padding: 0 16px; }
+    h1 { font-size: 1.4rem; }
+    button { padding: 10px 20px; font-size: 1rem; cursor: pointer; margin-top: 16px; }
+    #token-box {
+      margin-top: 20px;
+      word-break: break-all;
+      background: #f4f4f4;
+      padding: 16px;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      min-height: 48px;
+    }
+    #messages { margin-top: 20px; font-size: 0.9rem; color: #333; }
+    .msg { background: #e8f5e9; border-left: 4px solid #4caf50; padding: 8px 12px; margin-bottom: 8px; border-radius: 4px; }
+    .err { background: #ffebee; border-left: 4px solid #f44336; }
+  </style>
+</head>
+<body>
+  <h1>FCM 토큰 발급 테스트 (로컬 전용)</h1>
+  <p>아래 버튼을 누르면 브라우저 알림 권한을 요청하고 FCM 토큰을 발급받습니다.</p>
+  <button id="btn-get-token">알림 허용 & 토큰 발급</button>
+
+  <div id="token-box">토큰이 여기 표시됩니다.</div>
+  <button id="btn-copy" style="display:none">토큰 복사</button>
+
+  <h2 style="margin-top:32px; font-size:1rem;">포그라운드 메시지 수신 로그</h2>
+  <div id="messages"></div>
+
+  <!-- Firebase SDK (v10 compat CDN) -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging-compat.js"></script>
+
+  <script>
+    // ────────────────────────────────────────────────────────────────
+    // TODO: 아래 두 블록을 실제 값으로 채우세요.
+    // ────────────────────────────────────────────────────────────────
+    const firebaseConfig = {
+      apiKey:            "__FILL_ME__",
+      authDomain:        "__FILL_ME__",
+      projectId:         "__FILL_ME__",
+      storageBucket:     "__FILL_ME__",
+      messagingSenderId: "__FILL_ME__",
+      appId:             "__FILL_ME__",
+    };
+
+    const vapidKey = "__FILL_ME__";
+    // ────────────────────────────────────────────────────────────────
+
+    firebase.initializeApp(firebaseConfig);
+    const messaging = firebase.messaging();
+
+    const tokenBox = document.getElementById("token-box");
+    const btnCopy  = document.getElementById("btn-copy");
+    const messages = document.getElementById("messages");
+
+    function addMsg(text, isErr = false) {
+      const div = document.createElement("div");
+      div.className = "msg" + (isErr ? " err" : "");
+      div.textContent = new Date().toLocaleTimeString() + " — " + text;
+      messages.prepend(div);
+    }
+
+    document.getElementById("btn-get-token").addEventListener("click", async () => {
+      try {
+        const permission = await Notification.requestPermission();
+        if (permission !== "granted") {
+          addMsg("알림 권한이 거부되었습니다.", true);
+          return;
+        }
+        // 서비스워커를 등록하고 '활성화'될 때까지 기다린 뒤 토큰을 요청한다.
+        // (활성 SW 없이 getToken 하면 PushManager.subscribe 가 실패함)
+        const registration = await navigator.serviceWorker.register("/firebase-messaging-sw.js");
+        await navigator.serviceWorker.ready;
+        const token = await messaging.getToken({ vapidKey, serviceWorkerRegistration: registration });
+        tokenBox.textContent = token;
+        btnCopy.style.display = "inline-block";
+        addMsg("토큰 발급 완료!");
+      } catch (err) {
+        addMsg("오류: " + err.message, true);
+        console.error(err);
+      }
+    });
+
+    btnCopy.addEventListener("click", () => {
+      navigator.clipboard.writeText(tokenBox.textContent).then(() => alert("복사 완료!"));
+    });
+
+    // 포그라운드 메시지 수신
+    messaging.onMessage((payload) => {
+      console.log("포그라운드 메시지:", payload);
+      const n = payload.notification || {};
+      addMsg("[포그라운드] " + (n.title || "") + " — " + (n.body || ""));
+    });
+  </script>
+</body>
+</html>
