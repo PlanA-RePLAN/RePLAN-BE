@@ -323,7 +323,7 @@ class RoutineControllerTest {
     given(routineService.updateMotherRoutine(any(), any(), any()))
         .willReturn(
             new RoutineResponseDto(
-                1L, "수정된 루틴", dueDate, null, RoutineType.WEEKLY, 21, 5L, "영어", "BLUE", null));
+                1L, "수정된 루틴", dueDate, null, RoutineType.WEEKLY, 21, 5L, "영어", "BLUE", null, null));
 
     mockMvc
         .perform(
