@@ -6,15 +6,14 @@ import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import org.hibernate.annotations.SQLRestriction;
 import plana.replan.domain.user.entity.User;
 import plana.replan.global.entity.BaseTimeEntity;
 
+// 기기 토큰은 죽은 토큰·회원 탈퇴 시 모두 '진짜 삭제'한다(라우팅 정보일 뿐이라 보관하지 않고, 유니크 토큰 값도 풀어줌).
 @Entity
 @Table(name = "device_token")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-@SQLRestriction("deleted_at IS NULL")
 public class DeviceToken extends BaseTimeEntity {
 
   @Id

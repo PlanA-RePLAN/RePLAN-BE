@@ -18,6 +18,8 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.test.util.ReflectionTestUtils;
 import plana.replan.domain.auth.dto.PresignedUrlResponseDto;
 import plana.replan.domain.goal.repository.GoalRepository;
+import plana.replan.domain.notification.repository.DeviceTokenRepository;
+import plana.replan.domain.notification.repository.NotificationRepository;
 import plana.replan.domain.routine.repository.RoutineRepository;
 import plana.replan.domain.tag.repository.TagRepository;
 import plana.replan.domain.todo.repository.TodoRepository;
@@ -39,6 +41,8 @@ class UserServiceTest {
   @Mock private GoalRepository goalRepository;
   @Mock private RoutineRepository routineRepository;
   @Mock private TagRepository tagRepository;
+  @Mock private NotificationRepository notificationRepository;
+  @Mock private DeviceTokenRepository deviceTokenRepository;
   @Mock private S3Service s3Service;
   @Mock private StringRedisTemplate redisTemplate;
 
@@ -250,6 +254,12 @@ class UserServiceTest {
         .softDeleteAllByUserId(
             org.mockito.ArgumentMatchers.eq(1L),
             org.mockito.ArgumentMatchers.any(LocalDateTime.class));
+    // 알림은 soft delete, 기기 토큰은 진짜 삭제
+    verify(notificationRepository)
+        .softDeleteAllByUserId(
+            org.mockito.ArgumentMatchers.eq(1L),
+            org.mockito.ArgumentMatchers.any(LocalDateTime.class));
+    verify(deviceTokenRepository).deleteAllByUserId(1L);
 
     // refresh token은 익명화 전 "원래 이메일" 키로 삭제되어야 한다
     verify(redisTemplate).delete("refresh:test@test.com");
