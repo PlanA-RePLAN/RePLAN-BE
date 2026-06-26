@@ -24,7 +24,10 @@ public class NotificationSettingService {
   @Transactional
   public NotificationSettingResponse update(Long userId, NotificationSettingUpdateRequest request) {
     User user = findUser(userId);
-    user.updateNotificationSettings(request.todoDue(), request.todoFailed(), request.report());
+    // 요청 본문이 JSON null로 들어오면 변경 없이 현재 설정을 그대로 반환한다(보내지 않은 필드는 유지 규칙과 동일).
+    if (request != null) {
+      user.updateNotificationSettings(request.todoDue(), request.todoFailed(), request.report());
+    }
     return NotificationSettingResponse.from(user);
   }
 

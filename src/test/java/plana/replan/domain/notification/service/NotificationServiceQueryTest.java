@@ -48,7 +48,7 @@ class NotificationServiceQueryTest {
   private Notification noti(long id) {
     Notification n =
         Notification.builder()
-            .user(null)
+            .user(user())
             .type(NotificationType.TODO_DUE_SOON)
             .title("t")
             .body("b")

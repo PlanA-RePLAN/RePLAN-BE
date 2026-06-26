@@ -6,6 +6,7 @@ import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.SQLRestriction;
 import plana.replan.domain.user.entity.User;
 import plana.replan.global.entity.BaseTimeEntity;
 
@@ -13,6 +14,7 @@ import plana.replan.global.entity.BaseTimeEntity;
 @Table(name = "notification")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
+@SQLRestriction("deleted_at IS NULL")
 public class Notification extends BaseTimeEntity {
 
   @Id
@@ -55,7 +57,7 @@ public class Notification extends BaseTimeEntity {
       String body,
       TargetType targetType,
       Long targetId) {
-    this.user = user;
+    this.user = Objects.requireNonNull(user, "사용자는 필수입니다.");
     this.type = Objects.requireNonNull(type, "알림 종류는 필수입니다.");
     this.category = type.getCategory();
     this.title = Objects.requireNonNull(title, "제목은 필수입니다.");

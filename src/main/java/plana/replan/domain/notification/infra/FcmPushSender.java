@@ -37,9 +37,20 @@ public class FcmPushSender implements PushSender {
     } catch (FirebaseMessagingException e) {
       PushResult result = classify(e.getMessagingErrorCode());
       log.warn(
-          "FCM 발송 실패 - token={}, code={}, result={}", token, e.getMessagingErrorCode(), result);
+          "FCM 발송 실패 - token={}, code={}, result={}",
+          mask(token),
+          e.getMessagingErrorCode(),
+          result);
       return result;
     }
+  }
+
+  // 토큰은 민감 식별자이므로 로그에는 앞뒤 일부만 남긴다.
+  private static String mask(String token) {
+    if (token == null || token.length() <= 8) {
+      return "****";
+    }
+    return token.substring(0, 4) + "..." + token.substring(token.length() - 4);
   }
 
   public static PushResult classify(MessagingErrorCode code) {

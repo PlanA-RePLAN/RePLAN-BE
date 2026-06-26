@@ -6,6 +6,7 @@ import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.SQLRestriction;
 import plana.replan.domain.user.entity.User;
 import plana.replan.global.entity.BaseTimeEntity;
 
@@ -13,6 +14,7 @@ import plana.replan.global.entity.BaseTimeEntity;
 @Table(name = "device_token")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
+@SQLRestriction("deleted_at IS NULL")
 public class DeviceToken extends BaseTimeEntity {
 
   @Id
@@ -33,7 +35,7 @@ public class DeviceToken extends BaseTimeEntity {
 
   @Builder
   public DeviceToken(User user, String token, Platform platform) {
-    this.user = user;
+    this.user = Objects.requireNonNull(user, "사용자는 필수입니다.");
     this.token = Objects.requireNonNull(token, "토큰은 필수입니다.");
     this.platform = Objects.requireNonNull(platform, "플랫폼은 필수입니다.");
   }
