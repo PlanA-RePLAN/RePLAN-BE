@@ -27,7 +27,7 @@ public interface RoutineRepository extends JpaRepository<Routine, Long> {
   @EntityGraph(attributePaths = "children")
   Optional<Routine> findWithChildrenById(Long id);
 
-  @Query("SELECT r FROM Routine r WHERE r.parent IS NULL")
+  @Query("SELECT r FROM Routine r WHERE r.parent IS NULL AND r.deletedAt IS NULL")
   List<Routine> findAllActiveMotherRoutines();
 
   @Query(
