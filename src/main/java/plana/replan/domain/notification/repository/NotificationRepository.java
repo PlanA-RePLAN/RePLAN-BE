@@ -18,10 +18,6 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
 
   long countByUserAndIsReadFalse(User user);
 
-  @Modifying
-  @Query("UPDATE Notification n SET n.isRead = true WHERE n.user = :user AND n.isRead = false")
-  int markAllReadByUser(@Param("user") User user);
-
   // 회원 탈퇴 시 그 사람의 알림을 모두 soft delete 한다(다른 사용자 데이터와 동일 방식).
   @Modifying
   @Query(

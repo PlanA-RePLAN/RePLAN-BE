@@ -4,7 +4,6 @@ import static org.hamcrest.Matchers.nullValue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.BDDMockito.given;
-import static org.mockito.BDDMockito.willDoNothing;
 import static org.mockito.BDDMockito.willThrow;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -123,20 +122,6 @@ class NotificationControllerTest {
         .andExpect(jsonPath("$.success").value(false))
         .andExpect(jsonPath("$.error.code").value("NOTIFICATION_NOT_FOUND"))
         .andExpect(jsonPath("$.data").doesNotExist());
-  }
-
-  // ── PATCH /api/notifications/read-all ────────────────────────────────────
-
-  @Test
-  @DisplayName("전체 읽음 처리 성공: status=200")
-  void readAll_success() throws Exception {
-    willDoNothing().given(notificationService).markAllRead(any());
-
-    mockMvc
-        .perform(patch("/api/notifications/read-all").with(authentication(authToken(1L))))
-        .andExpect(status().isOk())
-        .andExpect(jsonPath("$.success").value(true))
-        .andExpect(jsonPath("$.error").doesNotExist());
   }
 
   // ── GET /api/notifications/settings ──────────────────────────────────────

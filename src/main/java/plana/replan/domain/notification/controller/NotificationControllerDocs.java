@@ -189,50 +189,6 @@ public interface NotificationControllerDocs {
   ResponseEntity<ApiResult<Void>> readOne(Long userId, Long notificationId);
 
   @Operation(
-      summary = "전체 알림 읽음 처리",
-      description =
-          "내 알림을 모두 읽음으로 표시한다.\n\n"
-              + "### Request Headers\n"
-              + "| 헤더명 | 필수 여부 | 타입 | 설명 |\n"
-              + "|--------|-----------|------|------|\n"
-              + "| Authorization | ✅ 필수 | string | `Bearer {accessToken}` |")
-  @ApiResponses({
-    @ApiResponse(
-        responseCode = "200",
-        description = "전체 읽음 처리 성공",
-        content =
-            @Content(
-                examples =
-                    @ExampleObject(
-                        value = "{\"status\":200,\"success\":true,\"data\":null,\"error\":null}"))),
-    @ApiResponse(
-        responseCode = "401",
-        description = "인증 실패",
-        content =
-            @Content(
-                examples = {
-                  @ExampleObject(
-                      name = "토큰 없음",
-                      value =
-                          "{\"status\":401,\"success\":false,\"data\":null,\"error\":{\"code\":\"EMPTY_TOKEN\",\"message\":\"인증 토큰이 없습니다.\"}}"),
-                  @ExampleObject(
-                      name = "만료된 토큰",
-                      value =
-                          "{\"status\":401,\"success\":false,\"data\":null,\"error\":{\"code\":\"EXPIRED_TOKEN\",\"message\":\"만료된 토큰입니다.\"}}")
-                })),
-    @ApiResponse(
-        responseCode = "404",
-        description = "사용자를 찾을 수 없음",
-        content =
-            @Content(
-                examples =
-                    @ExampleObject(
-                        value =
-                            "{\"status\":404,\"success\":false,\"data\":null,\"error\":{\"code\":\"USER_NOT_FOUND\",\"message\":\"유저를 찾을 수 없습니다.\"}}")))
-  })
-  ResponseEntity<ApiResult<Void>> readAll(Long userId);
-
-  @Operation(
       summary = "알림 설정 조회",
       description =
           "내 알림 수신 설정을 조회한다.\n\n"

@@ -54,13 +54,6 @@ public class NotificationController implements NotificationControllerDocs {
   }
 
   @Override
-  @PatchMapping("/read-all")
-  public ResponseEntity<ApiResult<Void>> readAll(@AuthenticationPrincipal Long userId) {
-    notificationService.markAllRead(userId);
-    return ResponseEntity.ok(ApiResult.ok());
-  }
-
-  @Override
   @GetMapping("/settings")
   public ResponseEntity<ApiResult<NotificationSettingResponse>> getSettings(
       @AuthenticationPrincipal Long userId) {

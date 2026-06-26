@@ -119,12 +119,6 @@ public class NotificationService {
     n.markRead();
   }
 
-  @Transactional
-  public void markAllRead(Long userId) {
-    User user = findUser(userId);
-    notificationRepository.markAllReadByUser(user);
-  }
-
   private User findUser(Long userId) {
     return userRepository
         .findById(userId)
