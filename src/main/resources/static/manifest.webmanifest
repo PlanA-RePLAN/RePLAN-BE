@@ -1,0 +1,9 @@
+{
+  "name": "replan 알림 테스트",
+  "short_name": "replan알림",
+  "start_url": "/fcm-test.html",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#ffffff"
+}
