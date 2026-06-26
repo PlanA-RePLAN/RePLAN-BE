@@ -58,7 +58,6 @@ class TodoServiceTest {
   @Mock private UserRepository userRepository;
   @Mock private TagRepository tagRepository;
   @Mock private RoutineRepository routineRepository;
-  @Mock private plana.replan.domain.routine.service.RoutineService routineService;
 
   @InjectMocks private TodoService todoService;
 
@@ -1632,8 +1631,8 @@ class TodoServiceTest {
   }
 
   @Test
-  @DisplayName("updateTodo - 루틴 있음 + routineType=null: 루틴 soft delete, todo.routine=null")
-  void updateTodo_success_removeRoutine() {
+  @DisplayName("updateTodo - 루틴 있음 + routineType=null: 루틴 무시, 기존 routine 연결 그대로 유지")
+  void updateTodo_success_existingRoutine_nullTypeIgnored() {
     User user = testUser();
     Todo todo = testTodo(1L, user);
     Routine routine = testRoutine(user, RoutineType.DAILY);
@@ -1644,13 +1643,13 @@ class TodoServiceTest {
     TodoDetailResponseDto result =
         todoService.updateTodo(1L, 1L, updateTodoRequest("제목", null, null, null, null));
 
-    verify(routineService).cascadeSoftDelete(routine);
-    assertThat(result.getRoutineType()).isNull();
+    assertThat(result.getRoutineType()).isEqualTo("DAILY");
+    verify(routineRepository, never()).save(any());
   }
 
   @Test
-  @DisplayName("updateTodo - 루틴 있음 + 유형 변경 (DAILY→WEEKLY): 기존 루틴 업데이트")
-  void updateTodo_success_changeRoutineType() {
+  @DisplayName("updateTodo - 루틴 있음 + routineType 변경 시도: 무시, 기존 루틴 그대로 유지")
+  void updateTodo_success_existingRoutine_typeChangeIgnored() {
     User user = testUser();
     Todo todo = testTodo(1L, user);
     Routine routine = testRoutine(user, RoutineType.DAILY);
@@ -1662,10 +1661,10 @@ class TodoServiceTest {
         todoService.updateTodo(
             1L, 1L, updateTodoRequest("수정된 제목", null, null, RoutineType.WEEKLY, 5));
 
-    assertThat(routine.getRoutineType()).isEqualTo(RoutineType.WEEKLY);
-    assertThat(routine.getRoutineDate()).isEqualTo(5);
-    assertThat(routine.getTitle()).isEqualTo("수정된 제목");
-    assertThat(result.getRoutineType()).isEqualTo("WEEKLY");
+    assertThat(routine.getRoutineType()).isEqualTo(RoutineType.DAILY);
+    assertThat(routine.getRoutineDate()).isNull();
+    assertThat(routine.getTitle()).isEqualTo("루틴");
+    assertThat(result.getRoutineType()).isEqualTo("DAILY");
     verify(routineRepository, never()).save(any());
   }
 

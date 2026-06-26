@@ -6,6 +6,7 @@ import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.willThrow;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -296,5 +297,135 @@ class RoutineControllerTest {
                     """))
         .andExpect(status().isNotFound())
         .andExpect(jsonPath("$.error.code").value("USER_NOT_FOUND"));
+  }
+
+  // ========== updateMotherRoutine (PUT /api/routines/{id}) ==========
+
+  @Test
+  @DisplayName("인증 없이 엄마 루틴 수정 호출: 401 반환")
+  void updateMotherRoutine_unauthenticated() throws Exception {
+    mockMvc
+        .perform(
+            put("/api/routines/1")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """
+                    { "title": "수정", "routineType": "DAILY" }
+                    """))
+        .andExpect(status().isUnauthorized())
+        .andExpect(jsonPath("$.error.code").value("EMPTY_TOKEN"));
+  }
+
+  @Test
+  @DisplayName("엄마 루틴 수정 성공: status=200, 수정된 필드 반환")
+  void updateMotherRoutine_success() throws Exception {
+    LocalDateTime dueDate = LocalDateTime.of(2025, 12, 31, 0, 0);
+    given(routineService.updateMotherRoutine(any(), any(), any()))
+        .willReturn(
+            new RoutineResponseDto(
+                1L, "수정된 루틴", dueDate, null, RoutineType.WEEKLY, 21, 5L, "영어", "BLUE", null));
+
+    mockMvc
+        .perform(
+            put("/api/routines/1")
+                .with(authentication(authToken(1L)))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """
+                    {
+                      "title": "수정된 루틴",
+                      "dueDate": "2025-12-31T00:00:00",
+                      "routineType": "WEEKLY",
+                      "routineDate": 21,
+                      "tagId": 5
+                    }
+                    """))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.success").value(true))
+        .andExpect(jsonPath("$.data.title").value("수정된 루틴"))
+        .andExpect(jsonPath("$.data.routineType").value("WEEKLY"))
+        .andExpect(jsonPath("$.data.routineDate").value(21))
+        .andExpect(jsonPath("$.data.tagId").value(5))
+        .andExpect(jsonPath("$.error").value(nullValue()));
+  }
+
+  @Test
+  @DisplayName("하위 루틴 ID로 수정 시도: status=400, error.code=ROUTINE_INVALID_TARGET")
+  void updateMotherRoutine_childRoutine_throws() throws Exception {
+    willThrow(new CustomException(RoutineErrorCode.ROUTINE_INVALID_TARGET))
+        .given(routineService)
+        .updateMotherRoutine(any(), any(), any());
+
+    mockMvc
+        .perform(
+            put("/api/routines/11")
+                .with(authentication(authToken(1L)))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """
+                    { "title": "수정", "routineType": "DAILY" }
+                    """))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.error.code").value("ROUTINE_INVALID_TARGET"));
+  }
+
+  @Test
+  @DisplayName("routineDate 범위 오류: status=400, error.code=ROUTINE_INVALID_DATE")
+  void updateMotherRoutine_invalidRoutineDate() throws Exception {
+    willThrow(new CustomException(RoutineErrorCode.ROUTINE_INVALID_DATE))
+        .given(routineService)
+        .updateMotherRoutine(any(), any(), any());
+
+    mockMvc
+        .perform(
+            put("/api/routines/1")
+                .with(authentication(authToken(1L)))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """
+                    { "title": "수정", "routineType": "WEEKLY", "routineDate": 128 }
+                    """))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.error.code").value("ROUTINE_INVALID_DATE"));
+  }
+
+  @Test
+  @DisplayName("존재하지 않는 tagId: status=404, error.code=TAG_NOT_FOUND")
+  void updateMotherRoutine_tagNotFound() throws Exception {
+    willThrow(new CustomException(TagErrorCode.TAG_NOT_FOUND))
+        .given(routineService)
+        .updateMotherRoutine(any(), any(), any());
+
+    mockMvc
+        .perform(
+            put("/api/routines/1")
+                .with(authentication(authToken(1L)))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """
+                    { "title": "수정", "routineType": "DAILY", "tagId": 999 }
+                    """))
+        .andExpect(status().isNotFound())
+        .andExpect(jsonPath("$.error.code").value("TAG_NOT_FOUND"));
+  }
+
+  @Test
+  @DisplayName("루틴을 찾을 수 없음: status=404, error.code=ROUTINE_NOT_FOUND")
+  void updateMotherRoutine_routineNotFound() throws Exception {
+    willThrow(new CustomException(RoutineErrorCode.ROUTINE_NOT_FOUND))
+        .given(routineService)
+        .updateMotherRoutine(any(), any(), any());
+
+    mockMvc
+        .perform(
+            put("/api/routines/999")
+                .with(authentication(authToken(1L)))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """
+                    { "title": "수정", "routineType": "DAILY" }
+                    """))
+        .andExpect(status().isNotFound())
+        .andExpect(jsonPath("$.error.code").value("ROUTINE_NOT_FOUND"));
   }
 }

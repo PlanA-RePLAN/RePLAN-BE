@@ -12,12 +12,14 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import plana.replan.domain.routine.dto.RoutineCreateRequestDto;
 import plana.replan.domain.routine.dto.RoutineResponseDto;
+import plana.replan.domain.routine.dto.RoutineUpdateRequestDto;
 import plana.replan.domain.routine.dto.SubRoutineCreateRequestDto;
 import plana.replan.domain.routine.dto.SubRoutineResponseDto;
 import plana.replan.domain.routine.dto.SubRoutineUpdateRequestDto;
@@ -54,6 +56,15 @@ public class RoutineController implements RoutineControllerDocs {
       @Valid @RequestBody SubRoutineCreateRequestDto request) {
     return ResponseEntity.status(HttpStatus.CREATED)
         .body(ApiResult.ok(routineService.createChildRoutine(userId, parentId, request)));
+  }
+
+  @Override
+  @PutMapping("/{id}")
+  public ResponseEntity<ApiResult<RoutineResponseDto>> updateMotherRoutine(
+      @AuthenticationPrincipal Long userId,
+      @PathVariable Long id,
+      @Valid @RequestBody RoutineUpdateRequestDto request) {
+    return ResponseEntity.ok(ApiResult.ok(routineService.updateMotherRoutine(userId, id, request)));
   }
 
   @Override

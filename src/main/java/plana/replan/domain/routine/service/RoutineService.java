@@ -16,6 +16,7 @@ import plana.replan.domain.goal.exception.GoalErrorCode;
 import plana.replan.domain.goal.repository.GoalRepository;
 import plana.replan.domain.routine.dto.RoutineCreateRequestDto;
 import plana.replan.domain.routine.dto.RoutineResponseDto;
+import plana.replan.domain.routine.dto.RoutineUpdateRequestDto;
 import plana.replan.domain.routine.dto.SubRoutineCreateRequestDto;
 import plana.replan.domain.routine.dto.SubRoutineResponseDto;
 import plana.replan.domain.routine.dto.SubRoutineUpdateRequestDto;
@@ -120,6 +121,36 @@ public class RoutineService {
     motherTodo.ifPresent(mt -> attachChildTodoUnder(mt, child));
 
     return SubRoutineResponseDto.from(child);
+  }
+
+  /** 엄마 루틴 전체 수정. 하위 루틴 ID를 넘기면 400(ROUTINE_INVALID_TARGET). goalId는 수정 불가. */
+  @Transactional
+  public RoutineResponseDto updateMotherRoutine(
+      Long userId, Long routineId, RoutineUpdateRequestDto request) {
+    Routine routine = findOwnedRoutine(userId, routineId);
+    if (routine.isChild()) {
+      throw new CustomException(RoutineErrorCode.ROUTINE_INVALID_TARGET);
+    }
+    validateRoutineDate(request.routineType(), request.routineDate());
+
+    Tag tag = null;
+    if (request.tagId() != null) {
+      tag =
+          tagRepository
+              .findById(request.tagId())
+              .orElseThrow(() -> new CustomException(TagErrorCode.TAG_NOT_FOUND));
+    }
+
+    Integer routineDate =
+        request.routineType() == RoutineType.DAILY ? null : request.routineDate();
+    routine.update(
+        request.title(),
+        request.dueDate(),
+        request.routineType(),
+        routineDate,
+        request.routineTime(),
+        tag);
+    return RoutineResponseDto.from(routine);
   }
 
   /** 하위 루틴 title 수정. 엄마 루틴 ID를 넘기면 400(ROUTINE_INVALID_TARGET). */

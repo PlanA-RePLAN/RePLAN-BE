@@ -27,6 +27,7 @@ import plana.replan.domain.goal.exception.GoalErrorCode;
 import plana.replan.domain.goal.repository.GoalRepository;
 import plana.replan.domain.routine.dto.RoutineCreateRequestDto;
 import plana.replan.domain.routine.dto.RoutineResponseDto;
+import plana.replan.domain.routine.dto.RoutineUpdateRequestDto;
 import plana.replan.domain.routine.entity.Routine;
 import plana.replan.domain.routine.entity.RoutineType;
 import plana.replan.domain.routine.exception.RoutineErrorCode;
@@ -583,6 +584,124 @@ class RoutineServiceTest {
     verify(todoRepository).saveAndFlush(captor.capture());
     assertThat(captor.getValue().getDueDate())
         .isEqualTo(LocalDate.of(2024, 1, 16).atTime(23, 59, 59));
+  }
+
+  // ========== updateMotherRoutine ==========
+
+  private Routine motherRoutine() {
+    Routine r = buildRoutine(RoutineType.DAILY, null);
+    ReflectionTestUtils.setField(r, "id", 10L);
+    return r;
+  }
+
+  @Test
+  void 엄마루틴_수정_DAILY_성공_필수필드만() {
+    Routine routine = motherRoutine();
+    given(routineRepository.findById(10L)).willReturn(Optional.of(routine));
+
+    RoutineResponseDto result =
+        routineService.updateMotherRoutine(
+            1L, 10L, new RoutineUpdateRequestDto("수정된 루틴", null, null, RoutineType.DAILY, null, null));
+
+    assertThat(result.getTitle()).isEqualTo("수정된 루틴");
+    assertThat(result.getRoutineType()).isEqualTo(RoutineType.DAILY);
+    assertThat(result.getRoutineDate()).isNull();
+    assertThat(result.getDueDate()).isNull();
+    assertThat(result.getTagId()).isNull();
+  }
+
+  @Test
+  void 엄마루틴_수정_WEEKLY_전체필드() {
+    Routine routine = motherRoutine();
+    LocalDateTime dueDate = LocalDateTime.of(2025, 12, 31, 0, 0);
+    given(routineRepository.findById(10L)).willReturn(Optional.of(routine));
+    given(tagRepository.findById(5L)).willReturn(Optional.of(testTag(5L)));
+
+    RoutineResponseDto result =
+        routineService.updateMotherRoutine(
+            1L, 10L, new RoutineUpdateRequestDto("수정된 루틴", dueDate, null, RoutineType.WEEKLY, 21, 5L));
+
+    assertThat(result.getTitle()).isEqualTo("수정된 루틴");
+    assertThat(result.getRoutineType()).isEqualTo(RoutineType.WEEKLY);
+    assertThat(result.getRoutineDate()).isEqualTo(21);
+    assertThat(result.getDueDate()).isEqualTo(dueDate);
+    assertThat(result.getTagId()).isEqualTo(5L);
+  }
+
+  @Test
+  void 엄마루틴_수정_하위루틴_ID_전달_400() {
+    User user = testUser();
+    Routine parent = buildRoutine(RoutineType.DAILY, null);
+    ReflectionTestUtils.setField(parent, "id", 10L);
+    Routine child = Routine.builder().title("하위").user(user).parent(parent).build();
+    ReflectionTestUtils.setField(child, "id", 11L);
+    given(routineRepository.findById(11L)).willReturn(Optional.of(child));
+
+    assertThatThrownBy(
+            () ->
+                routineService.updateMotherRoutine(
+                    1L,
+                    11L,
+                    new RoutineUpdateRequestDto("수정", null, null, RoutineType.DAILY, null, null)))
+        .isInstanceOf(CustomException.class)
+        .satisfies(
+            e ->
+                assertThat(((CustomException) e).getErrorCode())
+                    .isEqualTo(RoutineErrorCode.ROUTINE_INVALID_TARGET));
+  }
+
+  @Test
+  void 엄마루틴_수정_routineDate_범위오류_400() {
+    Routine routine = motherRoutine();
+    given(routineRepository.findById(10L)).willReturn(Optional.of(routine));
+
+    assertThatThrownBy(
+            () ->
+                routineService.updateMotherRoutine(
+                    1L,
+                    10L,
+                    new RoutineUpdateRequestDto("수정", null, null, RoutineType.WEEKLY, 128, null)))
+        .isInstanceOf(CustomException.class)
+        .satisfies(
+            e ->
+                assertThat(((CustomException) e).getErrorCode())
+                    .isEqualTo(RoutineErrorCode.ROUTINE_INVALID_DATE));
+  }
+
+  @Test
+  void 엄마루틴_수정_존재하지않는_tagId_404() {
+    Routine routine = motherRoutine();
+    given(routineRepository.findById(10L)).willReturn(Optional.of(routine));
+    given(tagRepository.findById(999L)).willReturn(Optional.empty());
+
+    assertThatThrownBy(
+            () ->
+                routineService.updateMotherRoutine(
+                    1L,
+                    10L,
+                    new RoutineUpdateRequestDto("수정", null, null, RoutineType.DAILY, null, 999L)))
+        .isInstanceOf(CustomException.class)
+        .satisfies(
+            e ->
+                assertThat(((CustomException) e).getErrorCode())
+                    .isEqualTo(TagErrorCode.TAG_NOT_FOUND));
+  }
+
+  @Test
+  void 엄마루틴_수정_루틴없음_404() {
+    given(routineRepository.findById(999L)).willReturn(Optional.empty());
+
+    assertThatThrownBy(
+            () ->
+                routineService.updateMotherRoutine(
+                    1L,
+                    999L,
+                    new RoutineUpdateRequestDto("수정", null, null, RoutineType.DAILY, null, null)))
+        .isInstanceOf(CustomException.class)
+        .satisfies(
+            e ->
+                assertThat(((CustomException) e).getErrorCode())
+                    .isEqualTo(RoutineErrorCode.ROUTINE_NOT_FOUND));
   }
 
   @Test

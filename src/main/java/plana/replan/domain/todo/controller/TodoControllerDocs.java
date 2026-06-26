@@ -728,19 +728,22 @@ public interface TodoControllerDocs {
           | title | ❌ 선택 | string | 투두 제목. null이면 변경하지 않음. 빈 문자열 불가 | `"토익 단어 50개 외우기"` |
           | dueDate | ❌ 선택 | string | 마감 일시 (ISO 8601 형식). null이면 마감일 제거 | `"2025-12-31T23:59:59"` |
           | tagId | ❌ 선택 | integer | 태그 ID. null이면 태그 제거 | `3` |
-          | routineType | ❌ 선택 | string | 반복 유형 (`DAILY`/`WEEKLY`/`MONTHLY`). null이면 반복 없음 | `"WEEKLY"` |
-          | routineDate | ❌ 선택 | integer | 반복 날짜 (WEEKLY: 1-127 비트마스크, MONTHLY: 1-31). DAILY는 null | `5` |
+          | routineType | ❌ 선택 | string | 반복 유형 (`DAILY`/`WEEKLY`/`MONTHLY`). **이미 반복에 연결된 투두에는 무시됨** | `"WEEKLY"` |
+          | routineDate | ❌ 선택 | integer | 반복 날짜 (WEEKLY: 1-127 비트마스크, MONTHLY: 1-31). DAILY는 null. **이미 반복에 연결된 투두에는 무시됨** | `5` |
+          | routineTime | ❌ 선택 | string | 반복 마감 시각 (HH:mm:ss). **이미 반복에 연결된 투두에는 무시됨** | `"09:00:00"` |
 
           ❌ 선택 필드는 생략하거나 null로 전달해도 동일하게 처리됩니다.
 
           **반복(routine) 처리 규칙**
 
+          `routineType`/`routineDate`/`routineTime`은 **해당 투두에 아직 연결된 Routine이 없을 때만** 새 Routine을 생성해 연결합니다.
+          이미 Routine이 연결되어 있다면 이 필드들은 무시됩니다 — 반복 시리즈 전체를 수정하려면 `PUT /api/routines/{id}`를 사용하세요.
+
           | 기존 상태 | routineType 값 | 동작 |
           |----------|---------------|------|
-          | 반복 있음 | `null` | 기존 루틴 삭제, 투두를 일반 투두로 변경 |
-          | 반복 있음 | 유형 값 | 기존 루틴의 유형·날짜·제목·태그 업데이트 |
           | 반복 없음 | `null` | 변경 없음 |
           | 반복 없음 | 유형 값 | 새 루틴 생성 후 투두에 연결 |
+          | 반복 있음 | 어떤 값이든 | **무시됨** — 기존 루틴 유지 (루틴 수정/삭제는 `PUT /api/routines/{id}` 또는 `DELETE /api/routines/{id}` 사용) |
           """,
       security = @SecurityRequirement(name = "Bearer Authentication"))
   @ApiResponses({
