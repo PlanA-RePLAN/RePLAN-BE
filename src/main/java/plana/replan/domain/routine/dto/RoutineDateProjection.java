@@ -23,4 +23,6 @@ public interface RoutineDateProjection {
   String getTagColor();
 
   Long getGoalId();
+
+  Long getTodoId();
 }

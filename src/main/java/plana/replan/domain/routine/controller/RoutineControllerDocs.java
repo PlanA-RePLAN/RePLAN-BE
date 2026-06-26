@@ -10,6 +10,7 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -27,16 +28,16 @@ import plana.replan.global.common.ApiResult;
 public interface RoutineControllerDocs {
 
   @Operation(
-      summary = "날짜별 루틴 조회",
+      summary = "루틴 조회 (날짜 / 주간 / 월간)",
       description =
           """
-          특정 날짜에 해당하는 루틴 목록을 반환합니다.
+          `filter`와 `date`를 기준으로 해당 기간의 루틴 목록을 날짜별로 묶어 반환합니다.
 
-          - `DAILY` 루틴: 항상 포함
-          - `WEEKLY` 루틴: 해당 날짜의 요일이 `routineDate` 비트마스크에 포함된 경우 반환
-          - `MONTHLY` 루틴: 해당 날짜의 일(day)이 `routineDate`와 일치하는 경우 반환
+          - `DAILY` 루틴: 기간 내 모든 날짜에 포함
+          - `WEEKLY` 루틴: 해당 날짜의 요일이 `routineDate` 비트마스크에 포함된 날짜에만 포함
+          - `MONTHLY` 루틴: 해당 날짜의 일(day)이 `routineDate`와 일치하는 날짜에만 포함
 
-          미래 날짜도 조회 가능합니다. 오늘 이후 날짜는 아직 Todo가 생성되지 않았을 수 있으므로, 이 API로 루틴 정보를 확인하세요.
+          각 루틴에 해당 날짜의 Todo가 이미 생성되어 있으면 `todoId`가 포함되고, 아직 없으면 `null`입니다.
 
           ---
 
@@ -50,13 +51,21 @@ public interface RoutineControllerDocs {
 
           ### Query Parameters
 
-          | 파라미터명 | 필수 여부 | 타입 | 설명 | 예시 |
-          |-----------|-----------|------|------|------|
-          | date | ✅ 필수 | string | 조회할 날짜 (yyyy-MM-dd 형식) | `2025-06-20` |
+          | 파라미터명 | 필수 여부 | 타입 | 기본값 | 설명 | 예시 |
+          |-----------|-----------|------|--------|------|------|
+          | filter | ❌ 선택 | string | `day` | 조회 범위 (`day` / `week` / `month`) | `week` |
+          | date | ✅ 필수 | string | 없음 | 기준 시작 날짜 (yyyy-MM-dd 형식) | `2025-06-20` |
+
+          **filter 범위 기준**
+          - `day`: date 당일 1일치
+          - `week`: date 포함 7일 (date ~ date+6)
+          - `month`: date부터 정확히 1개월 전날까지 (28~31일, 시작 월에 따라 다름)
 
           ---
 
           ### Response Elements
+
+          응답 `data`는 날짜(yyyy-MM-dd)를 키로 하는 객체이며, 값은 해당 날짜의 루틴 배열입니다.
 
           | 필드명 | 타입 | 설명 |
           |--------|------|------|
@@ -70,6 +79,7 @@ public interface RoutineControllerDocs {
           | tagTitle | string | 태그 제목. 없으면 null |
           | tagColor | string | 태그 색상. 없으면 null |
           | goalId | integer | 목표 ID. 없으면 null |
+          | todoId | integer | 해당 날짜에 생성된 Todo ID. 아직 생성 안 됐으면 null |
           """,
       security = @SecurityRequirement(name = "Bearer Authentication"))
   @ApiResponses({
@@ -85,38 +95,57 @@ public interface RoutineControllerDocs {
                             {
                               "status": 200,
                               "success": true,
-                              "data": [
-                                {
-                                  "routineId": 1,
-                                  "title": "아침 스트레칭",
-                                  "dueDate": null,
-                                  "routineTime": "08:00:00",
-                                  "routineType": "DAILY",
-                                  "routineDate": null,
-                                  "tagId": null,
-                                  "tagTitle": null,
-                                  "tagColor": null,
-                                  "goalId": null
-                                },
-                                {
-                                  "routineId": 2,
-                                  "title": "영어 단어 외우기",
-                                  "dueDate": "2025-12-31T00:00:00",
-                                  "routineTime": "09:00:00",
-                                  "routineType": "WEEKLY",
-                                  "routineDate": 21,
-                                  "tagId": 3,
-                                  "tagTitle": "영어",
-                                  "tagColor": "BLUE",
-                                  "goalId": 2
-                                }
-                              ],
+                              "data": {
+                                "2025-06-20": [
+                                  {
+                                    "routineId": 1,
+                                    "title": "아침 스트레칭",
+                                    "dueDate": null,
+                                    "routineTime": "08:00:00",
+                                    "routineType": "DAILY",
+                                    "routineDate": null,
+                                    "tagId": null,
+                                    "tagTitle": null,
+                                    "tagColor": null,
+                                    "goalId": null,
+                                    "todoId": 42
+                                  }
+                                ],
+                                "2025-06-21": [
+                                  {
+                                    "routineId": 1,
+                                    "title": "아침 스트레칭",
+                                    "dueDate": null,
+                                    "routineTime": "08:00:00",
+                                    "routineType": "DAILY",
+                                    "routineDate": null,
+                                    "tagId": null,
+                                    "tagTitle": null,
+                                    "tagColor": null,
+                                    "goalId": null,
+                                    "todoId": null
+                                  },
+                                  {
+                                    "routineId": 2,
+                                    "title": "영어 단어 외우기",
+                                    "dueDate": "2025-12-31T00:00:00",
+                                    "routineTime": "09:00:00",
+                                    "routineType": "WEEKLY",
+                                    "routineDate": 21,
+                                    "tagId": 3,
+                                    "tagTitle": "영어",
+                                    "tagColor": "BLUE",
+                                    "goalId": 2,
+                                    "todoId": 43
+                                  }
+                                ]
+                              },
                               "error": null
                             }
                             """))),
     @ApiResponse(
         responseCode = "400",
-        description = "date 파라미터 누락 또는 형식 오류",
+        description = "date 파라미터 누락·형식 오류 또는 filter 값 오류",
         content =
             @Content(
                 examples =
@@ -192,9 +221,12 @@ public interface RoutineControllerDocs {
                             }
                             """)))
   })
-  ResponseEntity<ApiResult<List<RoutineResponseDto>>> getRoutinesByDate(
+  ResponseEntity<ApiResult<Map<String, List<RoutineResponseDto>>>> getRoutinesByFilter(
       @AuthenticationPrincipal Long userId,
-      @Parameter(description = "조회할 날짜 (yyyy-MM-dd)", example = "2025-06-20") @RequestParam
+      @Parameter(description = "조회 범위 (day / week / month)", example = "week")
+          @RequestParam(defaultValue = "day")
+          String filter,
+      @Parameter(description = "기준 시작 날짜 (yyyy-MM-dd)", example = "2025-06-20") @RequestParam
           LocalDate date);
 
   @Operation(
