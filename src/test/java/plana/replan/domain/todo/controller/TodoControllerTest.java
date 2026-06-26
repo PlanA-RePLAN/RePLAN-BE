@@ -548,6 +548,7 @@ class TodoControllerTest {
             "영어",
             "BLUE",
             "DAILY",
+            null,
             List.of(new SubTodoDto(10L, "챕터 1 읽기", false)));
 
     given(todoService.getTodoDetail(any(), any())).willReturn(response);
@@ -978,7 +979,7 @@ class TodoControllerTest {
   @DisplayName("투두 수정 성공: status=200, TodoDetailResponseDto 반환")
   void updateTodo_success() throws Exception {
     TodoDetailResponseDto response =
-        new TodoDetailResponseDto(1L, "수정된 제목", null, false, 3L, "영어", "BLUE", "WEEKLY", List.of());
+        new TodoDetailResponseDto(1L, "수정된 제목", null, false, 3L, "영어", "BLUE", "WEEKLY", 5, List.of());
 
     given(todoService.updateTodo(any(), any(), any())).willReturn(response);
 
@@ -1008,7 +1009,7 @@ class TodoControllerTest {
   @DisplayName("title 생략: status=200 (title은 선택 필드)")
   void updateTodo_omitTitle_ok() throws Exception {
     TodoDetailResponseDto response =
-        new TodoDetailResponseDto(1L, "기존 제목", null, false, null, null, null, null, List.of());
+        new TodoDetailResponseDto(1L, "기존 제목", null, false, null, null, null, null, null, List.of());
     given(todoService.updateTodo(any(), any(), any())).willReturn(response);
 
     mockMvc
