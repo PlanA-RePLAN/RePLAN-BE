@@ -768,6 +768,7 @@ public interface TodoControllerDocs {
                                 "tagTitle": "영어",
                                 "tagColor": "BLUE",
                                 "routineType": "WEEKLY",
+                                "routineDate": 5,
                                 "subTodos": []
                               },
                               "error": null
@@ -933,6 +934,7 @@ public interface TodoControllerDocs {
 
           **반환 필드**
           - `routineType`: 루틴에 연결된 투두인 경우 `DAILY` / `WEEKLY` / `MONTHLY`, 일반 투두는 `null`
+          - `routineDate`: WEEKLY이면 요일 비트마스크(1-127), MONTHLY이면 일자(1-31), DAILY 또는 루틴 없으면 `null`
           - `tagId`, `tagTitle`, `tagColor`: 태그가 없으면 모두 `null`
           - `subTodos`: 하위 투두 목록 (없으면 빈 배열)
           """,
@@ -959,6 +961,7 @@ public interface TodoControllerDocs {
                                 "tagTitle": "영어",
                                 "tagColor": "BLUE",
                                 "routineType": "DAILY",
+                                "routineDate": null,
                                 "subTodos": [
                                   {
                                     "todoId": 10,
