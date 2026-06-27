@@ -624,8 +624,7 @@ class AuthControllerTest {
         .perform(
             post("/api/auth/oauth/apple")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(
-                    "{\"identityToken\":\"id-token\",\"authorizationCode\":\"auth-code\"}"))
+                .content("{\"identityToken\":\"id-token\",\"authorizationCode\":\"auth-code\"}"))
         .andExpect(status().isOk());
   }
 

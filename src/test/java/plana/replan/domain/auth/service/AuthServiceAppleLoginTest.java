@@ -55,8 +55,7 @@ class AuthServiceAppleLoginTest {
     given(jwtUtil.generateAccessToken(anyString(), anyString(), any())).willReturn("access-token");
     given(jwtUtil.generateRefreshToken(anyString())).willReturn("refresh-token");
     given(jwtUtil.getRefreshExpiration()).willReturn(604800000L);
-    given(appleTokenVerifier.verify(anyString()))
-        .willReturn(new AppleIdTokenPayload(EMAIL, AUD));
+    given(appleTokenVerifier.verify(anyString())).willReturn(new AppleIdTokenPayload(EMAIL, AUD));
     given(appleAuthClient.exchangeRefreshToken(eq(AUD), anyString()))
         .willReturn("apple-refresh-token");
   }

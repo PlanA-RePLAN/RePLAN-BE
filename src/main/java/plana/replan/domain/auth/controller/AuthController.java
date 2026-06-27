@@ -840,8 +840,7 @@ public class AuthController {
                 examples =
                     @ExampleObject(
                         name = "APPLE_TOKEN_INVALID",
-                        value =
-                            "{\"success\":false,\"message\":\"Apple ID Token 검증에 실패했습니다.\"}"))),
+                        value = "{\"success\":false,\"message\":\"Apple ID Token 검증에 실패했습니다.\"}"))),
     @ApiResponse(
         responseCode = "409",
         description = "다른 방식으로 이미 가입된 이메일",
@@ -860,8 +859,7 @@ public class AuthController {
                 examples =
                     @ExampleObject(
                         name = "OAUTH_SERVER_UNAVAILABLE",
-                        value =
-                            "{\"success\":false,\"message\":\"OAuth 서버와 통신에 실패했습니다.\"}")))
+                        value = "{\"success\":false,\"message\":\"OAuth 서버와 통신에 실패했습니다.\"}")))
   })
   @PostMapping("/oauth/apple")
   public ResponseEntity<ApiResult<OAuthLoginResponseDto>> appleLogin(

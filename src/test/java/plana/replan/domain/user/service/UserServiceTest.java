@@ -2,8 +2,8 @@ package plana.replan.domain.user.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.BDDMockito.given;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
@@ -306,7 +306,9 @@ class UserServiceTest {
     userService.deleteAccount(userId);
 
     // 탈퇴는 진행됨 — 데이터 soft delete가 호출됐는지로 확인
-    verify(todoRepository).softDeleteAllByUserId(org.mockito.ArgumentMatchers.eq(userId), org.mockito.ArgumentMatchers.any());
+    verify(todoRepository)
+        .softDeleteAllByUserId(
+            org.mockito.ArgumentMatchers.eq(userId), org.mockito.ArgumentMatchers.any());
     verify(redisTemplate).delete("apple:refresh:" + userId);
   }
 
