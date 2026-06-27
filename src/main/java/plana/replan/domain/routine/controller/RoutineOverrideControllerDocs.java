@@ -21,7 +21,7 @@ import plana.replan.domain.routine.dto.RoutineOverridePinRequestDto;
 import plana.replan.domain.routine.dto.RoutineOverrideResponseDto;
 import plana.replan.global.common.ApiResult;
 
-@Tag(name = "RoutineOverride", description = "루틴 인스턴스 단건 수정 API. 반복 todo의 특정 날짜 인스턴스만 변경한다.")
+@Tag(name = "Routine", description = "루틴 인스턴스 단건 수정 API. 반복 todo의 특정 날짜 인스턴스만 변경한다.")
 public interface RoutineOverrideControllerDocs {
 
   @Operation(
