@@ -9,11 +9,13 @@ import java.time.Instant;
 import java.util.Base64;
 import java.util.Date;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import plana.replan.domain.user.exception.UserErrorCode;
 import plana.replan.global.config.AppleProperties;
 import plana.replan.global.exception.CustomException;
 
+@Slf4j
 @Component
 @RequiredArgsConstructor
 public class AppleClientSecretGenerator {
@@ -49,6 +51,7 @@ public class AppleClientSecretGenerator {
       byte[] der = Base64.getDecoder().decode(cleaned);
       return KeyFactory.getInstance("EC").generatePrivate(new PKCS8EncodedKeySpec(der));
     } catch (Exception e) {
+      log.error("애플 비공개키 로딩 실패", e);
       throw new CustomException(UserErrorCode.APPLE_TOKEN_INVALID);
     }
   }

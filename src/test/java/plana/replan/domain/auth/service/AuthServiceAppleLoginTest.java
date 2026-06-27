@@ -20,6 +20,7 @@ import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
+import org.springframework.test.util.ReflectionTestUtils;
 import plana.replan.domain.auth.apple.AppleAuthClient;
 import plana.replan.domain.auth.apple.AppleIdTokenPayload;
 import plana.replan.domain.auth.apple.AppleTokenVerifier;
@@ -74,6 +75,7 @@ class AuthServiceAppleLoginTest {
             .role(Role.ROLE_USER)
             .provider(Provider.APPLE)
             .build();
+    ReflectionTestUtils.setField(user, "id", 1L);
     given(userRepository.findByEmail(EMAIL)).willReturn(Optional.of(user));
     given(userRepository.findByEmailAndProvider(EMAIL, Provider.APPLE))
         .willReturn(Optional.of(user));

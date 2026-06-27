@@ -294,16 +294,16 @@ public class AuthService {
     String email = payload.email();
     String clientId = payload.aud();
 
-    // 2. authorizationCode 교환 → refresh token 확보(탈퇴 시 철회용)
-    String refreshToken =
-        appleAuthClient.exchangeRefreshToken(clientId, request.getAuthorizationCode());
-    String storedValue = clientId + "|" + refreshToken;
-
-    // 3. 같은 이메일로 이미 다른 방식으로 가입된 경우 차단
+    // 2. 같은 이메일로 이미 다른 방식으로 가입된 경우 차단 (Apple 네트워크 호출 전에 먼저 확인)
     Optional<User> existingUser = userRepository.findByEmail(email);
     if (existingUser.isPresent() && existingUser.get().getProvider() != Provider.APPLE) {
       throw new CustomException(UserErrorCode.OAUTH_PROVIDER_CONFLICT);
     }
+
+    // 3. authorizationCode 교환 → refresh token 확보(탈퇴 시 철회용)
+    String refreshToken =
+        appleAuthClient.exchangeRefreshToken(clientId, request.getAuthorizationCode());
+    String storedValue = clientId + "|" + refreshToken;
 
     // 4. 기존유저: JWT 발급 + refresh token을 userId 키에 저장 / 신규유저: tempToken + email 임시 키
     return userRepository
