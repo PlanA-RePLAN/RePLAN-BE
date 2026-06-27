@@ -45,4 +45,27 @@ class AppleClientSecretGeneratorTest {
     assertThat(claims.getSubject()).isEqualTo("com.replan.service");
     assertThat(claims.getAudience()).contains("https://appleid.apple.com");
   }
+
+  @Test
+  void 환경변수처럼_리터럴_백슬래시n이_섞인_키도_로딩된다() throws Exception {
+    KeyPairGenerator gen = KeyPairGenerator.getInstance("EC");
+    gen.initialize(new ECGenParameterSpec("secp256r1"));
+    KeyPair pair = gen.generateKeyPair();
+
+    // 환경변수로 주입될 때 흔한 형태: 한 줄에 리터럴 \n 이 포함됨
+    String oneLinePem =
+        "-----BEGIN PRIVATE KEY-----\\n"
+            + Base64.getEncoder().encodeToString(pair.getPrivate().getEncoded())
+            + "\\n-----END PRIVATE KEY-----";
+    AppleProperties props = new AppleProperties();
+    props.setTeamId("TEAM123456");
+    props.setKeyId("KEY1234567");
+    props.setPrivateKey(oneLinePem);
+
+    String secret = new AppleClientSecretGenerator(props).generate("com.replan.service");
+
+    Claims claims =
+        Jwts.parser().verifyWith(pair.getPublic()).build().parseSignedClaims(secret).getPayload();
+    assertThat(claims.getSubject()).isEqualTo("com.replan.service");
+  }
 }

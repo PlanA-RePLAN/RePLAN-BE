@@ -45,7 +45,8 @@ public class AppleClientSecretGenerator {
   private PrivateKey loadPrivateKey(String p8) {
     try {
       String cleaned =
-          p8.replace("-----BEGIN PRIVATE KEY-----", "")
+          p8.replace("\\n", "") // 환경변수로 주입 시 한 줄에 담긴 리터럴 \n 제거
+              .replace("-----BEGIN PRIVATE KEY-----", "")
               .replace("-----END PRIVATE KEY-----", "")
               .replaceAll("\\s", "");
       byte[] der = Base64.getDecoder().decode(cleaned);
