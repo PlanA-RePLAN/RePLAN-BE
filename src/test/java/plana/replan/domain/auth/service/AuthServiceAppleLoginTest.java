@@ -23,6 +23,7 @@ import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.test.util.ReflectionTestUtils;
 import plana.replan.domain.auth.apple.AppleAuthClient;
 import plana.replan.domain.auth.apple.AppleIdTokenPayload;
+import plana.replan.domain.auth.apple.AppleTokenResponse;
 import plana.replan.domain.auth.apple.AppleTokenVerifier;
 import plana.replan.domain.auth.dto.AppleLoginRequestDto;
 import plana.replan.domain.auth.dto.OAuthLoginResponseDto;
@@ -49,6 +50,7 @@ class AuthServiceAppleLoginTest {
 
   private static final String EMAIL = "apple-user@privaterelay.appleid.com";
   private static final String AUD = "com.replan.service";
+  private static final String SUB = "apple-sub-001";
 
   @BeforeEach
   void setUp() {
@@ -56,9 +58,10 @@ class AuthServiceAppleLoginTest {
     given(jwtUtil.generateAccessToken(anyString(), anyString(), any())).willReturn("access-token");
     given(jwtUtil.generateRefreshToken(anyString())).willReturn("refresh-token");
     given(jwtUtil.getRefreshExpiration()).willReturn(604800000L);
-    given(appleTokenVerifier.verify(anyString())).willReturn(new AppleIdTokenPayload(EMAIL, AUD));
+    given(appleTokenVerifier.verify(anyString()))
+        .willReturn(new AppleIdTokenPayload(EMAIL, AUD, SUB));
     given(appleAuthClient.exchangeRefreshToken(eq(AUD), anyString()))
-        .willReturn("apple-refresh-token");
+        .willReturn(new AppleTokenResponse("apple-refresh-token", SUB));
   }
 
   private AppleLoginRequestDto request() {
@@ -120,5 +123,17 @@ class AuthServiceAppleLoginTest {
     assertThatThrownBy(() -> authService.appleLogin(request()))
         .isInstanceOf(CustomException.class)
         .hasFieldOrPropertyWithValue("errorCode", UserErrorCode.OAUTH_PROVIDER_CONFLICT);
+  }
+
+  @Test
+  @DisplayName("신분증과 인가코드의 sub가 다르면(다른 사용자) 토큰 무효 예외")
+  void subMismatch() {
+    given(userRepository.findByEmail(EMAIL)).willReturn(Optional.empty());
+    given(appleAuthClient.exchangeRefreshToken(eq(AUD), anyString()))
+        .willReturn(new AppleTokenResponse("apple-refresh-token", "different-sub"));
+
+    assertThatThrownBy(() -> authService.appleLogin(request()))
+        .isInstanceOf(CustomException.class)
+        .hasFieldOrPropertyWithValue("errorCode", UserErrorCode.APPLE_TOKEN_INVALID);
   }
 }

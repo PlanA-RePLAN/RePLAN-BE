@@ -64,7 +64,14 @@ public class AppleTokenVerifier {
       if (email == null) {
         throw new CustomException(UserErrorCode.APPLE_TOKEN_INVALID);
       }
-      return new AppleIdTokenPayload(email, matchedAud);
+
+      // 애플이 이메일 인증을 완료한 계정인지 확인 (email_verified는 boolean 또는 "true" 문자열로 옴)
+      Object emailVerified = claims.get("email_verified");
+      if (!"true".equals(String.valueOf(emailVerified))) {
+        throw new CustomException(UserErrorCode.APPLE_TOKEN_INVALID);
+      }
+
+      return new AppleIdTokenPayload(email, matchedAud, claims.getSubject());
     } catch (CustomException e) {
       throw e;
     } catch (ResourceAccessException e) {

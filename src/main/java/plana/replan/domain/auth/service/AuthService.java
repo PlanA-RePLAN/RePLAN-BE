@@ -16,6 +16,7 @@ import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClient;
 import plana.replan.domain.auth.apple.AppleAuthClient;
 import plana.replan.domain.auth.apple.AppleIdTokenPayload;
+import plana.replan.domain.auth.apple.AppleTokenResponse;
 import plana.replan.domain.auth.apple.AppleTokenVerifier;
 import plana.replan.domain.auth.dto.AppleLoginRequestDto;
 import plana.replan.domain.auth.dto.GoogleLoginRequestDto;
@@ -301,9 +302,15 @@ public class AuthService {
     }
 
     // 3. authorizationCode 교환 → refresh token 확보(탈퇴 시 철회용)
-    String refreshToken =
+    AppleTokenResponse tokenResponse =
         appleAuthClient.exchangeRefreshToken(clientId, request.getAuthorizationCode());
-    String storedValue = clientId + "|" + refreshToken;
+
+    // 3-1. 신분증(identityToken)과 인가코드가 같은 사용자에게서 왔는지 확인(bind)
+    if (tokenResponse.sub() != null && !tokenResponse.sub().equals(payload.sub())) {
+      throw new CustomException(UserErrorCode.APPLE_TOKEN_INVALID);
+    }
+
+    String storedValue = clientId + "|" + tokenResponse.refreshToken();
 
     // 4. 기존유저: JWT 발급 + refresh token을 userId 키에 저장 / 신규유저: tempToken + email 임시 키
     return userRepository
