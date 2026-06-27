@@ -81,10 +81,7 @@ public class TodoService {
     }
 
     double newSortOrder =
-        todoRepository
-            .findMaxSortOrderByUser(user)
-            .map(max -> max + 10000.0)
-            .orElse(10000.0);
+        todoRepository.findMaxSortOrderByUser(user).map(max -> max + 10000.0).orElse(10000.0);
 
     Todo todo =
         Todo.builder()
