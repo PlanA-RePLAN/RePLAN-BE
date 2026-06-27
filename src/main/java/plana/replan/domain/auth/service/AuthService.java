@@ -14,6 +14,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClient;
+import plana.replan.domain.auth.apple.AppleAuthClient;
+import plana.replan.domain.auth.apple.AppleIdTokenPayload;
+import plana.replan.domain.auth.apple.AppleTokenVerifier;
+import plana.replan.domain.auth.dto.AppleLoginRequestDto;
 import plana.replan.domain.auth.dto.GoogleLoginRequestDto;
 import plana.replan.domain.auth.dto.KakaoLoginRequestDto;
 import plana.replan.domain.auth.dto.LoginRequestDto;
@@ -45,6 +49,8 @@ public class AuthService {
   private final RestClient restClient;
   private final S3Service s3Service;
   private final TagService tagService;
+  private final AppleTokenVerifier appleTokenVerifier;
+  private final AppleAuthClient appleAuthClient;
 
   @Transactional
   public void signUp(SignUpRequestDto request) {
@@ -269,6 +275,44 @@ public class AuthService {
                   tokens.getAccessToken(), tokens.getRefreshToken());
             })
         .orElseGet(() -> OAuthLoginResponseDto.newUser(issueTempToken(email, Provider.KAKAO)));
+  }
+
+  @Transactional
+  public OAuthLoginResponseDto appleLogin(AppleLoginRequestDto request) {
+
+    // 1. identityToken 검증 → 이메일, aud(=client_id) 추출
+    AppleIdTokenPayload payload = appleTokenVerifier.verify(request.getIdentityToken());
+    String email = payload.email();
+    String clientId = payload.aud();
+
+    // 2. authorizationCode 교환 → refresh token 확보(탈퇴 시 철회용)
+    String refreshToken =
+        appleAuthClient.exchangeRefreshToken(clientId, request.getAuthorizationCode());
+    String storedValue = clientId + "|" + refreshToken;
+
+    // 3. 같은 이메일로 이미 다른 방식으로 가입된 경우 차단
+    Optional<User> existingUser = userRepository.findByEmail(email);
+    if (existingUser.isPresent() && existingUser.get().getProvider() != Provider.APPLE) {
+      throw new CustomException(UserErrorCode.OAUTH_PROVIDER_CONFLICT);
+    }
+
+    // 4. 기존유저: JWT 발급 + refresh token을 userId 키에 저장 / 신규유저: tempToken + email 임시 키
+    return userRepository
+        .findByEmailAndProvider(email, Provider.APPLE)
+        .map(
+            user -> {
+              redisTemplate.opsForValue().set("apple:refresh:" + user.getId(), storedValue);
+              LoginResponseDto tokens = issueTokenPair(user);
+              return OAuthLoginResponseDto.existingUser(
+                  tokens.getAccessToken(), tokens.getRefreshToken());
+            })
+        .orElseGet(
+            () -> {
+              redisTemplate
+                  .opsForValue()
+                  .set("apple-refresh-temp:" + email, storedValue, 300, TimeUnit.SECONDS);
+              return OAuthLoginResponseDto.newUser(issueTempToken(email, Provider.APPLE));
+            });
   }
 
   @SuppressWarnings("unchecked")
