@@ -14,6 +14,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
+import plana.replan.domain.auth.dto.AppleLoginRequestDto;
 import plana.replan.domain.auth.dto.GoogleLoginRequestDto;
 import plana.replan.domain.auth.dto.KakaoLoginRequestDto;
 import plana.replan.domain.auth.dto.LoginRequestDto;
@@ -814,6 +815,58 @@ public class AuthController {
   public ResponseEntity<ApiResult<OAuthLoginResponseDto>> kakaoLogin(
       @Valid @RequestBody KakaoLoginRequestDto request) {
     return ResponseEntity.ok(ApiResult.ok(authService.kakaoLogin(request)));
+  }
+
+  @Operation(
+      summary = "애플 로그인",
+      description =
+          """
+          **호출 주체**: 비인증 사용자
+
+          **비즈니스 로직**
+          1. 프론트가 보낸 identityToken(JWT)을 애플 공개키로 검증 → 이메일 추출
+          2. authorizationCode를 애플 토큰 엔드포인트에서 refresh token으로 교환(탈퇴 시 철회용)
+          3. 같은 이메일이 다른 provider로 가입돼 있으면 409
+          4. 기존유저: accessToken/refreshToken 발급 (isNewUser: false)
+          5. 신규유저: tempToken(5분) 발급 (isNewUser: true) → 온보딩 후 `/api/auth/oauth/register` 호출 필요
+          """)
+  @ApiResponses({
+    @ApiResponse(responseCode = "200", description = "로그인 성공"),
+    @ApiResponse(
+        responseCode = "401",
+        description = "애플 토큰 검증 실패",
+        content =
+            @Content(
+                examples =
+                    @ExampleObject(
+                        name = "APPLE_TOKEN_INVALID",
+                        value =
+                            "{\"success\":false,\"message\":\"Apple ID Token 검증에 실패했습니다.\"}"))),
+    @ApiResponse(
+        responseCode = "409",
+        description = "다른 방식으로 이미 가입된 이메일",
+        content =
+            @Content(
+                examples =
+                    @ExampleObject(
+                        name = "OAUTH_PROVIDER_CONFLICT",
+                        value =
+                            "{\"success\":false,\"message\":\"해당 이메일은 이미 다른 방식으로 가입되어 있습니다.\"}"))),
+    @ApiResponse(
+        responseCode = "503",
+        description = "애플 서버 통신 실패",
+        content =
+            @Content(
+                examples =
+                    @ExampleObject(
+                        name = "OAUTH_SERVER_UNAVAILABLE",
+                        value =
+                            "{\"success\":false,\"message\":\"OAuth 서버와 통신에 실패했습니다.\"}")))
+  })
+  @PostMapping("/oauth/apple")
+  public ResponseEntity<ApiResult<OAuthLoginResponseDto>> appleLogin(
+      @Valid @RequestBody AppleLoginRequestDto request) {
+    return ResponseEntity.ok(ApiResult.ok(authService.appleLogin(request)));
   }
 
   @Operation(

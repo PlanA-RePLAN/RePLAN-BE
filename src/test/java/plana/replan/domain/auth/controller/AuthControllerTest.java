@@ -612,6 +612,34 @@ class AuthControllerTest {
         .andExpect(jsonPath("$.data").value(nullValue()));
   }
 
+  // ── Apple OAuth ──────────────────────────────────────────────────────────
+
+  @Test
+  @DisplayName("애플 로그인 - 정상 요청이면 200")
+  void appleLogin_success() throws Exception {
+    given(authService.appleLogin(any()))
+        .willReturn(OAuthLoginResponseDto.existingUser("access", "refresh"));
+
+    mockMvc
+        .perform(
+            post("/api/auth/oauth/apple")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    "{\"identityToken\":\"id-token\",\"authorizationCode\":\"auth-code\"}"))
+        .andExpect(status().isOk());
+  }
+
+  @Test
+  @DisplayName("애플 로그인 - identityToken 누락 시 400")
+  void appleLogin_missingToken() throws Exception {
+    mockMvc
+        .perform(
+            post("/api/auth/oauth/apple")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"authorizationCode\":\"auth-code\"}"))
+        .andExpect(status().isBadRequest());
+  }
+
   // ── Nickname Check ────────────────────────────────────────────────────────
 
   @Test
