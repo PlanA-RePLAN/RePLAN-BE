@@ -15,6 +15,7 @@ public enum UserErrorCode implements ErrorCode {
   GOOGLE_TOKEN_INVALID(401, "Google ID Token 검증에 실패했습니다."),
   NAVER_TOKEN_INVALID(401, "Naver Access Token 검증에 실패했습니다."),
   KAKAO_TOKEN_INVALID(401, "Kakao Access Token 검증에 실패했습니다."),
+  APPLE_TOKEN_INVALID(401, "Apple ID Token 검증에 실패했습니다."),
   INVALID_TEMP_TOKEN(401, "유효하지 않은 임시 토큰입니다."),
   DUPLICATE_NICKNAME(409, "이미 사용 중인 닉네임입니다."),
   INVALID_S3_KEY(400, "유효하지 않은 S3 키입니다."),
