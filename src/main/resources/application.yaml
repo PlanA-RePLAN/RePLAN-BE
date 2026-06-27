@@ -44,6 +44,12 @@ google:
   client-ids:
     web: ${GOOGLE_WEB_CLIENT_ID}
 
+apple:
+  client-ids: ${APPLE_CLIENT_IDS:}
+  team-id: ${APPLE_TEAM_ID:}
+  key-id: ${APPLE_KEY_ID:}
+  private-key: ${APPLE_PRIVATE_KEY:}
+
 cloud:
   aws:
     region:
