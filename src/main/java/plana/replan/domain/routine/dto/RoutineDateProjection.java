@@ -25,4 +25,16 @@ public interface RoutineDateProjection {
   Long getGoalId();
 
   Long getTodoId();
+
+  Double getOverrideSortOrder();
+
+  Double getDefaultSortOrder();
+
+  Boolean getIsSkipped();
+
+  Boolean getIsPinned();
+
+  Boolean getIsCompleted();
+
+  Boolean getHasOverride();
 }
