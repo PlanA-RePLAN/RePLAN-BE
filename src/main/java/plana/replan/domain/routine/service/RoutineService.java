@@ -10,6 +10,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import plana.replan.domain.goal.entity.Goal;
@@ -363,19 +364,25 @@ public class RoutineService {
     boolean isPinned = override != null && Boolean.TRUE.equals(override.getIsPinned());
     boolean isCompleted = override != null && Boolean.TRUE.equals(override.getIsCompleted());
 
-    Todo todo =
-        todoRepository.saveAndFlush(
-            Todo.builder()
-                .title(title)
-                .dueDate(dueDate)
-                .sortOrder(sortOrder)
-                .isPinned(isPinned)
-                .user(motherForInherit.getUser())
-                .tag(tag)
-                .goal(motherForInherit.getGoal())
-                .routine(routine)
-                .parent(parentTodo)
-                .build());
+    Todo todo;
+    try {
+      todo =
+          todoRepository.saveAndFlush(
+              Todo.builder()
+                  .title(title)
+                  .dueDate(dueDate)
+                  .sortOrder(sortOrder)
+                  .isPinned(isPinned)
+                  .user(motherForInherit.getUser())
+                  .tag(tag)
+                  .goal(motherForInherit.getGoal())
+                  .routine(routine)
+                  .parent(parentTodo)
+                  .build());
+    } catch (DataIntegrityViolationException e) {
+      // 스케줄러 중복 실행 등으로 unique(routine_id, due_date) 충돌 시 no-op
+      return null;
+    }
 
     if (isCompleted) {
       LocalDateTime completedTime =

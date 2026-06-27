@@ -1715,6 +1715,60 @@ class TodoServiceTest {
   }
 
   @Test
+  @DisplayName("reorderTodo - 루틴 있는 투두: ROUTINE_TODO_USE_ROUTINE_API 예외")
+  void reorderTodo_routineTodo_throws() {
+    User user = testUser();
+    Todo todo = testTodo(1L, user);
+    Routine routine = testRoutine(user, RoutineType.DAILY);
+    ReflectionTestUtils.setField(todo, "routine", routine);
+
+    given(todoRepository.findById(1L)).willReturn(Optional.of(todo));
+
+    assertThatThrownBy(() -> todoService.reorderTodo(1L, 1L, orderRequest(null, 2L)))
+        .isInstanceOf(CustomException.class)
+        .satisfies(
+            e ->
+                assertThat(((CustomException) e).getErrorCode())
+                    .isEqualTo(TodoErrorCode.ROUTINE_TODO_USE_ROUTINE_API));
+  }
+
+  @Test
+  @DisplayName("completeTodo - 루틴 있는 투두: ROUTINE_TODO_USE_ROUTINE_API 예외")
+  void completeTodo_routineTodo_throws() {
+    User user = testUser();
+    Todo todo = testTodo(1L, user);
+    Routine routine = testRoutine(user, RoutineType.DAILY);
+    ReflectionTestUtils.setField(todo, "routine", routine);
+
+    given(todoRepository.findById(1L)).willReturn(Optional.of(todo));
+
+    assertThatThrownBy(() -> todoService.completeTodo(1L, 1L, completeRequest(true)))
+        .isInstanceOf(CustomException.class)
+        .satisfies(
+            e ->
+                assertThat(((CustomException) e).getErrorCode())
+                    .isEqualTo(TodoErrorCode.ROUTINE_TODO_USE_ROUTINE_API));
+  }
+
+  @Test
+  @DisplayName("pinTodo - 루틴 있는 투두: ROUTINE_TODO_USE_ROUTINE_API 예외")
+  void pinTodo_routineTodo_throws() {
+    User user = testUser();
+    Todo todo = testTodo(1L, user);
+    Routine routine = testRoutine(user, RoutineType.DAILY);
+    ReflectionTestUtils.setField(todo, "routine", routine);
+
+    given(todoRepository.findById(1L)).willReturn(Optional.of(todo));
+
+    assertThatThrownBy(() -> todoService.pinTodo(1L, 1L, pinRequest(true)))
+        .isInstanceOf(CustomException.class)
+        .satisfies(
+            e ->
+                assertThat(((CustomException) e).getErrorCode())
+                    .isEqualTo(TodoErrorCode.ROUTINE_TODO_USE_ROUTINE_API));
+  }
+
+  @Test
   @DisplayName("updateTodo - 루틴 있음: dueDate 요청 시 ROUTINE_TODO_USE_ROUTINE_API 예외")
   void updateTodo_routineTodo_dueDateIgnored_throws() {
     User user = testUser();

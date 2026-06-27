@@ -6,6 +6,7 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import plana.replan.domain.routine.dto.RoutineOverrideCompleteRequestDto;
@@ -25,6 +26,7 @@ import plana.replan.domain.todo.entity.Todo;
 import plana.replan.domain.todo.repository.TodoRepository;
 import plana.replan.domain.user.exception.UserErrorCode;
 import plana.replan.global.exception.CustomException;
+import plana.replan.global.exception.GlobalErrorCode;
 
 @Service
 @RequiredArgsConstructor
@@ -40,6 +42,10 @@ public class RoutineOverrideService {
   public RoutineOverrideResponseDto updateContent(
       Long userId, Long routineId, LocalDate date, RoutineOverrideContentRequestDto request) {
     Routine routine = findOwnedMotherRoutine(userId, routineId);
+
+    if (request.title() != null && request.title().isBlank()) {
+      throw new CustomException(GlobalErrorCode.INVALID_INPUT);
+    }
 
     final Tag tag;
     if (request.tagId() != null) {
@@ -164,9 +170,16 @@ public class RoutineOverrideService {
     return routineOverrideRepository
         .findByRoutineAndOverrideDate(routine, date)
         .orElseGet(
-            () ->
-                routineOverrideRepository.save(
-                    RoutineOverride.builder().routine(routine).overrideDate(date).build()));
+            () -> {
+              try {
+                return routineOverrideRepository.saveAndFlush(
+                    RoutineOverride.builder().routine(routine).overrideDate(date).build());
+              } catch (DataIntegrityViolationException e) {
+                return routineOverrideRepository
+                    .findByRoutineAndOverrideDate(routine, date)
+                    .orElseThrow(() -> e);
+              }
+            });
   }
 
   private Optional<Todo> findExistingTodo(Routine routine, LocalDate date) {

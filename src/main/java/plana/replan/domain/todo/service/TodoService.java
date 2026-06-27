@@ -254,6 +254,10 @@ public class TodoService {
       throw new CustomException(TodoErrorCode.TODO_NOT_FOUND);
     }
 
+    if (todo.getRoutine() != null) {
+      throw new CustomException(TodoErrorCode.ROUTINE_TODO_USE_ROUTINE_API);
+    }
+
     Tag tag = null;
     if (request.getTagId() != null) {
       tag =
@@ -263,10 +267,6 @@ public class TodoService {
       if (!tag.getUser().getId().equals(userId)) {
         throw new CustomException(TagErrorCode.TAG_NOT_FOUND);
       }
-    }
-
-    if (todo.getRoutine() != null) {
-      throw new CustomException(TodoErrorCode.ROUTINE_TODO_USE_ROUTINE_API);
     }
 
     if (request.getTitle() != null && request.getTitle().isBlank()) {
