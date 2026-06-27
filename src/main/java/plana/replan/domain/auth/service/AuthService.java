@@ -305,8 +305,9 @@ public class AuthService {
     AppleTokenResponse tokenResponse =
         appleAuthClient.exchangeRefreshToken(clientId, request.getAuthorizationCode());
 
-    // 3-1. 신분증(identityToken)과 인가코드가 같은 사용자에게서 왔는지 확인(bind)
-    if (tokenResponse.sub() != null && !tokenResponse.sub().equals(payload.sub())) {
+    // 3-1. 신분증(identityToken)과 인가코드가 같은 사용자에게서 왔는지 확인(bind).
+    //      교환 응답의 sub가 없거나(파싱 불가) 신분증 sub와 다르면 거부한다.
+    if (tokenResponse.sub() == null || !tokenResponse.sub().equals(payload.sub())) {
       throw new CustomException(UserErrorCode.APPLE_TOKEN_INVALID);
     }
 

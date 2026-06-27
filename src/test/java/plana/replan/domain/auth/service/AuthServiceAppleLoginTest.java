@@ -136,4 +136,16 @@ class AuthServiceAppleLoginTest {
         .isInstanceOf(CustomException.class)
         .hasFieldOrPropertyWithValue("errorCode", UserErrorCode.APPLE_TOKEN_INVALID);
   }
+
+  @Test
+  @DisplayName("교환 응답에 sub가 없으면(검증 불가) 토큰 무효 예외")
+  void subMissing() {
+    given(userRepository.findByEmail(EMAIL)).willReturn(Optional.empty());
+    given(appleAuthClient.exchangeRefreshToken(eq(AUD), anyString()))
+        .willReturn(new AppleTokenResponse("apple-refresh-token", null));
+
+    assertThatThrownBy(() -> authService.appleLogin(request()))
+        .isInstanceOf(CustomException.class)
+        .hasFieldOrPropertyWithValue("errorCode", UserErrorCode.APPLE_TOKEN_INVALID);
+  }
 }
