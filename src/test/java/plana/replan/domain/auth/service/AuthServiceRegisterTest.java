@@ -161,6 +161,30 @@ class AuthServiceRegisterTest {
   }
 
   @Test
+  @DisplayName("애플 가입인데 임시 refresh token이 없으면(만료 등) INVALID_TEMP_TOKEN으로 가입 실패")
+  void register_apple_missingRefresh_throws() {
+    String tempToken = "temp-uuid";
+    String email = "apple-user@privaterelay.appleid.com";
+    given(valueOperations.get("oauth-temp:" + tempToken)).willReturn(email + ":APPLE");
+    given(valueOperations.get("apple-refresh-temp:" + email)).willReturn(null);
+    given(userRepository.existsByNickname(anyString())).willReturn(false);
+    User saved =
+        User.builder()
+            .email(email)
+            .nickname("nick")
+            .role(Role.ROLE_USER)
+            .provider(Provider.APPLE)
+            .build();
+    ReflectionTestUtils.setField(saved, "id", 1L);
+    given(userRepository.save(any(User.class))).willReturn(saved);
+
+    assertThatThrownBy(
+            () -> authService.register(new OAuthRegisterRequestDto("nick", null), tempToken))
+        .isInstanceOf(CustomException.class)
+        .hasFieldOrPropertyWithValue("errorCode", UserErrorCode.INVALID_TEMP_TOKEN);
+  }
+
+  @Test
   @DisplayName("닉네임 중복: DUPLICATE_NICKNAME 예외")
   void register_duplicateNickname_throws() {
     String tempToken = "valid-temp-token";

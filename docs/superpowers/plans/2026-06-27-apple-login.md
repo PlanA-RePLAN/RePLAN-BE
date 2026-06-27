@@ -528,6 +528,11 @@ git commit -m "Feat: 애플 로그인 요청 DTO 추가"
 
 ### Task 6: AuthService.appleLogin
 
+> **보안 보강(실제 구현 반영, 코드리뷰 후 추가):** appleLogin은 ① 검증된 identityToken의 `sub`와
+> authorizationCode 교환 응답 id_token의 `sub`가 일치하는지 확인하고(불일치/없음 → `APPLE_TOKEN_INVALID`,
+> 거부 시 발급된 애플 refresh token은 best-effort revoke), ② provider 충돌 검사를 애플 네트워크 호출
+> **전에** 수행한다. identityToken의 `email_verified`(true) 검사는 AppleTokenVerifier(Task 3)에서 한다.
+
 **Files:**
 - Modify: `src/main/java/plana/replan/domain/auth/service/AuthService.java` (필드 추가 + appleLogin 메서드 추가)
 - Test: `src/test/java/plana/replan/domain/auth/service/AuthServiceAppleLoginTest.java`

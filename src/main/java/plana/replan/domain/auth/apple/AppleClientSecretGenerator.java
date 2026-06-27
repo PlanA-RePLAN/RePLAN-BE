@@ -11,9 +11,9 @@ import java.util.Date;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
-import plana.replan.domain.user.exception.UserErrorCode;
 import plana.replan.global.config.AppleProperties;
 import plana.replan.global.exception.CustomException;
+import plana.replan.global.exception.GlobalErrorCode;
 
 @Slf4j
 @Component
@@ -52,8 +52,9 @@ public class AppleClientSecretGenerator {
       byte[] der = Base64.getDecoder().decode(cleaned);
       return KeyFactory.getInstance("EC").generatePrivate(new PKCS8EncodedKeySpec(der));
     } catch (Exception e) {
-      log.error("애플 비공개키 로딩 실패", e);
-      throw new CustomException(UserErrorCode.APPLE_TOKEN_INVALID);
+      // 사용자 토큰 오류가 아니라 서버의 애플 비공개키 설정/파싱 문제이므로 500으로 처리한다.
+      log.error("애플 비공개키 로딩 실패 - 서버 설정을 확인하세요", e);
+      throw new CustomException(GlobalErrorCode.INTERNAL_SERVER_ERROR);
     }
   }
 }
