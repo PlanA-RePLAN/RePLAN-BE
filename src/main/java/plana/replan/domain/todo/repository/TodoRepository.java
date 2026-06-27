@@ -92,6 +92,11 @@ public interface TodoRepository extends JpaRepository<Todo, Long> {
       @Param("end") LocalDateTime end);
 
   @Query(
+      "SELECT MAX(t.sortOrder) FROM Todo t WHERE t.user = :user AND t.parent IS NULL"
+          + " AND t.deletedAt IS NULL")
+  Optional<Double> findMaxSortOrderByUser(@Param("user") User user);
+
+  @Query(
       "SELECT t FROM Todo t WHERE t.user = :user AND t.parent IS NULL AND t.replan IS NOT NULL"
           + " AND ((t.dueDate >= :start AND t.dueDate < :end)"
           + " OR (t.dueDate IS NULL AND t.completedTime >= :start AND t.completedTime < :end))")

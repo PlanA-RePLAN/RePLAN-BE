@@ -135,6 +135,7 @@ class TodoServiceTest {
   @DisplayName("성공 (tagId 없음): 올바른 DTO 반환, isPinned=false, tagId=null, tagRepository 미호출")
   void createTodo_success_withoutTag() {
     given(userRepository.findById(1L)).willReturn(Optional.of(testUser()));
+    given(todoRepository.findMaxSortOrderByUser(any())).willReturn(Optional.empty());
     given(todoRepository.save(any(Todo.class))).willAnswer(inv -> inv.getArgument(0));
 
     TodoResponseDto result = todoService.createTodo(1L, request("제목", null, null));
@@ -156,6 +157,7 @@ class TodoServiceTest {
     LocalDateTime dueDate = LocalDateTime.of(2026, 5, 10, 12, 30);
     given(userRepository.findById(1L)).willReturn(Optional.of(testUser()));
     given(tagRepository.findById(5L)).willReturn(Optional.of(testTag(5L)));
+    given(todoRepository.findMaxSortOrderByUser(any())).willReturn(Optional.empty());
     given(todoRepository.save(any(Todo.class))).willAnswer(inv -> inv.getArgument(0));
 
     TodoResponseDto result = todoService.createTodo(1L, request("제목", dueDate, 5L));
@@ -163,6 +165,34 @@ class TodoServiceTest {
     assertThat(result.getTitle()).isEqualTo("제목");
     assertThat(result.getDueDate()).isEqualTo(dueDate);
     assertThat(result.getTagId()).isEqualTo(5L);
+  }
+
+  @Test
+  @DisplayName("첫 번째 todo 생성: sortOrder = 10000.0 (기본값)")
+  void createTodo_firstTodo_sortOrderIsDefault() {
+    given(userRepository.findById(1L)).willReturn(Optional.of(testUser()));
+    given(todoRepository.findMaxSortOrderByUser(any())).willReturn(Optional.empty());
+    given(todoRepository.save(any(Todo.class))).willAnswer(inv -> inv.getArgument(0));
+
+    todoService.createTodo(1L, request("첫 번째 할일", null, null));
+
+    ArgumentCaptor<Todo> captor = ArgumentCaptor.forClass(Todo.class);
+    verify(todoRepository).save(captor.capture());
+    assertThat(captor.getValue().getSortOrder()).isEqualTo(10000.0);
+  }
+
+  @Test
+  @DisplayName("기존 todo가 있을 때 새 todo 생성: sortOrder = maxSortOrder + 10000")
+  void createTodo_withExistingTodos_sortOrderIsMaxPlusTenThousand() {
+    given(userRepository.findById(1L)).willReturn(Optional.of(testUser()));
+    given(todoRepository.findMaxSortOrderByUser(any())).willReturn(Optional.of(25000.0));
+    given(todoRepository.save(any(Todo.class))).willAnswer(inv -> inv.getArgument(0));
+
+    todoService.createTodo(1L, request("새 할일", null, null));
+
+    ArgumentCaptor<Todo> captor = ArgumentCaptor.forClass(Todo.class);
+    verify(todoRepository).save(captor.capture());
+    assertThat(captor.getValue().getSortOrder()).isEqualTo(35000.0);
   }
 
   private SubTodoCreateRequestDto subRequest(String title) {
