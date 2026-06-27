@@ -80,11 +80,15 @@ public class TodoService {
               .orElseThrow(() -> new CustomException(GoalErrorCode.GOAL_NOT_FOUND));
     }
 
+    double newSortOrder =
+        todoRepository.findMaxSortOrderByUser(user).map(max -> max + 10000.0).orElse(10000.0);
+
     Todo todo =
         Todo.builder()
             .title(request.getTitle())
             .dueDate(request.getDueDate())
             .isPinned(false)
+            .sortOrder(newSortOrder)
             .user(user)
             .tag(tag)
             .goal(goal)
