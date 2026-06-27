@@ -171,6 +171,15 @@ public class AuthService {
                 .build());
     tagService.createDefaultTags(user);
 
+    // 5-1. 애플이면 임시 저장된 refresh token을 userId 키로 옮긴다
+    if (provider == Provider.APPLE) {
+      String appleRefresh = redisTemplate.opsForValue().get("apple-refresh-temp:" + email);
+      if (appleRefresh != null) {
+        redisTemplate.opsForValue().set("apple:refresh:" + user.getId(), appleRefresh);
+        redisTemplate.delete("apple-refresh-temp:" + email);
+      }
+    }
+
     // 6. tempToken 삭제
     redisTemplate.delete("oauth-temp:" + tempToken);
 
