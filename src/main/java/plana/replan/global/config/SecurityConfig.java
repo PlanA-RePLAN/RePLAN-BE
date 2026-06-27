@@ -53,6 +53,7 @@ public class SecurityConfig {
                         "/v3/api-docs",
                         "/swagger-ui.html",
                         "/actuator/health",
+                        "/internal/**", // 로컬/dev 전용 내부 테스트 엔드포인트
                         "/api/auth/**", // 로그인, 회원가입은 인증 없이 허용
                         "/api/s3/**", // tempToken 검증은 서비스 레이어에서 수동으로
                         "/fcm-test.html", // 로컬 FCM 토큰 테스트용 정적 파일

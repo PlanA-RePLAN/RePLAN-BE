@@ -12,6 +12,7 @@ import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
@@ -31,6 +32,7 @@ import plana.replan.domain.routine.dto.RoutineUpdateRequestDto;
 import plana.replan.domain.routine.entity.Routine;
 import plana.replan.domain.routine.entity.RoutineType;
 import plana.replan.domain.routine.exception.RoutineErrorCode;
+import plana.replan.domain.routine.repository.RoutineOverrideRepository;
 import plana.replan.domain.routine.repository.RoutineRepository;
 import plana.replan.domain.tag.entity.Tag;
 import plana.replan.domain.tag.exception.TagErrorCode;
@@ -53,6 +55,7 @@ class RoutineServiceTest {
 
   @Mock private Clock clock;
   @Mock private RoutineRepository routineRepository;
+  @Mock private RoutineOverrideRepository routineOverrideRepository;
   @Mock private UserRepository userRepository;
   @Mock private TagRepository tagRepository;
   @Mock private GoalRepository goalRepository;
@@ -65,6 +68,9 @@ class RoutineServiceTest {
     // 예외 발생 테스트에서는 clock이 호출되지 않으므로 lenient 처리
     lenient().when(clock.instant()).thenReturn(TEST_DATE.atStartOfDay(KST).toInstant());
     lenient().when(clock.getZone()).thenReturn(KST);
+    lenient()
+        .when(routineOverrideRepository.findByRoutineIdInAndOverrideDate(any(), any()))
+        .thenReturn(Collections.emptyList());
   }
 
   private User testUser() {

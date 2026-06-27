@@ -10,7 +10,6 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import plana.replan.domain.goal.entity.Goal;
@@ -23,8 +22,10 @@ import plana.replan.domain.routine.dto.SubRoutineCreateRequestDto;
 import plana.replan.domain.routine.dto.SubRoutineResponseDto;
 import plana.replan.domain.routine.dto.SubRoutineUpdateRequestDto;
 import plana.replan.domain.routine.entity.Routine;
+import plana.replan.domain.routine.entity.RoutineOverride;
 import plana.replan.domain.routine.entity.RoutineType;
 import plana.replan.domain.routine.exception.RoutineErrorCode;
+import plana.replan.domain.routine.repository.RoutineOverrideRepository;
 import plana.replan.domain.routine.repository.RoutineRepository;
 import plana.replan.domain.tag.entity.Tag;
 import plana.replan.domain.tag.exception.TagErrorCode;
@@ -43,6 +44,7 @@ public class RoutineService {
 
   private final Clock clock;
   private final RoutineRepository routineRepository;
+  private final RoutineOverrideRepository routineOverrideRepository;
   private final UserRepository userRepository;
   private final TagRepository tagRepository;
   private final GoalRepository goalRepository;
@@ -152,6 +154,20 @@ public class RoutineService {
         routineDate,
         request.routineTime(),
         tag);
+
+    LocalDate today = LocalDate.now(clock);
+    routineOverrideRepository.deleteByRoutineAndOverrideDateGreaterThanEqual(routine, today);
+
+    // 오늘 이미 배치로 생성된 todo가 있으면 새 루틴 값으로 즉시 반영
+    todoRepository
+        .findMotherTodoByRoutineAndDate(routine, today.atStartOfDay(), today.atTime(LocalTime.MAX))
+        .ifPresent(
+            motherTodo -> {
+              motherTodo.updateTitle(routine.getTitle());
+              motherTodo.updateTag(routine.getTag());
+              motherTodo.getChildren().forEach(child -> child.updateTag(routine.getTag()));
+            });
+
     return RoutineResponseDto.from(routine);
   }
 
@@ -255,9 +271,22 @@ public class RoutineService {
   @Transactional
   public void generateDailyTodos() {
     LocalDate today = LocalDate.now(clock);
-    routineRepository.findAllActiveMotherRoutines().stream()
-        .filter(r -> isOccurrenceDay(r, today))
-        .forEach(this::createTodoTreeFromMother);
+    List<Routine> routines =
+        routineRepository.findAllActiveMotherRoutines().stream()
+            .filter(r -> isOccurrenceDay(r, today))
+            .collect(Collectors.toList());
+
+    List<Long> routineIds = routines.stream().map(Routine::getId).collect(Collectors.toList());
+    Map<Long, RoutineOverride> overrideMap =
+        routineOverrideRepository.findByRoutineIdInAndOverrideDate(routineIds, today).stream()
+            .collect(Collectors.toMap(o -> o.getRoutine().getId(), o -> o));
+
+    routines.forEach(
+        r -> {
+          RoutineOverride override = overrideMap.get(r.getId());
+          if (override != null && override.isSkipped()) return;
+          createTodoTreeFromMother(r, override);
+        });
   }
 
   private boolean isOccurrenceDay(Routine routine, LocalDate today) {
@@ -274,6 +303,10 @@ public class RoutineService {
    * 상속한다.
    */
   public void createTodoTreeFromMother(Routine motherRoutine) {
+    createTodoTreeFromMother(motherRoutine, null);
+  }
+
+  public void createTodoTreeFromMother(Routine motherRoutine, RoutineOverride override) {
     if (motherRoutine.isChild()) {
       throw new IllegalStateException("createTodoTreeFromMother는 엄마 루틴에만 호출 가능합니다.");
     }
@@ -292,11 +325,11 @@ public class RoutineService {
       return;
     }
 
-    Todo motherTodo = saveRoutineTodo(motherRoutine, dueDate, null);
+    Todo motherTodo = saveRoutineTodo(motherRoutine, dueDate, null, override);
     if (motherTodo == null) {
       return;
     }
-    motherRoutine.getChildren().forEach(child -> saveRoutineTodo(child, dueDate, motherTodo));
+    motherRoutine.getChildren().forEach(child -> saveRoutineTodo(child, dueDate, motherTodo, null));
   }
 
   /** 기존 엄마 Todo에 하위 Todo 1개를 매단다. 하위 루틴 추가 API에서 호출. dueDate/tag/goal/user는 엄마 Todo에서 상속한다. */
@@ -304,34 +337,55 @@ public class RoutineService {
     if (!childRoutine.isChild()) {
       throw new IllegalStateException("attachChildTodoUnder는 하위 루틴에만 호출 가능합니다.");
     }
-    saveRoutineTodo(childRoutine, motherTodo.getDueDate(), motherTodo);
+    saveRoutineTodo(childRoutine, motherTodo.getDueDate(), motherTodo, null);
   }
 
-  private Todo saveRoutineTodo(Routine routine, LocalDateTime dueDate, Todo parentTodo) {
+  private Todo saveRoutineTodo(
+      Routine routine, LocalDateTime dueDate, Todo parentTodo, RoutineOverride override) {
     if (todoRepository.existsByRoutineAndDueDate(routine, dueDate)) {
       return null;
     }
-    try {
-      Routine motherForInherit = routine.isChild() ? routine.getParent() : routine;
-      return todoRepository.saveAndFlush(
-          Todo.builder()
-              .title(routine.getTitle())
-              .dueDate(dueDate)
-              .isPinned(false)
-              .user(motherForInherit.getUser())
-              .tag(motherForInherit.getTag())
-              .goal(motherForInherit.getGoal())
-              .routine(routine)
-              .parent(parentTodo)
-              .build());
-    } catch (DataIntegrityViolationException e) {
-      String msg = e.getMostSpecificCause().getMessage();
-      if (msg == null || !msg.contains("uq_todo_routine_duedate")) {
-        throw e;
-      }
-      // uq_todo_routine_duedate 충돌 — 동시 INSERT로 이미 생성된 것으로 간주
-      return null;
+
+    Routine motherForInherit = routine.isChild() ? routine.getParent() : routine;
+
+    String title =
+        (override != null && override.getTitle() != null)
+            ? override.getTitle()
+            : routine.getTitle();
+    Tag tag =
+        (override != null && override.getTag() != null)
+            ? override.getTag()
+            : motherForInherit.getTag();
+    double sortOrder =
+        (override != null && override.getSortOrder() != null)
+            ? override.getSortOrder()
+            : motherForInherit.getDefaultSortOrder();
+    boolean isPinned = override != null && Boolean.TRUE.equals(override.getIsPinned());
+    boolean isCompleted = override != null && Boolean.TRUE.equals(override.getIsCompleted());
+
+    Todo todo =
+        todoRepository.saveAndFlush(
+            Todo.builder()
+                .title(title)
+                .dueDate(dueDate)
+                .sortOrder(sortOrder)
+                .isPinned(isPinned)
+                .user(motherForInherit.getUser())
+                .tag(tag)
+                .goal(motherForInherit.getGoal())
+                .routine(routine)
+                .parent(parentTodo)
+                .build());
+
+    if (isCompleted) {
+      LocalDateTime completedTime =
+          override.getCompletedTime() != null
+              ? override.getCompletedTime()
+              : LocalDateTime.now(clock);
+      todo.updateCompleted(true, completedTime);
     }
+
+    return todo;
   }
 
   private LocalDate nextOccurrence(Routine routine, LocalDate today) {

@@ -265,6 +265,10 @@ public class TodoService {
       }
     }
 
+    if (todo.getRoutine() != null) {
+      throw new CustomException(TodoErrorCode.ROUTINE_TODO_USE_ROUTINE_API);
+    }
+
     if (request.getTitle() != null && request.getTitle().isBlank()) {
       throw new CustomException(GlobalErrorCode.INVALID_INPUT);
     }
@@ -347,6 +351,10 @@ public class TodoService {
       throw new CustomException(TodoErrorCode.TODO_NOT_FOUND);
     }
 
+    if (todo.getRoutine() != null) {
+      throw new CustomException(TodoErrorCode.ROUTINE_TODO_USE_ROUTINE_API);
+    }
+
     if (request.getPrevTodoId() == null && request.getNextTodoId() == null) {
       throw new CustomException(GlobalErrorCode.INVALID_INPUT);
     }
@@ -398,6 +406,10 @@ public class TodoService {
       throw new CustomException(TodoErrorCode.TODO_NOT_FOUND);
     }
 
+    if (todo.getRoutine() != null) {
+      throw new CustomException(TodoErrorCode.ROUTINE_TODO_USE_ROUTINE_API);
+    }
+
     todo.updateCompleted(request.getIsCompleted(), LocalDateTime.now(clock));
     return TodoListResponseDto.from(todo, clock);
   }
@@ -420,6 +432,10 @@ public class TodoService {
       throw new CustomException(TodoErrorCode.TODO_NOT_FOUND);
     }
 
+    if (todo.getRoutine() != null) {
+      throw new CustomException(TodoErrorCode.ROUTINE_TODO_USE_ROUTINE_API);
+    }
+
     todo.updatePinned(request.getIsPinned());
     return TodoListResponseDto.from(todo, clock);
   }
@@ -440,6 +456,10 @@ public class TodoService {
 
     if (todo.getParent() != null) {
       throw new CustomException(TodoErrorCode.TODO_NOT_FOUND);
+    }
+
+    if (todo.getRoutine() != null) {
+      throw new CustomException(TodoErrorCode.ROUTINE_TODO_USE_ROUTINE_API);
     }
 
     todo.getChildren().forEach(child -> child.softDelete());
