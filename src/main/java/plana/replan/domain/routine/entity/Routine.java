@@ -67,8 +67,15 @@ public class Routine extends BaseTimeEntity {
   @JoinColumn(name = "replan_id")
   private Replan replan;
 
+  @Column(name = "default_sort_order", nullable = false)
+  private double defaultSortOrder = 10000.0;
+
   @Column(name = "is_active", nullable = false)
   private boolean isActive = true;
+
+  public void updateDefaultSortOrder(double defaultSortOrder) {
+    this.defaultSortOrder = defaultSortOrder;
+  }
 
   public void deactivate() {
     this.isActive = false;

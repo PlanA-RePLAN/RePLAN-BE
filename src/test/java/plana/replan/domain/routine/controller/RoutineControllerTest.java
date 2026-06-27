@@ -71,7 +71,22 @@ class RoutineControllerTest {
     given(routineService.createRoutine(any(), any()))
         .willReturn(
             new RoutineResponseDto(
-                1L, "아침 스트레칭", null, null, RoutineType.DAILY, null, null, null, null, null, null));
+                1L,
+                "아침 스트레칭",
+                null,
+                null,
+                RoutineType.DAILY,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                10000.0,
+                false,
+                false,
+                false,
+                false));
 
     mockMvc
         .perform(
@@ -100,7 +115,22 @@ class RoutineControllerTest {
     given(routineService.createRoutine(any(), any()))
         .willReturn(
             new RoutineResponseDto(
-                2L, "영어 단어", dueDate, null, RoutineType.WEEKLY, 21, 5L, null, null, 2L, null));
+                2L,
+                "영어 단어",
+                dueDate,
+                null,
+                RoutineType.WEEKLY,
+                21,
+                5L,
+                null,
+                null,
+                2L,
+                null,
+                10000.0,
+                false,
+                false,
+                false,
+                false));
 
     mockMvc
         .perform(
@@ -134,7 +164,22 @@ class RoutineControllerTest {
     given(routineService.createRoutine(any(), any()))
         .willReturn(
             new RoutineResponseDto(
-                3L, "월간 회고", null, null, RoutineType.MONTHLY, 15, null, null, null, null, null));
+                3L,
+                "월간 회고",
+                null,
+                null,
+                RoutineType.MONTHLY,
+                15,
+                null,
+                null,
+                null,
+                null,
+                null,
+                10000.0,
+                false,
+                false,
+                false,
+                false));
 
     mockMvc
         .perform(
@@ -323,7 +368,22 @@ class RoutineControllerTest {
     given(routineService.updateMotherRoutine(any(), any(), any()))
         .willReturn(
             new RoutineResponseDto(
-                1L, "수정된 루틴", dueDate, null, RoutineType.WEEKLY, 21, 5L, "영어", "BLUE", null, null));
+                1L,
+                "수정된 루틴",
+                dueDate,
+                null,
+                RoutineType.WEEKLY,
+                21,
+                5L,
+                "영어",
+                "BLUE",
+                null,
+                null,
+                10000.0,
+                false,
+                false,
+                false,
+                false));
 
     mockMvc
         .perform(

@@ -12,6 +12,7 @@ import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
@@ -29,8 +30,10 @@ import plana.replan.domain.routine.dto.RoutineCreateRequestDto;
 import plana.replan.domain.routine.dto.RoutineResponseDto;
 import plana.replan.domain.routine.dto.RoutineUpdateRequestDto;
 import plana.replan.domain.routine.entity.Routine;
+import plana.replan.domain.routine.entity.RoutineOverride;
 import plana.replan.domain.routine.entity.RoutineType;
 import plana.replan.domain.routine.exception.RoutineErrorCode;
+import plana.replan.domain.routine.repository.RoutineOverrideRepository;
 import plana.replan.domain.routine.repository.RoutineRepository;
 import plana.replan.domain.tag.entity.Tag;
 import plana.replan.domain.tag.exception.TagErrorCode;
@@ -53,6 +56,7 @@ class RoutineServiceTest {
 
   @Mock private Clock clock;
   @Mock private RoutineRepository routineRepository;
+  @Mock private RoutineOverrideRepository routineOverrideRepository;
   @Mock private UserRepository userRepository;
   @Mock private TagRepository tagRepository;
   @Mock private GoalRepository goalRepository;
@@ -65,6 +69,9 @@ class RoutineServiceTest {
     // 예외 발생 테스트에서는 clock이 호출되지 않으므로 lenient 처리
     lenient().when(clock.instant()).thenReturn(TEST_DATE.atStartOfDay(KST).toInstant());
     lenient().when(clock.getZone()).thenReturn(KST);
+    lenient()
+        .when(routineOverrideRepository.findByRoutineIdInAndOverrideDate(any(), any()))
+        .thenReturn(Collections.emptyList());
   }
 
   private User testUser() {
@@ -737,5 +744,76 @@ class RoutineServiceTest {
             e ->
                 assertThat(((CustomException) e).getErrorCode())
                     .isEqualTo(RoutineErrorCode.ROUTINE_NOT_FOUND));
+  }
+
+  // ========== generateDailyTodos with override ==========
+
+  @Test
+  void generateDailyTodos_override_제목_태그_반영됨() {
+    Tag tag = testTag(5L);
+    Routine routine = buildRoutine(RoutineType.DAILY, null);
+
+    RoutineOverride override =
+        RoutineOverride.builder().routine(routine).overrideDate(TEST_DATE).build();
+    override.updateContent("오버라이드 제목", tag);
+
+    given(routineRepository.findAllActiveMotherRoutines()).willReturn(List.of(routine));
+    given(routineOverrideRepository.findByRoutineIdInAndOverrideDate(any(), any()))
+        .willReturn(List.of(override));
+
+    routineService.generateDailyTodos();
+
+    ArgumentCaptor<Todo> captor = ArgumentCaptor.forClass(Todo.class);
+    verify(todoRepository).saveAndFlush(captor.capture());
+    assertThat(captor.getValue().getTitle()).isEqualTo("오버라이드 제목");
+    assertThat(captor.getValue().getTag()).isEqualTo(tag);
+  }
+
+  @Test
+  void generateDailyTodos_override_skip_이면_생성_안됨() {
+    Routine routine = buildRoutine(RoutineType.DAILY, null);
+
+    RoutineOverride override =
+        RoutineOverride.builder().routine(routine).overrideDate(TEST_DATE).build();
+    override.skip();
+
+    given(routineRepository.findAllActiveMotherRoutines()).willReturn(List.of(routine));
+    given(routineOverrideRepository.findByRoutineIdInAndOverrideDate(any(), any()))
+        .willReturn(List.of(override));
+
+    routineService.generateDailyTodos();
+
+    verify(todoRepository, never()).saveAndFlush(any(Todo.class));
+  }
+
+  // ========== updateMotherRoutine — override 정리 및 오늘 todo 동기화 ==========
+
+  @Test
+  void 엄마루틴_수정_오늘_이후_override_삭제됨() {
+    Routine routine = motherRoutine();
+    given(routineRepository.findById(10L)).willReturn(Optional.of(routine));
+
+    routineService.updateMotherRoutine(
+        1L, 10L, new RoutineUpdateRequestDto("수정된 루틴", null, null, RoutineType.DAILY, null, null));
+
+    verify(routineOverrideRepository)
+        .deleteByRoutineAndOverrideDateGreaterThanEqual(routine, TEST_DATE);
+  }
+
+  @Test
+  void 엄마루틴_수정_오늘_todo_존재시_제목_태그_즉시_반영() {
+    Routine routine = motherRoutine();
+    Todo existingTodo =
+        Todo.builder().title("기존 제목").user(testUser()).isPinned(false).routine(routine).build();
+    ReflectionTestUtils.setField(existingTodo, "id", 100L);
+
+    given(routineRepository.findById(10L)).willReturn(Optional.of(routine));
+    given(todoRepository.findMotherTodoByRoutineAndDate(any(), any(), any()))
+        .willReturn(Optional.of(existingTodo));
+
+    routineService.updateMotherRoutine(
+        1L, 10L, new RoutineUpdateRequestDto("수정된 루틴", null, null, RoutineType.DAILY, null, null));
+
+    assertThat(existingTodo.getTitle()).isEqualTo("수정된 루틴");
   }
 }
