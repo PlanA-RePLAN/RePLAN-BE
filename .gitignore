@@ -51,3 +51,6 @@ CLAUDE.md
 #로컬 DB및 레디스
 postgres_data/
 redis_data/
+
+# docs 폴더는 레포에 올리지 않음(내부 산출물·ERD 등)
+docs/
