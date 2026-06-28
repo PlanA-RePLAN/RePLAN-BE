@@ -71,6 +71,18 @@ jobs:
             aws ssm get-parameter --name /replan/prod/REDIS_HOST --query Parameter.Value --output text --region ${{ secrets.AWS_REGION }} | xargs -I{} echo "REDIS_HOST={}" >> /home/ubuntu/app/.env
             aws ssm get-parameter --name /replan/prod/REDIS_PORT --query Parameter.Value --output text --region ${{ secrets.AWS_REGION }} | xargs -I{} echo "REDIS_PORT={}" >> /home/ubuntu/app/.env
             aws ssm get-parameter --name /replan/prod/GEMINI_API_KEY --query Parameter.Value --output text --region ${{ secrets.AWS_REGION }} | xargs -I{} echo "GEMINI_API_KEY={}" >> /home/ubuntu/app/.env
+            # 애플 로그인 설정
+            aws ssm get-parameter --name /replan/prod/APPLE_CLIENT_IDS --query Parameter.Value --output text --region ${{ secrets.AWS_REGION }} | xargs -I{} echo "APPLE_CLIENT_IDS={}" >> /home/ubuntu/app/.env
+            aws ssm get-parameter --name /replan/prod/APPLE_TEAM_ID --query Parameter.Value --output text --region ${{ secrets.AWS_REGION }} | xargs -I{} echo "APPLE_TEAM_ID={}" >> /home/ubuntu/app/.env
+            aws ssm get-parameter --name /replan/prod/APPLE_KEY_ID --query Parameter.Value --output text --region ${{ secrets.AWS_REGION }} | xargs -I{} echo "APPLE_KEY_ID={}" >> /home/ubuntu/app/.env
+            # 애플 비공개키(.p8)는 한 줄(\n 이스케이프)로 SSM(SecureString)에 저장한다.
+            # 빈 값이 들어가면 애플 로그인이 동작하지 않으므로 조회 실패 시 배포를 중단한다.
+            APPLE_PRIVATE_KEY="$(aws ssm get-parameter --name /replan/prod/APPLE_PRIVATE_KEY --with-decryption --query Parameter.Value --output text --region ${{ secrets.AWS_REGION }})"
+            if [ -z "$APPLE_PRIVATE_KEY" ]; then
+              echo "APPLE_PRIVATE_KEY 조회 실패 또는 빈 값 — 배포 중단" >&2
+              exit 1
+            fi
+            printf 'APPLE_PRIVATE_KEY=%s\n' "$APPLE_PRIVATE_KEY" >> /home/ubuntu/app/.env
             # Firebase 서비스 계정 키(JSON)는 공백·따옴표가 있어 xargs 대신 한 줄로 직접 기록한다.
             # 조회 실패 시 빈 값이 들어가면 앱이 또 기동 실패(502)하므로, 비어 있으면 배포를 중단한다.
             FIREBASE_SERVICE_ACCOUNT_JSON="$(aws ssm get-parameter --name /replan/prod/FIREBASE_SERVICE_ACCOUNT_JSON --with-decryption --query Parameter.Value --output text --region ${{ secrets.AWS_REGION }})"

@@ -2,9 +2,11 @@ package plana.replan.domain.user.service;
 
 import java.time.LocalDateTime;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import plana.replan.domain.auth.apple.AppleAuthClient;
 import plana.replan.domain.auth.dto.PresignedUrlResponseDto;
 import plana.replan.domain.goal.repository.GoalRepository;
 import plana.replan.domain.notification.repository.DeviceTokenRepository;
@@ -14,6 +16,7 @@ import plana.replan.domain.tag.repository.TagRepository;
 import plana.replan.domain.todo.repository.TodoRepository;
 import plana.replan.domain.user.dto.ProfileUpdateRequestDto;
 import plana.replan.domain.user.dto.UserResponseDto;
+import plana.replan.domain.user.entity.Provider;
 import plana.replan.domain.user.entity.User;
 import plana.replan.domain.user.exception.UserErrorCode;
 import plana.replan.domain.user.repository.UserRepository;
@@ -21,6 +24,7 @@ import plana.replan.global.exception.CustomException;
 import plana.replan.global.exception.GlobalErrorCode;
 import plana.replan.global.s3.S3Service;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class UserService {
@@ -34,6 +38,7 @@ public class UserService {
   private final DeviceTokenRepository deviceTokenRepository;
   private final S3Service s3Service;
   private final StringRedisTemplate redisTemplate;
+  private final AppleAuthClient appleAuthClient;
 
   @Transactional(readOnly = true)
   public UserResponseDto getMyInfo(Long userId) {
@@ -79,6 +84,22 @@ public class UserService {
 
     // refresh token 키는 원래 이메일 기준이므로 익명화 전에 미리 확보한다.
     String originalEmail = user.getEmail();
+
+    // 애플 유저면 애플 연동 해제(revoke). 실패해도 탈퇴는 계속 진행한다.
+    if (user.getProvider() == Provider.APPLE) {
+      String stored = redisTemplate.opsForValue().get("apple:refresh:" + userId);
+      if (stored != null) {
+        int sep = stored.indexOf('|');
+        if (sep > 0) {
+          try {
+            appleAuthClient.revoke(stored.substring(0, sep), stored.substring(sep + 1));
+          } catch (Exception e) {
+            log.warn("애플 토큰 철회 실패 - 탈퇴는 계속 진행합니다. userId={}", userId, e);
+          }
+        }
+        redisTemplate.delete("apple:refresh:" + userId);
+      }
+    }
 
     // 1) 회원이 만든 데이터(투두·목표·루틴·태그)를 함께 soft delete 한다.
     LocalDateTime now = LocalDateTime.now();
