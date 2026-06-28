@@ -12,6 +12,7 @@ import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
@@ -27,9 +28,12 @@ import plana.replan.domain.goal.exception.GoalErrorCode;
 import plana.replan.domain.goal.repository.GoalRepository;
 import plana.replan.domain.routine.dto.RoutineCreateRequestDto;
 import plana.replan.domain.routine.dto.RoutineResponseDto;
+import plana.replan.domain.routine.dto.RoutineUpdateRequestDto;
 import plana.replan.domain.routine.entity.Routine;
+import plana.replan.domain.routine.entity.RoutineOverride;
 import plana.replan.domain.routine.entity.RoutineType;
 import plana.replan.domain.routine.exception.RoutineErrorCode;
+import plana.replan.domain.routine.repository.RoutineOverrideRepository;
 import plana.replan.domain.routine.repository.RoutineRepository;
 import plana.replan.domain.tag.entity.Tag;
 import plana.replan.domain.tag.exception.TagErrorCode;
@@ -52,6 +56,7 @@ class RoutineServiceTest {
 
   @Mock private Clock clock;
   @Mock private RoutineRepository routineRepository;
+  @Mock private RoutineOverrideRepository routineOverrideRepository;
   @Mock private UserRepository userRepository;
   @Mock private TagRepository tagRepository;
   @Mock private GoalRepository goalRepository;
@@ -64,6 +69,9 @@ class RoutineServiceTest {
     // 예외 발생 테스트에서는 clock이 호출되지 않으므로 lenient 처리
     lenient().when(clock.instant()).thenReturn(TEST_DATE.atStartOfDay(KST).toInstant());
     lenient().when(clock.getZone()).thenReturn(KST);
+    lenient()
+        .when(routineOverrideRepository.findByRoutineIdInAndOverrideDate(any(), any()))
+        .thenReturn(Collections.emptyList());
   }
 
   private User testUser() {
@@ -504,7 +512,7 @@ class RoutineServiceTest {
 
   // ========== generateDailyTodos (배치) ==========
 
-  // TEST_DATE = 2024-01-15 (월요일), 어제 = 2024-01-14 (일요일)
+  // TEST_DATE = 2024-01-15 (월요일, DayOfWeek=1, bit=1), day of month = 15
 
   private Routine buildRoutine(RoutineType type, Integer routineDate) {
     return Routine.builder()
@@ -515,19 +523,9 @@ class RoutineServiceTest {
         .build();
   }
 
-  private Todo buildTodoWithRoutine(Routine routine, LocalDateTime dueDate) {
-    return Todo.builder()
-        .title(routine.getTitle())
-        .dueDate(dueDate)
-        .isPinned(false)
-        .user(routine.getUser())
-        .routine(routine)
-        .build();
-  }
-
   @Test
-  void generateDailyTodos_어제_마감_반복Todo_없으면_생성_안됨() {
-    given(todoRepository.findMotherRoutineTodosForRollover(any(), any())).willReturn(List.of());
+  void generateDailyTodos_활성루틴_없으면_생성_안됨() {
+    given(routineRepository.findAllActiveMotherRoutines()).willReturn(List.of());
 
     routineService.generateDailyTodos();
 
@@ -535,13 +533,10 @@ class RoutineServiceTest {
   }
 
   @Test
-  void generateDailyTodos_DAILY_어제_마감_반복Todo_있으면_오늘_dueDate로_생성됨() {
-    // 어제(2024-01-14) dueDate DAILY 반복 Todo → nextOccurrence(오늘=2024-01-15) = 2024-01-15
+  void generateDailyTodos_DAILY_오늘_투두_생성됨() {
+    // DAILY → isOccurrenceDay = 항상 true → 오늘(2024-01-15) 투두 생성
     Routine routine = buildRoutine(RoutineType.DAILY, null);
-    Todo yesterdayTodo =
-        buildTodoWithRoutine(routine, LocalDate.of(2024, 1, 14).atTime(23, 59, 59));
-    given(todoRepository.findMotherRoutineTodosForRollover(any(), any()))
-        .willReturn(List.of(yesterdayTodo));
+    given(routineRepository.findAllActiveMotherRoutines()).willReturn(List.of(routine));
 
     routineService.generateDailyTodos();
 
@@ -552,50 +547,273 @@ class RoutineServiceTest {
   }
 
   @Test
-  void generateDailyTodos_WEEKLY_어제_마감_반복Todo_있으면_다음_반복일_dueDate로_생성됨() {
-    // 어제(2024-01-14, 일) dueDate WEEKLY(화=2) → nextOccurrence(오늘=월) = 2024-01-16(화)
+  void generateDailyTodos_WEEKLY_오늘이_해당요일_투두_생성됨() {
+    // 오늘=월요일(bit=1), WEEKLY(mask=1) → isOccurrenceDay = true → 오늘 투두 생성
+    Routine routine = buildRoutine(RoutineType.WEEKLY, 1);
+    given(routineRepository.findAllActiveMotherRoutines()).willReturn(List.of(routine));
+
+    routineService.generateDailyTodos();
+
+    ArgumentCaptor<Todo> captor = ArgumentCaptor.forClass(Todo.class);
+    verify(todoRepository).saveAndFlush(captor.capture());
+    assertThat(captor.getValue().getDueDate())
+        .isEqualTo(LocalDate.of(2024, 1, 15).atTime(23, 59, 59));
+  }
+
+  @Test
+  void generateDailyTodos_WEEKLY_오늘이_해당요일_아님_생성_안됨() {
+    // 오늘=월요일(bit=1), WEEKLY(mask=2, 화요일) → isOccurrenceDay = false
     Routine routine = buildRoutine(RoutineType.WEEKLY, 2);
-    Todo yesterdayTodo =
-        buildTodoWithRoutine(routine, LocalDate.of(2024, 1, 14).atTime(23, 59, 59));
-    given(todoRepository.findMotherRoutineTodosForRollover(any(), any()))
-        .willReturn(List.of(yesterdayTodo));
+    given(routineRepository.findAllActiveMotherRoutines()).willReturn(List.of(routine));
+
+    routineService.generateDailyTodos();
+
+    verify(todoRepository, never()).saveAndFlush(any(Todo.class));
+  }
+
+  @Test
+  void generateDailyTodos_MONTHLY_오늘이_해당일_투두_생성됨() {
+    // 오늘=15일, MONTHLY(15일) → isOccurrenceDay = true → 오늘 투두 생성
+    Routine routine = buildRoutine(RoutineType.MONTHLY, 15);
+    given(routineRepository.findAllActiveMotherRoutines()).willReturn(List.of(routine));
 
     routineService.generateDailyTodos();
 
     ArgumentCaptor<Todo> captor = ArgumentCaptor.forClass(Todo.class);
     verify(todoRepository).saveAndFlush(captor.capture());
     assertThat(captor.getValue().getDueDate())
-        .isEqualTo(LocalDate.of(2024, 1, 16).atTime(23, 59, 59));
+        .isEqualTo(LocalDate.of(2024, 1, 15).atTime(23, 59, 59));
   }
 
   @Test
-  void generateDailyTodos_MONTHLY_어제_마감_반복Todo_있으면_다음_반복일_dueDate로_생성됨() {
-    // 어제(2024-01-14) dueDate MONTHLY(16일) → nextOccurrence(오늘=15일) = 2024-01-16
+  void generateDailyTodos_MONTHLY_오늘이_해당일_아님_생성_안됨() {
+    // 오늘=15일, MONTHLY(16일) → isOccurrenceDay = false
     Routine routine = buildRoutine(RoutineType.MONTHLY, 16);
-    Todo yesterdayTodo =
-        buildTodoWithRoutine(routine, LocalDate.of(2024, 1, 14).atTime(23, 59, 59));
-    given(todoRepository.findMotherRoutineTodosForRollover(any(), any()))
-        .willReturn(List.of(yesterdayTodo));
+    given(routineRepository.findAllActiveMotherRoutines()).willReturn(List.of(routine));
 
     routineService.generateDailyTodos();
 
-    ArgumentCaptor<Todo> captor = ArgumentCaptor.forClass(Todo.class);
-    verify(todoRepository).saveAndFlush(captor.capture());
-    assertThat(captor.getValue().getDueDate())
-        .isEqualTo(LocalDate.of(2024, 1, 16).atTime(23, 59, 59));
+    verify(todoRepository, never()).saveAndFlush(any(Todo.class));
   }
 
   @Test
-  void generateDailyTodos_다음_반복일_Todo_이미_존재시_중복_생성_안됨() {
+  void generateDailyTodos_종료일_지난_루틴_생성_안됨() {
+    // DAILY, 종료일 = 2024-01-14 → 오늘(Jan 15)이 종료일 이후 → 생성 안 함
+    Routine routine =
+        Routine.builder()
+            .title("테스트 루틴")
+            .routineType(RoutineType.DAILY)
+            .dueDate(LocalDate.of(2024, 1, 14).atStartOfDay())
+            .user(testUser())
+            .build();
+    given(routineRepository.findAllActiveMotherRoutines()).willReturn(List.of(routine));
+
+    routineService.generateDailyTodos();
+
+    verify(todoRepository, never()).saveAndFlush(any(Todo.class));
+  }
+
+  @Test
+  void generateDailyTodos_오늘_투두_이미_존재시_중복_생성_안됨() {
     Routine routine = buildRoutine(RoutineType.DAILY, null);
-    Todo yesterdayTodo =
-        buildTodoWithRoutine(routine, LocalDate.of(2024, 1, 14).atTime(23, 59, 59));
-    given(todoRepository.findMotherRoutineTodosForRollover(any(), any()))
-        .willReturn(List.of(yesterdayTodo));
+    given(routineRepository.findAllActiveMotherRoutines()).willReturn(List.of(routine));
     given(todoRepository.existsByRoutineAndDueDate(any(), any())).willReturn(true);
 
     routineService.generateDailyTodos();
 
     verify(todoRepository, never()).saveAndFlush(any(Todo.class));
+  }
+
+  // ========== updateMotherRoutine ==========
+
+  private Routine motherRoutine() {
+    Routine r = buildRoutine(RoutineType.DAILY, null);
+    ReflectionTestUtils.setField(r, "id", 10L);
+    return r;
+  }
+
+  @Test
+  void 엄마루틴_수정_DAILY_성공_필수필드만() {
+    Routine routine = motherRoutine();
+    given(routineRepository.findById(10L)).willReturn(Optional.of(routine));
+
+    RoutineResponseDto result =
+        routineService.updateMotherRoutine(
+            1L,
+            10L,
+            new RoutineUpdateRequestDto("수정된 루틴", null, null, RoutineType.DAILY, null, null));
+
+    assertThat(result.getTitle()).isEqualTo("수정된 루틴");
+    assertThat(result.getRoutineType()).isEqualTo(RoutineType.DAILY);
+    assertThat(result.getRoutineDate()).isNull();
+    assertThat(result.getDueDate()).isNull();
+    assertThat(result.getTagId()).isNull();
+  }
+
+  @Test
+  void 엄마루틴_수정_WEEKLY_전체필드() {
+    Routine routine = motherRoutine();
+    LocalDateTime dueDate = LocalDateTime.of(2025, 12, 31, 0, 0);
+    given(routineRepository.findById(10L)).willReturn(Optional.of(routine));
+    given(tagRepository.findById(5L)).willReturn(Optional.of(testTag(5L)));
+
+    RoutineResponseDto result =
+        routineService.updateMotherRoutine(
+            1L,
+            10L,
+            new RoutineUpdateRequestDto("수정된 루틴", dueDate, null, RoutineType.WEEKLY, 21, 5L));
+
+    assertThat(result.getTitle()).isEqualTo("수정된 루틴");
+    assertThat(result.getRoutineType()).isEqualTo(RoutineType.WEEKLY);
+    assertThat(result.getRoutineDate()).isEqualTo(21);
+    assertThat(result.getDueDate()).isEqualTo(dueDate);
+    assertThat(result.getTagId()).isEqualTo(5L);
+  }
+
+  @Test
+  void 엄마루틴_수정_하위루틴_ID_전달_400() {
+    User user = testUser();
+    Routine parent = buildRoutine(RoutineType.DAILY, null);
+    ReflectionTestUtils.setField(parent, "id", 10L);
+    Routine child = Routine.builder().title("하위").user(user).parent(parent).build();
+    ReflectionTestUtils.setField(child, "id", 11L);
+    given(routineRepository.findById(11L)).willReturn(Optional.of(child));
+
+    assertThatThrownBy(
+            () ->
+                routineService.updateMotherRoutine(
+                    1L,
+                    11L,
+                    new RoutineUpdateRequestDto("수정", null, null, RoutineType.DAILY, null, null)))
+        .isInstanceOf(CustomException.class)
+        .satisfies(
+            e ->
+                assertThat(((CustomException) e).getErrorCode())
+                    .isEqualTo(RoutineErrorCode.ROUTINE_INVALID_TARGET));
+  }
+
+  @Test
+  void 엄마루틴_수정_routineDate_범위오류_400() {
+    Routine routine = motherRoutine();
+    given(routineRepository.findById(10L)).willReturn(Optional.of(routine));
+
+    assertThatThrownBy(
+            () ->
+                routineService.updateMotherRoutine(
+                    1L,
+                    10L,
+                    new RoutineUpdateRequestDto("수정", null, null, RoutineType.WEEKLY, 128, null)))
+        .isInstanceOf(CustomException.class)
+        .satisfies(
+            e ->
+                assertThat(((CustomException) e).getErrorCode())
+                    .isEqualTo(RoutineErrorCode.ROUTINE_INVALID_DATE));
+  }
+
+  @Test
+  void 엄마루틴_수정_존재하지않는_tagId_404() {
+    Routine routine = motherRoutine();
+    given(routineRepository.findById(10L)).willReturn(Optional.of(routine));
+    given(tagRepository.findById(999L)).willReturn(Optional.empty());
+
+    assertThatThrownBy(
+            () ->
+                routineService.updateMotherRoutine(
+                    1L,
+                    10L,
+                    new RoutineUpdateRequestDto("수정", null, null, RoutineType.DAILY, null, 999L)))
+        .isInstanceOf(CustomException.class)
+        .satisfies(
+            e ->
+                assertThat(((CustomException) e).getErrorCode())
+                    .isEqualTo(TagErrorCode.TAG_NOT_FOUND));
+  }
+
+  @Test
+  void 엄마루틴_수정_루틴없음_404() {
+    given(routineRepository.findById(999L)).willReturn(Optional.empty());
+
+    assertThatThrownBy(
+            () ->
+                routineService.updateMotherRoutine(
+                    1L,
+                    999L,
+                    new RoutineUpdateRequestDto("수정", null, null, RoutineType.DAILY, null, null)))
+        .isInstanceOf(CustomException.class)
+        .satisfies(
+            e ->
+                assertThat(((CustomException) e).getErrorCode())
+                    .isEqualTo(RoutineErrorCode.ROUTINE_NOT_FOUND));
+  }
+
+  // ========== generateDailyTodos with override ==========
+
+  @Test
+  void generateDailyTodos_override_제목_태그_반영됨() {
+    Tag tag = testTag(5L);
+    Routine routine = buildRoutine(RoutineType.DAILY, null);
+
+    RoutineOverride override =
+        RoutineOverride.builder().routine(routine).overrideDate(TEST_DATE).build();
+    override.updateContent("오버라이드 제목", tag);
+
+    given(routineRepository.findAllActiveMotherRoutines()).willReturn(List.of(routine));
+    given(routineOverrideRepository.findByRoutineIdInAndOverrideDate(any(), any()))
+        .willReturn(List.of(override));
+
+    routineService.generateDailyTodos();
+
+    ArgumentCaptor<Todo> captor = ArgumentCaptor.forClass(Todo.class);
+    verify(todoRepository).saveAndFlush(captor.capture());
+    assertThat(captor.getValue().getTitle()).isEqualTo("오버라이드 제목");
+    assertThat(captor.getValue().getTag()).isEqualTo(tag);
+  }
+
+  @Test
+  void generateDailyTodos_override_skip_이면_생성_안됨() {
+    Routine routine = buildRoutine(RoutineType.DAILY, null);
+
+    RoutineOverride override =
+        RoutineOverride.builder().routine(routine).overrideDate(TEST_DATE).build();
+    override.skip();
+
+    given(routineRepository.findAllActiveMotherRoutines()).willReturn(List.of(routine));
+    given(routineOverrideRepository.findByRoutineIdInAndOverrideDate(any(), any()))
+        .willReturn(List.of(override));
+
+    routineService.generateDailyTodos();
+
+    verify(todoRepository, never()).saveAndFlush(any(Todo.class));
+  }
+
+  // ========== updateMotherRoutine — override 정리 및 오늘 todo 동기화 ==========
+
+  @Test
+  void 엄마루틴_수정_오늘_이후_override_삭제됨() {
+    Routine routine = motherRoutine();
+    given(routineRepository.findById(10L)).willReturn(Optional.of(routine));
+
+    routineService.updateMotherRoutine(
+        1L, 10L, new RoutineUpdateRequestDto("수정된 루틴", null, null, RoutineType.DAILY, null, null));
+
+    verify(routineOverrideRepository)
+        .deleteByRoutineAndOverrideDateGreaterThanEqual(routine, TEST_DATE);
+  }
+
+  @Test
+  void 엄마루틴_수정_오늘_todo_존재시_제목_태그_즉시_반영() {
+    Routine routine = motherRoutine();
+    Todo existingTodo =
+        Todo.builder().title("기존 제목").user(testUser()).isPinned(false).routine(routine).build();
+    ReflectionTestUtils.setField(existingTodo, "id", 100L);
+
+    given(routineRepository.findById(10L)).willReturn(Optional.of(routine));
+    given(todoRepository.findMotherTodoByRoutineAndDate(any(), any(), any()))
+        .willReturn(Optional.of(existingTodo));
+
+    routineService.updateMotherRoutine(
+        1L, 10L, new RoutineUpdateRequestDto("수정된 루틴", null, null, RoutineType.DAILY, null, null));
+
+    assertThat(existingTodo.getTitle()).isEqualTo("수정된 루틴");
   }
 }

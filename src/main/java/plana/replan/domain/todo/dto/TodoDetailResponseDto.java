@@ -40,6 +40,11 @@ public class TodoDetailResponseDto {
   @Schema(description = "반복 유형 (DAILY/WEEKLY/MONTHLY, 반복 아니면 null)", example = "DAILY")
   private String routineType;
 
+  @Schema(
+      description = "반복 날짜 (WEEKLY: 1-127 비트마스크, MONTHLY: 1-31 일자, DAILY 또는 반복 없으면 null)",
+      example = "5")
+  private Integer routineDate;
+
   @Schema(description = "하위 투두 목록")
   private List<SubTodoDto> subTodos;
 
@@ -78,6 +83,7 @@ public class TodoDetailResponseDto {
         routine != null && routine.getRoutineType() != null
             ? routine.getRoutineType().name()
             : null,
+        routine != null ? routine.getRoutineDate() : null,
         subTodos);
   }
 }

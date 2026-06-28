@@ -23,4 +23,18 @@ public interface RoutineDateProjection {
   String getTagColor();
 
   Long getGoalId();
+
+  Long getTodoId();
+
+  Double getOverrideSortOrder();
+
+  Double getDefaultSortOrder();
+
+  Boolean getIsSkipped();
+
+  Boolean getIsPinned();
+
+  Boolean getIsCompleted();
+
+  Boolean getHasOverride();
 }

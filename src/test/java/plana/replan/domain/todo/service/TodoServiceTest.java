@@ -58,7 +58,6 @@ class TodoServiceTest {
   @Mock private UserRepository userRepository;
   @Mock private TagRepository tagRepository;
   @Mock private RoutineRepository routineRepository;
-  @Mock private plana.replan.domain.routine.service.RoutineService routineService;
 
   @InjectMocks private TodoService todoService;
 
@@ -136,6 +135,7 @@ class TodoServiceTest {
   @DisplayName("성공 (tagId 없음): 올바른 DTO 반환, isPinned=false, tagId=null, tagRepository 미호출")
   void createTodo_success_withoutTag() {
     given(userRepository.findById(1L)).willReturn(Optional.of(testUser()));
+    given(todoRepository.findMaxSortOrderByUser(any())).willReturn(Optional.empty());
     given(todoRepository.save(any(Todo.class))).willAnswer(inv -> inv.getArgument(0));
 
     TodoResponseDto result = todoService.createTodo(1L, request("제목", null, null));
@@ -157,6 +157,7 @@ class TodoServiceTest {
     LocalDateTime dueDate = LocalDateTime.of(2026, 5, 10, 12, 30);
     given(userRepository.findById(1L)).willReturn(Optional.of(testUser()));
     given(tagRepository.findById(5L)).willReturn(Optional.of(testTag(5L)));
+    given(todoRepository.findMaxSortOrderByUser(any())).willReturn(Optional.empty());
     given(todoRepository.save(any(Todo.class))).willAnswer(inv -> inv.getArgument(0));
 
     TodoResponseDto result = todoService.createTodo(1L, request("제목", dueDate, 5L));
@@ -164,6 +165,34 @@ class TodoServiceTest {
     assertThat(result.getTitle()).isEqualTo("제목");
     assertThat(result.getDueDate()).isEqualTo(dueDate);
     assertThat(result.getTagId()).isEqualTo(5L);
+  }
+
+  @Test
+  @DisplayName("첫 번째 todo 생성: sortOrder = 10000.0 (기본값)")
+  void createTodo_firstTodo_sortOrderIsDefault() {
+    given(userRepository.findById(1L)).willReturn(Optional.of(testUser()));
+    given(todoRepository.findMaxSortOrderByUser(any())).willReturn(Optional.empty());
+    given(todoRepository.save(any(Todo.class))).willAnswer(inv -> inv.getArgument(0));
+
+    todoService.createTodo(1L, request("첫 번째 할일", null, null));
+
+    ArgumentCaptor<Todo> captor = ArgumentCaptor.forClass(Todo.class);
+    verify(todoRepository).save(captor.capture());
+    assertThat(captor.getValue().getSortOrder()).isEqualTo(10000.0);
+  }
+
+  @Test
+  @DisplayName("기존 todo가 있을 때 새 todo 생성: sortOrder = maxSortOrder + 10000")
+  void createTodo_withExistingTodos_sortOrderIsMaxPlusTenThousand() {
+    given(userRepository.findById(1L)).willReturn(Optional.of(testUser()));
+    given(todoRepository.findMaxSortOrderByUser(any())).willReturn(Optional.of(25000.0));
+    given(todoRepository.save(any(Todo.class))).willAnswer(inv -> inv.getArgument(0));
+
+    todoService.createTodo(1L, request("새 할일", null, null));
+
+    ArgumentCaptor<Todo> captor = ArgumentCaptor.forClass(Todo.class);
+    verify(todoRepository).save(captor.capture());
+    assertThat(captor.getValue().getSortOrder()).isEqualTo(35000.0);
   }
 
   private SubTodoCreateRequestDto subRequest(String title) {
@@ -1074,8 +1103,8 @@ class TodoServiceTest {
   }
 
   @Test
-  @DisplayName("deleteTodo - 성공 (루틴 있음): 루틴은 삭제하지 않음")
-  void deleteTodo_success_routineNotDeleted() {
+  @DisplayName("deleteTodo - 루틴 있는 투두: ROUTINE_TODO_USE_ROUTINE_API 예외")
+  void deleteTodo_routineTodo_throws() {
     User user = testUser();
     Todo todo = testTodo(1L, user);
     Routine routine = testRoutine(user, RoutineType.DAILY);
@@ -1083,10 +1112,12 @@ class TodoServiceTest {
 
     given(todoRepository.findById(1L)).willReturn(Optional.of(todo));
 
-    todoService.deleteTodo(1L, 1L);
-
-    assertThat(ReflectionTestUtils.getField(todo, "deletedAt")).isNotNull();
-    assertThat(ReflectionTestUtils.getField(routine, "deletedAt")).isNull();
+    assertThatThrownBy(() -> todoService.deleteTodo(1L, 1L))
+        .isInstanceOf(CustomException.class)
+        .satisfies(
+            e ->
+                assertThat(((CustomException) e).getErrorCode())
+                    .isEqualTo(TodoErrorCode.ROUTINE_TODO_USE_ROUTINE_API));
   }
 
   // ── reorderTodo ──────────────────────────────────────────────────────────────
@@ -1632,8 +1663,8 @@ class TodoServiceTest {
   }
 
   @Test
-  @DisplayName("updateTodo - 루틴 있음 + routineType=null: 루틴 soft delete, todo.routine=null")
-  void updateTodo_success_removeRoutine() {
+  @DisplayName("updateTodo - 루틴 있음: ROUTINE_TODO_USE_ROUTINE_API 예외")
+  void updateTodo_routineTodo_throws() {
     User user = testUser();
     Todo todo = testTodo(1L, user);
     Routine routine = testRoutine(user, RoutineType.DAILY);
@@ -1641,32 +1672,13 @@ class TodoServiceTest {
 
     given(todoRepository.findById(1L)).willReturn(Optional.of(todo));
 
-    TodoDetailResponseDto result =
-        todoService.updateTodo(1L, 1L, updateTodoRequest("제목", null, null, null, null));
-
-    verify(routineService).cascadeSoftDelete(routine);
-    assertThat(result.getRoutineType()).isNull();
-  }
-
-  @Test
-  @DisplayName("updateTodo - 루틴 있음 + 유형 변경 (DAILY→WEEKLY): 기존 루틴 업데이트")
-  void updateTodo_success_changeRoutineType() {
-    User user = testUser();
-    Todo todo = testTodo(1L, user);
-    Routine routine = testRoutine(user, RoutineType.DAILY);
-    ReflectionTestUtils.setField(todo, "routine", routine);
-
-    given(todoRepository.findById(1L)).willReturn(Optional.of(todo));
-
-    TodoDetailResponseDto result =
-        todoService.updateTodo(
-            1L, 1L, updateTodoRequest("수정된 제목", null, null, RoutineType.WEEKLY, 5));
-
-    assertThat(routine.getRoutineType()).isEqualTo(RoutineType.WEEKLY);
-    assertThat(routine.getRoutineDate()).isEqualTo(5);
-    assertThat(routine.getTitle()).isEqualTo("수정된 제목");
-    assertThat(result.getRoutineType()).isEqualTo("WEEKLY");
-    verify(routineRepository, never()).save(any());
+    assertThatThrownBy(
+            () -> todoService.updateTodo(1L, 1L, updateTodoRequest("제목", null, null, null, null)))
+        .isInstanceOf(CustomException.class)
+        .satisfies(
+            e ->
+                assertThat(((CustomException) e).getErrorCode())
+                    .isEqualTo(TodoErrorCode.ROUTINE_TODO_USE_ROUTINE_API));
   }
 
   @Test
@@ -1700,5 +1712,85 @@ class TodoServiceTest {
     todoService.updateTodo(1L, 1L, updateTodoRequest("제목", null, null, null, null));
 
     verify(routineRepository, never()).save(any());
+  }
+
+  @Test
+  @DisplayName("reorderTodo - 루틴 있는 투두: ROUTINE_TODO_USE_ROUTINE_API 예외")
+  void reorderTodo_routineTodo_throws() {
+    User user = testUser();
+    Todo todo = testTodo(1L, user);
+    Routine routine = testRoutine(user, RoutineType.DAILY);
+    ReflectionTestUtils.setField(todo, "routine", routine);
+
+    given(todoRepository.findById(1L)).willReturn(Optional.of(todo));
+
+    assertThatThrownBy(() -> todoService.reorderTodo(1L, 1L, orderRequest(null, 2L)))
+        .isInstanceOf(CustomException.class)
+        .satisfies(
+            e ->
+                assertThat(((CustomException) e).getErrorCode())
+                    .isEqualTo(TodoErrorCode.ROUTINE_TODO_USE_ROUTINE_API));
+  }
+
+  @Test
+  @DisplayName("completeTodo - 루틴 있는 투두: ROUTINE_TODO_USE_ROUTINE_API 예외")
+  void completeTodo_routineTodo_throws() {
+    User user = testUser();
+    Todo todo = testTodo(1L, user);
+    Routine routine = testRoutine(user, RoutineType.DAILY);
+    ReflectionTestUtils.setField(todo, "routine", routine);
+
+    given(todoRepository.findById(1L)).willReturn(Optional.of(todo));
+
+    assertThatThrownBy(() -> todoService.completeTodo(1L, 1L, completeRequest(true)))
+        .isInstanceOf(CustomException.class)
+        .satisfies(
+            e ->
+                assertThat(((CustomException) e).getErrorCode())
+                    .isEqualTo(TodoErrorCode.ROUTINE_TODO_USE_ROUTINE_API));
+  }
+
+  @Test
+  @DisplayName("pinTodo - 루틴 있는 투두: ROUTINE_TODO_USE_ROUTINE_API 예외")
+  void pinTodo_routineTodo_throws() {
+    User user = testUser();
+    Todo todo = testTodo(1L, user);
+    Routine routine = testRoutine(user, RoutineType.DAILY);
+    ReflectionTestUtils.setField(todo, "routine", routine);
+
+    given(todoRepository.findById(1L)).willReturn(Optional.of(todo));
+
+    assertThatThrownBy(() -> todoService.pinTodo(1L, 1L, pinRequest(true)))
+        .isInstanceOf(CustomException.class)
+        .satisfies(
+            e ->
+                assertThat(((CustomException) e).getErrorCode())
+                    .isEqualTo(TodoErrorCode.ROUTINE_TODO_USE_ROUTINE_API));
+  }
+
+  @Test
+  @DisplayName("updateTodo - 루틴 있음: dueDate 요청 시 ROUTINE_TODO_USE_ROUTINE_API 예외")
+  void updateTodo_routineTodo_dueDateIgnored_throws() {
+    User user = testUser();
+    Todo todo = testTodo(1L, user);
+    LocalDateTime originalDueDate = LocalDateTime.of(2026, 6, 25, 23, 59, 59);
+    ReflectionTestUtils.setField(todo, "dueDate", originalDueDate);
+    Routine routine = testRoutine(user, RoutineType.DAILY);
+    ReflectionTestUtils.setField(todo, "routine", routine);
+
+    given(todoRepository.findById(1L)).willReturn(Optional.of(todo));
+
+    assertThatThrownBy(
+            () ->
+                todoService.updateTodo(
+                    1L,
+                    1L,
+                    updateTodoRequest(
+                        "제목", LocalDateTime.of(2026, 6, 27, 23, 59), null, null, null)))
+        .isInstanceOf(CustomException.class)
+        .satisfies(
+            e ->
+                assertThat(((CustomException) e).getErrorCode())
+                    .isEqualTo(TodoErrorCode.ROUTINE_TODO_USE_ROUTINE_API));
   }
 }

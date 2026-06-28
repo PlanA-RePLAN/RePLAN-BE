@@ -39,6 +39,15 @@ public class User extends BaseTimeEntity {
   @Column(name = "profile_image", columnDefinition = "TEXT")
   private String profileImage;
 
+  @Column(name = "notify_todo_due", nullable = false)
+  private boolean notifyTodoDue = true;
+
+  @Column(name = "notify_todo_failed", nullable = false)
+  private boolean notifyTodoFailed = true;
+
+  @Column(name = "notify_report", nullable = false)
+  private boolean notifyReport = true;
+
   @Builder
   public User(
       String email,
@@ -67,6 +76,18 @@ public class User extends BaseTimeEntity {
    * 회원 탈퇴 처리. 개인정보(이메일·닉네임·비밀번호·프로필이미지)를 파기하고 soft delete 한다. 이메일/닉네임은 다른 회원과 겹치지 않도록 id를 붙인 익명값으로
    * 바꾼다. (id가 유일하므로 전역 유니크 제약과도 충돌하지 않는다.)
    */
+  public void updateNotificationSettings(Boolean todoDue, Boolean todoFailed, Boolean report) {
+    if (todoDue != null) {
+      this.notifyTodoDue = todoDue;
+    }
+    if (todoFailed != null) {
+      this.notifyTodoFailed = todoFailed;
+    }
+    if (report != null) {
+      this.notifyReport = report;
+    }
+  }
+
   public void withdraw() {
     this.email = "deleted_" + this.id + "@deleted.local";
     this.nickname = "deleted_" + this.id;

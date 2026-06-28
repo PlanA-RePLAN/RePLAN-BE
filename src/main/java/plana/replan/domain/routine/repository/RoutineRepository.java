@@ -1,5 +1,6 @@
 package plana.replan.domain.routine.repository;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -26,22 +27,38 @@ public interface RoutineRepository extends JpaRepository<Routine, Long> {
   @EntityGraph(attributePaths = "children")
   Optional<Routine> findWithChildrenById(Long id);
 
+  @Query("SELECT r FROM Routine r WHERE r.parent IS NULL AND r.deletedAt IS NULL")
+  List<Routine> findAllActiveMotherRoutines();
+
   @Query(
       nativeQuery = true,
       value =
           """
-          SELECT r.id           AS routineId,
-                 r.title,
-                 r.due_date     AS dueDate,
-                 r.routine_time AS routineTime,
-                 r.routine_type AS routineType,
-                 r.routine_date AS routineDate,
-                 t.id           AS tagId,
-                 t.title        AS tagTitle,
-                 t.color        AS tagColor,
-                 r.goal_id      AS goalId
+          SELECT r.id                                    AS routineId,
+                 COALESCE(ro.title, r.title)             AS title,
+                 r.due_date                              AS dueDate,
+                 r.routine_time                          AS routineTime,
+                 r.routine_type                          AS routineType,
+                 r.routine_date                          AS routineDate,
+                 COALESCE(ro.tag_id, r.tag_id)           AS tagId,
+                 t.title                                 AS tagTitle,
+                 t.color                                 AS tagColor,
+                 r.goal_id                               AS goalId,
+                 td.id                                   AS todoId,
+                 ro.sort_order                           AS overrideSortOrder,
+                 r.default_sort_order                    AS defaultSortOrder,
+                 COALESCE(ro.is_skipped,   FALSE)        AS isSkipped,
+                 COALESCE(ro.is_pinned,    FALSE)        AS isPinned,
+                 COALESCE(ro.is_completed, FALSE)        AS isCompleted,
+                 (ro.id IS NOT NULL)                     AS hasOverride
           FROM routine r
-          LEFT JOIN tag t ON r.tag_id = t.id AND t.deleted_at IS NULL
+          LEFT JOIN routine_override ro
+                 ON ro.routine_id = r.id AND ro.override_date = :targetDate
+          LEFT JOIN tag t ON COALESCE(ro.tag_id, r.tag_id) = t.id AND t.deleted_at IS NULL
+          LEFT JOIN todo td ON td.routine_id = r.id
+                            AND td.deleted_at IS NULL
+                            AND td.parent_id IS NULL
+                            AND CAST(td.due_date AS date) = :targetDate
           WHERE r.user_id = :userId
             AND r.deleted_at IS NULL
             AND r.parent_id IS NULL
@@ -54,5 +71,6 @@ public interface RoutineRepository extends JpaRepository<Routine, Long> {
   List<RoutineDateProjection> findMotherRoutinesByDate(
       @Param("userId") Long userId,
       @Param("dayBit") int dayBit,
-      @Param("dayOfMonth") int dayOfMonth);
+      @Param("dayOfMonth") int dayOfMonth,
+      @Param("targetDate") LocalDate targetDate);
 }

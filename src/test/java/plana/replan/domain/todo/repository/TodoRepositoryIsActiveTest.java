@@ -7,17 +7,20 @@ import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.transaction.annotation.Transactional;
 import plana.replan.domain.todo.entity.Todo;
 import plana.replan.domain.user.entity.Provider;
 import plana.replan.domain.user.entity.Role;
 import plana.replan.domain.user.entity.User;
 import plana.replan.domain.user.repository.UserRepository;
+import plana.replan.global.config.TestFirebaseConfig;
 
 // 이 프로젝트 최초의 repository 통합 테스트.
 // test/resources/application.yaml 이 Flyway를 끄고 H2 create-drop을 쓰도록 이미 설정돼 있다.
 @SpringBootTest
 @Transactional
+@Import(TestFirebaseConfig.class)
 class TodoRepositoryIsActiveTest {
 
   @Autowired private TodoRepository todoRepository;

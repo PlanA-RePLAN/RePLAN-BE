@@ -9,6 +9,8 @@ import org.springframework.transaction.annotation.Transactional;
 import plana.replan.domain.auth.apple.AppleAuthClient;
 import plana.replan.domain.auth.dto.PresignedUrlResponseDto;
 import plana.replan.domain.goal.repository.GoalRepository;
+import plana.replan.domain.notification.repository.DeviceTokenRepository;
+import plana.replan.domain.notification.repository.NotificationRepository;
 import plana.replan.domain.routine.repository.RoutineRepository;
 import plana.replan.domain.tag.repository.TagRepository;
 import plana.replan.domain.todo.repository.TodoRepository;
@@ -32,6 +34,8 @@ public class UserService {
   private final GoalRepository goalRepository;
   private final RoutineRepository routineRepository;
   private final TagRepository tagRepository;
+  private final NotificationRepository notificationRepository;
+  private final DeviceTokenRepository deviceTokenRepository;
   private final S3Service s3Service;
   private final StringRedisTemplate redisTemplate;
   private final AppleAuthClient appleAuthClient;
@@ -103,6 +107,9 @@ public class UserService {
     goalRepository.softDeleteAllByUserId(userId, now);
     routineRepository.softDeleteAllByUserId(userId, now);
     tagRepository.softDeleteAllByUserId(userId, now);
+    // 알림은 soft delete, 기기 토큰은 진짜 삭제(유니크 토큰 값을 풀어 재등록 가능하게)
+    notificationRepository.softDeleteAllByUserId(userId, now);
+    deviceTokenRepository.deleteAllByUserId(userId);
 
     // 2) 개인정보 익명화 + 회원 soft delete
     user.withdraw();

@@ -67,8 +67,15 @@ public class Routine extends BaseTimeEntity {
   @JoinColumn(name = "replan_id")
   private Replan replan;
 
+  @Column(name = "default_sort_order", nullable = false)
+  private double defaultSortOrder = 10000.0;
+
   @Column(name = "is_active", nullable = false)
   private boolean isActive = true;
+
+  public void updateDefaultSortOrder(double defaultSortOrder) {
+    this.defaultSortOrder = defaultSortOrder;
+  }
 
   public void deactivate() {
     this.isActive = false;
@@ -79,8 +86,14 @@ public class Routine extends BaseTimeEntity {
   }
 
   public void update(
-      String title, RoutineType routineType, Integer routineDate, LocalTime routineTime, Tag tag) {
+      String title,
+      LocalDateTime dueDate,
+      RoutineType routineType,
+      Integer routineDate,
+      LocalTime routineTime,
+      Tag tag) {
     this.title = requireNonBlank(title);
+    this.dueDate = dueDate;
     this.routineType = routineType;
     this.routineDate = routineDate;
     this.routineTime = routineTime;

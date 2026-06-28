@@ -4,7 +4,9 @@ import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
@@ -16,12 +18,15 @@ import plana.replan.domain.goal.exception.GoalErrorCode;
 import plana.replan.domain.goal.repository.GoalRepository;
 import plana.replan.domain.routine.dto.RoutineCreateRequestDto;
 import plana.replan.domain.routine.dto.RoutineResponseDto;
+import plana.replan.domain.routine.dto.RoutineUpdateRequestDto;
 import plana.replan.domain.routine.dto.SubRoutineCreateRequestDto;
 import plana.replan.domain.routine.dto.SubRoutineResponseDto;
 import plana.replan.domain.routine.dto.SubRoutineUpdateRequestDto;
 import plana.replan.domain.routine.entity.Routine;
+import plana.replan.domain.routine.entity.RoutineOverride;
 import plana.replan.domain.routine.entity.RoutineType;
 import plana.replan.domain.routine.exception.RoutineErrorCode;
+import plana.replan.domain.routine.repository.RoutineOverrideRepository;
 import plana.replan.domain.routine.repository.RoutineRepository;
 import plana.replan.domain.tag.entity.Tag;
 import plana.replan.domain.tag.exception.TagErrorCode;
@@ -32,6 +37,7 @@ import plana.replan.domain.user.entity.User;
 import plana.replan.domain.user.exception.UserErrorCode;
 import plana.replan.domain.user.repository.UserRepository;
 import plana.replan.global.exception.CustomException;
+import plana.replan.global.exception.GlobalErrorCode;
 
 @Service
 @RequiredArgsConstructor
@@ -39,6 +45,7 @@ public class RoutineService {
 
   private final Clock clock;
   private final RoutineRepository routineRepository;
+  private final RoutineOverrideRepository routineOverrideRepository;
   private final UserRepository userRepository;
   private final TagRepository tagRepository;
   private final GoalRepository goalRepository;
@@ -122,6 +129,49 @@ public class RoutineService {
     return SubRoutineResponseDto.from(child);
   }
 
+  /** 엄마 루틴 전체 수정. 하위 루틴 ID를 넘기면 400(ROUTINE_INVALID_TARGET). goalId는 수정 불가. */
+  @Transactional
+  public RoutineResponseDto updateMotherRoutine(
+      Long userId, Long routineId, RoutineUpdateRequestDto request) {
+    Routine routine = findOwnedRoutine(userId, routineId);
+    if (routine.isChild()) {
+      throw new CustomException(RoutineErrorCode.ROUTINE_INVALID_TARGET);
+    }
+    validateRoutineDate(request.routineType(), request.routineDate());
+
+    Tag tag = null;
+    if (request.tagId() != null) {
+      tag =
+          tagRepository
+              .findById(request.tagId())
+              .orElseThrow(() -> new CustomException(TagErrorCode.TAG_NOT_FOUND));
+    }
+
+    Integer routineDate = request.routineType() == RoutineType.DAILY ? null : request.routineDate();
+    routine.update(
+        request.title(),
+        request.dueDate(),
+        request.routineType(),
+        routineDate,
+        request.routineTime(),
+        tag);
+
+    LocalDate today = LocalDate.now(clock);
+    routineOverrideRepository.deleteByRoutineAndOverrideDateGreaterThanEqual(routine, today);
+
+    // 오늘 이미 배치로 생성된 todo가 있으면 새 루틴 값으로 즉시 반영
+    todoRepository
+        .findMotherTodoByRoutineAndDate(routine, today.atStartOfDay(), today.atTime(LocalTime.MAX))
+        .ifPresent(
+            motherTodo -> {
+              motherTodo.updateTitle(routine.getTitle());
+              motherTodo.updateTag(routine.getTag());
+              motherTodo.getChildren().forEach(child -> child.updateTag(routine.getTag()));
+            });
+
+    return RoutineResponseDto.from(routine);
+  }
+
   /** 하위 루틴 title 수정. 엄마 루틴 ID를 넘기면 400(ROUTINE_INVALID_TARGET). */
   @Transactional
   public SubRoutineResponseDto updateChildRoutine(
@@ -135,7 +185,8 @@ public class RoutineService {
   }
 
   @Transactional(readOnly = true)
-  public List<RoutineResponseDto> getRoutinesByDate(Long userId, LocalDate date) {
+  public Map<String, List<RoutineResponseDto>> getRoutinesByFilter(
+      Long userId, String filter, LocalDate date) {
     if (userId == null) {
       throw new CustomException(UserErrorCode.USER_NOT_FOUND);
     }
@@ -143,11 +194,26 @@ public class RoutineService {
         .findById(userId)
         .orElseThrow(() -> new CustomException(UserErrorCode.USER_NOT_FOUND));
 
+    List<LocalDate> dates =
+        switch (filter.toLowerCase()) {
+          case "day" -> List.of(date);
+          case "week" -> date.datesUntil(date.plusWeeks(1)).collect(Collectors.toList());
+          case "month" -> date.datesUntil(date.plusMonths(1)).collect(Collectors.toList());
+          default -> throw new CustomException(GlobalErrorCode.INVALID_INPUT);
+        };
+
+    Map<String, List<RoutineResponseDto>> result = new LinkedHashMap<>();
+    for (LocalDate d : dates) {
+      result.put(d.toString(), getRoutinesForDate(userId, d));
+    }
+    return result;
+  }
+
+  private List<RoutineResponseDto> getRoutinesForDate(Long userId, LocalDate date) {
     int dayBit = 1 << (date.getDayOfWeek().getValue() - 1);
     int dayOfMonth = date.getDayOfMonth();
-
-    return routineRepository.findMotherRoutinesByDate(userId, dayBit, dayOfMonth).stream()
-        .map(p -> RoutineResponseDto.from(p))
+    return routineRepository.findMotherRoutinesByDate(userId, dayBit, dayOfMonth, date).stream()
+        .map(RoutineResponseDto::from)
         .collect(Collectors.toList());
   }
 
@@ -205,12 +271,31 @@ public class RoutineService {
 
   @Transactional
   public void generateDailyTodos() {
-    LocalDate yesterday = LocalDate.now(clock).minusDays(1);
-    LocalDateTime start = yesterday.atStartOfDay();
-    LocalDateTime end = yesterday.atTime(23, 59, 59);
-    todoRepository
-        .findMotherRoutineTodosForRollover(start, end)
-        .forEach(todo -> createTodoTreeFromMother(todo.getRoutine()));
+    LocalDate today = LocalDate.now(clock);
+    List<Routine> routines =
+        routineRepository.findAllActiveMotherRoutines().stream()
+            .filter(r -> isOccurrenceDay(r, today))
+            .collect(Collectors.toList());
+
+    List<Long> routineIds = routines.stream().map(Routine::getId).collect(Collectors.toList());
+    Map<Long, RoutineOverride> overrideMap =
+        routineOverrideRepository.findByRoutineIdInAndOverrideDate(routineIds, today).stream()
+            .collect(Collectors.toMap(o -> o.getRoutine().getId(), o -> o));
+
+    routines.forEach(
+        r -> {
+          RoutineOverride override = overrideMap.get(r.getId());
+          if (override != null && override.isSkipped()) return;
+          createTodoTreeFromMother(r, override);
+        });
+  }
+
+  private boolean isOccurrenceDay(Routine routine, LocalDate today) {
+    return switch (routine.getRoutineType()) {
+      case DAILY -> true;
+      case WEEKLY -> (routine.getRoutineDate() & (1 << (today.getDayOfWeek().getValue() - 1))) != 0;
+      case MONTHLY -> routine.getRoutineDate().equals(today.getDayOfMonth());
+    };
   }
 
   /**
@@ -219,6 +304,10 @@ public class RoutineService {
    * 상속한다.
    */
   public void createTodoTreeFromMother(Routine motherRoutine) {
+    createTodoTreeFromMother(motherRoutine, null);
+  }
+
+  public void createTodoTreeFromMother(Routine motherRoutine, RoutineOverride override) {
     if (motherRoutine.isChild()) {
       throw new IllegalStateException("createTodoTreeFromMother는 엄마 루틴에만 호출 가능합니다.");
     }
@@ -237,11 +326,11 @@ public class RoutineService {
       return;
     }
 
-    Todo motherTodo = saveRoutineTodo(motherRoutine, dueDate, null);
+    Todo motherTodo = saveRoutineTodo(motherRoutine, dueDate, null, override);
     if (motherTodo == null) {
       return;
     }
-    motherRoutine.getChildren().forEach(child -> saveRoutineTodo(child, dueDate, motherTodo));
+    motherRoutine.getChildren().forEach(child -> saveRoutineTodo(child, dueDate, motherTodo, null));
   }
 
   /** 기존 엄마 Todo에 하위 Todo 1개를 매단다. 하위 루틴 추가 API에서 호출. dueDate/tag/goal/user는 엄마 Todo에서 상속한다. */
@@ -249,34 +338,61 @@ public class RoutineService {
     if (!childRoutine.isChild()) {
       throw new IllegalStateException("attachChildTodoUnder는 하위 루틴에만 호출 가능합니다.");
     }
-    saveRoutineTodo(childRoutine, motherTodo.getDueDate(), motherTodo);
+    saveRoutineTodo(childRoutine, motherTodo.getDueDate(), motherTodo, null);
   }
 
-  private Todo saveRoutineTodo(Routine routine, LocalDateTime dueDate, Todo parentTodo) {
+  private Todo saveRoutineTodo(
+      Routine routine, LocalDateTime dueDate, Todo parentTodo, RoutineOverride override) {
     if (todoRepository.existsByRoutineAndDueDate(routine, dueDate)) {
       return null;
     }
+
+    Routine motherForInherit = routine.isChild() ? routine.getParent() : routine;
+
+    String title =
+        (override != null && override.getTitle() != null)
+            ? override.getTitle()
+            : routine.getTitle();
+    Tag tag =
+        (override != null && override.getTag() != null)
+            ? override.getTag()
+            : motherForInherit.getTag();
+    double sortOrder =
+        (override != null && override.getSortOrder() != null)
+            ? override.getSortOrder()
+            : motherForInherit.getDefaultSortOrder();
+    boolean isPinned = override != null && Boolean.TRUE.equals(override.getIsPinned());
+    boolean isCompleted = override != null && Boolean.TRUE.equals(override.getIsCompleted());
+
+    Todo todo;
     try {
-      Routine motherForInherit = routine.isChild() ? routine.getParent() : routine;
-      return todoRepository.saveAndFlush(
-          Todo.builder()
-              .title(routine.getTitle())
-              .dueDate(dueDate)
-              .isPinned(false)
-              .user(motherForInherit.getUser())
-              .tag(motherForInherit.getTag())
-              .goal(motherForInherit.getGoal())
-              .routine(routine)
-              .parent(parentTodo)
-              .build());
+      todo =
+          todoRepository.saveAndFlush(
+              Todo.builder()
+                  .title(title)
+                  .dueDate(dueDate)
+                  .sortOrder(sortOrder)
+                  .isPinned(isPinned)
+                  .user(motherForInherit.getUser())
+                  .tag(tag)
+                  .goal(motherForInherit.getGoal())
+                  .routine(routine)
+                  .parent(parentTodo)
+                  .build());
     } catch (DataIntegrityViolationException e) {
-      String msg = e.getMostSpecificCause().getMessage();
-      if (msg == null || !msg.contains("uq_todo_routine_duedate")) {
-        throw e;
-      }
-      // uq_todo_routine_duedate 충돌 — 동시 INSERT로 이미 생성된 것으로 간주
+      // 스케줄러 중복 실행 등으로 unique(routine_id, due_date) 충돌 시 no-op
       return null;
     }
+
+    if (isCompleted) {
+      LocalDateTime completedTime =
+          override.getCompletedTime() != null
+              ? override.getCompletedTime()
+              : LocalDateTime.now(clock);
+      todo.updateCompleted(true, completedTime);
+    }
+
+    return todo;
   }
 
   private LocalDate nextOccurrence(Routine routine, LocalDate today) {

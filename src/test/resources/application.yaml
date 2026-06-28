@@ -38,3 +38,6 @@ cloud:
 
 gemini:
   api-key: test-gemini-api-key
+
+firebase:
+  enabled: false

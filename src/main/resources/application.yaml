@@ -66,3 +66,7 @@ statistics:
   batch:
     gemini-call-delay-ms: 2500
     max-retry-count: 3
+
+firebase:
+  enabled: true
+  service-account-json: ${FIREBASE_SERVICE_ACCOUNT_JSON:}

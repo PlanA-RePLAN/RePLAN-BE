@@ -29,12 +29,12 @@ public interface TodoRepository extends JpaRepository<Todo, Long> {
   List<Todo> findAllByRoutine(Routine routine);
 
   @Query(
-      "SELECT t FROM Todo t JOIN t.routine r"
-          + " WHERE t.parent IS NULL"
-          + " AND t.dueDate BETWEEN :start AND :end"
-          + " AND r.deletedAt IS NULL")
-  List<Todo> findMotherRoutineTodosForRollover(
-      @Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
+      "SELECT t FROM Todo t WHERE t.routine = :routine AND t.parent IS NULL"
+          + " AND t.dueDate >= :start AND t.dueDate < :end AND t.deletedAt IS NULL")
+  Optional<Todo> findMotherTodoByRoutineAndDate(
+      @Param("routine") Routine routine,
+      @Param("start") LocalDateTime start,
+      @Param("end") LocalDateTime end);
 
   @Query(
       "SELECT t FROM Todo t"
@@ -100,6 +100,11 @@ public interface TodoRepository extends JpaRepository<Todo, Long> {
       @Param("end") LocalDateTime end);
 
   @Query(
+      "SELECT MAX(t.sortOrder) FROM Todo t WHERE t.user = :user AND t.parent IS NULL"
+          + " AND t.deletedAt IS NULL")
+  Optional<Double> findMaxSortOrderByUser(@Param("user") User user);
+
+  @Query(
       "SELECT t FROM Todo t WHERE t.user = :user AND t.parent IS NULL AND t.replan IS NOT NULL"
           + " AND ((t.dueDate >= :start AND t.dueDate < :end)"
           + " OR (t.dueDate IS NULL AND t.completedTime >= :start AND t.completedTime < :end))")
@@ -107,4 +112,18 @@ public interface TodoRepository extends JpaRepository<Todo, Long> {
       @Param("user") User user,
       @Param("start") LocalDateTime start,
       @Param("end") LocalDateTime end);
+
+  @Query(
+      "SELECT t FROM Todo t JOIN FETCH t.user WHERE t.parent IS NULL AND t.isCompleted = false"
+          + " AND t.isPinned = true AND t.isActive = true"
+          + " AND t.dueDate >= :start AND t.dueDate < :end")
+  List<Todo> findPinnedDueBetween(
+      @Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
+
+  @Query(
+      "SELECT t FROM Todo t JOIN FETCH t.user WHERE t.parent IS NULL AND t.isCompleted = false"
+          + " AND t.isActive = true AND t.replan IS NULL"
+          + " AND t.dueDate >= :start AND t.dueDate < :end")
+  List<Todo> findFailedBetween(
+      @Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
 }

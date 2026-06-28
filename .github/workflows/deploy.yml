@@ -83,6 +83,14 @@ jobs:
               exit 1
             fi
             printf 'APPLE_PRIVATE_KEY=%s\n' "$APPLE_PRIVATE_KEY" >> /home/ubuntu/app/.env
+            # Firebase 서비스 계정 키(JSON)는 공백·따옴표가 있어 xargs 대신 한 줄로 직접 기록한다.
+            # 조회 실패 시 빈 값이 들어가면 앱이 또 기동 실패(502)하므로, 비어 있으면 배포를 중단한다.
+            FIREBASE_SERVICE_ACCOUNT_JSON="$(aws ssm get-parameter --name /replan/prod/FIREBASE_SERVICE_ACCOUNT_JSON --with-decryption --query Parameter.Value --output text --region ${{ secrets.AWS_REGION }})"
+            if [ -z "$FIREBASE_SERVICE_ACCOUNT_JSON" ]; then
+              echo "FIREBASE_SERVICE_ACCOUNT_JSON 조회 실패 또는 빈 값 — 배포 중단" >&2
+              exit 1
+            fi
+            printf 'FIREBASE_SERVICE_ACCOUNT_JSON=%s\n' "$FIREBASE_SERVICE_ACCOUNT_JSON" >> /home/ubuntu/app/.env
 
             # GitHub Secrets에서 ECR 정보 추가
             echo "ECR_REGISTRY=${{ secrets.ECR_REGISTRY }}" >> /home/ubuntu/app/.env
