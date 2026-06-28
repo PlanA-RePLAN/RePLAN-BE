@@ -7,6 +7,7 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.http.HttpHeaders;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -14,6 +15,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClient;
+import plana.replan.domain.auth.apple.AppleAuthClient;
+import plana.replan.domain.auth.apple.AppleIdTokenPayload;
+import plana.replan.domain.auth.apple.AppleTokenResponse;
+import plana.replan.domain.auth.apple.AppleTokenVerifier;
+import plana.replan.domain.auth.dto.AppleLoginRequestDto;
 import plana.replan.domain.auth.dto.GoogleLoginRequestDto;
 import plana.replan.domain.auth.dto.KakaoLoginRequestDto;
 import plana.replan.domain.auth.dto.LoginRequestDto;
@@ -33,6 +39,7 @@ import plana.replan.global.jwt.JwtErrorCode;
 import plana.replan.global.jwt.JwtUtil;
 import plana.replan.global.s3.S3Service;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class AuthService {
@@ -45,6 +52,8 @@ public class AuthService {
   private final RestClient restClient;
   private final S3Service s3Service;
   private final TagService tagService;
+  private final AppleTokenVerifier appleTokenVerifier;
+  private final AppleAuthClient appleAuthClient;
 
   @Transactional
   public void signUp(SignUpRequestDto request) {
@@ -165,6 +174,17 @@ public class AuthService {
                 .build());
     tagService.createDefaultTags(user);
 
+    // 5-1. 애플이면 임시 저장된 refresh token을 userId 키로 옮긴다
+    if (provider == Provider.APPLE) {
+      String appleRefresh = redisTemplate.opsForValue().get("apple-refresh-temp:" + email);
+      // 임시 키가 없으면(만료 등) 탈퇴 시 애플 연동 해제를 못 하므로, 가입 상태 불일치로 보고 재로그인을 요구한다.
+      if (appleRefresh == null) {
+        throw new CustomException(UserErrorCode.INVALID_TEMP_TOKEN);
+      }
+      redisTemplate.opsForValue().set("apple:refresh:" + user.getId(), appleRefresh);
+      redisTemplate.delete("apple-refresh-temp:" + email);
+    }
+
     // 6. tempToken 삭제
     redisTemplate.delete("oauth-temp:" + tempToken);
 
@@ -269,6 +289,57 @@ public class AuthService {
                   tokens.getAccessToken(), tokens.getRefreshToken());
             })
         .orElseGet(() -> OAuthLoginResponseDto.newUser(issueTempToken(email, Provider.KAKAO)));
+  }
+
+  @Transactional
+  public OAuthLoginResponseDto appleLogin(AppleLoginRequestDto request) {
+
+    // 1. identityToken 검증 → 이메일, aud(=client_id) 추출
+    AppleIdTokenPayload payload = appleTokenVerifier.verify(request.getIdentityToken());
+    String email = payload.email();
+    String clientId = payload.aud();
+
+    // 2. 같은 이메일로 이미 다른 방식으로 가입된 경우 차단 (Apple 네트워크 호출 전에 먼저 확인)
+    Optional<User> existingUser = userRepository.findByEmail(email);
+    if (existingUser.isPresent() && existingUser.get().getProvider() != Provider.APPLE) {
+      throw new CustomException(UserErrorCode.OAUTH_PROVIDER_CONFLICT);
+    }
+
+    // 3. authorizationCode 교환 → refresh token 확보(탈퇴 시 철회용)
+    AppleTokenResponse tokenResponse =
+        appleAuthClient.exchangeRefreshToken(clientId, request.getAuthorizationCode());
+
+    // 3-1. 신분증(identityToken)과 인가코드가 같은 사용자에게서 왔는지 확인(bind).
+    //      교환 응답의 sub가 없거나(파싱 불가) 신분증 sub와 다르면 거부한다.
+    //      이미 발급받은 애플 refresh token은 저장하지 않고 버리므로, 고아 연동이 남지 않게 best-effort로 철회한다.
+    if (tokenResponse.sub() == null || !tokenResponse.sub().equals(payload.sub())) {
+      try {
+        appleAuthClient.revoke(clientId, tokenResponse.refreshToken());
+      } catch (Exception e) {
+        log.warn("bind 실패로 거부된 애플 토큰 철회 실패(무시하고 진행)", e);
+      }
+      throw new CustomException(UserErrorCode.APPLE_TOKEN_INVALID);
+    }
+
+    String storedValue = clientId + "|" + tokenResponse.refreshToken();
+
+    // 4. 기존유저: JWT 발급 + refresh token을 userId 키에 저장 / 신규유저: tempToken + email 임시 키
+    return userRepository
+        .findByEmailAndProvider(email, Provider.APPLE)
+        .map(
+            user -> {
+              redisTemplate.opsForValue().set("apple:refresh:" + user.getId(), storedValue);
+              LoginResponseDto tokens = issueTokenPair(user);
+              return OAuthLoginResponseDto.existingUser(
+                  tokens.getAccessToken(), tokens.getRefreshToken());
+            })
+        .orElseGet(
+            () -> {
+              redisTemplate
+                  .opsForValue()
+                  .set("apple-refresh-temp:" + email, storedValue, 300, TimeUnit.SECONDS);
+              return OAuthLoginResponseDto.newUser(issueTempToken(email, Provider.APPLE));
+            });
   }
 
   @SuppressWarnings("unchecked")

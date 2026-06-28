@@ -14,6 +14,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
+import plana.replan.domain.auth.dto.AppleLoginRequestDto;
 import plana.replan.domain.auth.dto.GoogleLoginRequestDto;
 import plana.replan.domain.auth.dto.KakaoLoginRequestDto;
 import plana.replan.domain.auth.dto.LoginRequestDto;
@@ -814,6 +815,150 @@ public class AuthController {
   public ResponseEntity<ApiResult<OAuthLoginResponseDto>> kakaoLogin(
       @Valid @RequestBody KakaoLoginRequestDto request) {
     return ResponseEntity.ok(ApiResult.ok(authService.kakaoLogin(request)));
+  }
+
+  @Operation(
+      summary = "애플 로그인",
+      description =
+          """
+          **호출 주체**: 비인증 사용자
+
+          **비즈니스 로직**
+          1. 프론트가 보낸 identityToken(JWT)을 애플 공개키로 검증 → 이메일 추출
+          2. authorizationCode를 애플 토큰 엔드포인트에서 refresh token으로 교환(탈퇴 시 철회용)
+          3. 같은 이메일이 다른 provider로 가입돼 있으면 409
+          4. 기존유저: accessToken/refreshToken 발급 (isNewUser: false)
+          5. 신규유저: tempToken(5분) 발급 (isNewUser: true) → 온보딩 후 `/api/auth/oauth/register` 호출 필요
+          """)
+  @ApiResponses({
+    @ApiResponse(
+        responseCode = "200",
+        description = "로그인 성공 - 기존유저: accessToken/refreshToken, 신규유저: tempToken",
+        content =
+            @Content(
+                schema = @Schema(implementation = OAuthLoginResponseDto.class),
+                examples = {
+                  @ExampleObject(
+                      name = "기존 유저",
+                      value =
+                          """
+                          {
+                            "status": 200,
+                            "success": true,
+                            "data": {
+                              "isNewUser": false,
+                              "tempToken": null,
+                              "accessToken": "eyJhbGciOiJIUzI1NiJ9...",
+                              "refreshToken": "eyJhbGciOiJIUzI1NiJ9..."
+                            },
+                            "error": null
+                          }
+                          """),
+                  @ExampleObject(
+                      name = "신규 유저",
+                      value =
+                          """
+                          {
+                            "status": 200,
+                            "success": true,
+                            "data": {
+                              "isNewUser": true,
+                              "tempToken": "b1a2c3d4-...",
+                              "accessToken": null,
+                              "refreshToken": null
+                            },
+                            "error": null
+                          }
+                          """)
+                })),
+    @ApiResponse(
+        responseCode = "400",
+        description = "요청 값 유효성 검사 실패 (identityToken/authorizationCode 누락)",
+        content =
+            @Content(
+                examples =
+                    @ExampleObject(
+                        value =
+                            """
+                            {
+                              "status": 400,
+                              "success": false,
+                              "data": null,
+                              "error": {
+                                "code": "INVALID_INPUT",
+                                "message": "잘못된 입력입니다.",
+                                "detail": "identityToken: 공백일 수 없습니다."
+                              }
+                            }
+                            """))),
+    @ApiResponse(
+        responseCode = "401",
+        description = "애플 토큰 검증 실패",
+        content =
+            @Content(
+                examples =
+                    @ExampleObject(
+                        name = "APPLE_TOKEN_INVALID",
+                        value =
+                            """
+                            {
+                              "status": 401,
+                              "success": false,
+                              "data": null,
+                              "error": {
+                                "code": "APPLE_TOKEN_INVALID",
+                                "message": "Apple ID Token 검증에 실패했습니다.",
+                                "detail": null
+                              }
+                            }
+                            """))),
+    @ApiResponse(
+        responseCode = "409",
+        description = "다른 방식으로 이미 가입된 이메일",
+        content =
+            @Content(
+                examples =
+                    @ExampleObject(
+                        name = "OAUTH_PROVIDER_CONFLICT",
+                        value =
+                            """
+                            {
+                              "status": 409,
+                              "success": false,
+                              "data": null,
+                              "error": {
+                                "code": "OAUTH_PROVIDER_CONFLICT",
+                                "message": "해당 이메일은 이미 다른 방식으로 가입되어 있습니다.",
+                                "detail": null
+                              }
+                            }
+                            """))),
+    @ApiResponse(
+        responseCode = "503",
+        description = "애플 서버 통신 실패",
+        content =
+            @Content(
+                examples =
+                    @ExampleObject(
+                        name = "OAUTH_SERVER_UNAVAILABLE",
+                        value =
+                            """
+                            {
+                              "status": 503,
+                              "success": false,
+                              "data": null,
+                              "error": {
+                                "code": "OAUTH_SERVER_UNAVAILABLE",
+                                "message": "OAuth 서버와 통신에 실패했습니다.",
+                                "detail": null
+                              }
+                            }
+                            """)))
+  })
+  @PostMapping("/oauth/apple")
+  public ResponseEntity<ApiResult<OAuthLoginResponseDto>> appleLogin(
+      @Valid @RequestBody AppleLoginRequestDto request) {
+    return ResponseEntity.ok(ApiResult.ok(authService.appleLogin(request)));
   }
 
   @Operation(
