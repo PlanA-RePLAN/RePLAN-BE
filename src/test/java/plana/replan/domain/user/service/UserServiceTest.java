@@ -2,6 +2,7 @@ package plana.replan.domain.user.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -15,7 +16,9 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.test.util.ReflectionTestUtils;
+import plana.replan.domain.auth.apple.AppleAuthClient;
 import plana.replan.domain.auth.dto.PresignedUrlResponseDto;
 import plana.replan.domain.goal.repository.GoalRepository;
 import plana.replan.domain.notification.repository.DeviceTokenRepository;
@@ -45,6 +48,8 @@ class UserServiceTest {
   @Mock private DeviceTokenRepository deviceTokenRepository;
   @Mock private S3Service s3Service;
   @Mock private StringRedisTemplate redisTemplate;
+  @Mock private ValueOperations<String, String> valueOperations;
+  @Mock private AppleAuthClient appleAuthClient;
 
   @InjectMocks private UserService userService;
 
@@ -263,6 +268,58 @@ class UserServiceTest {
 
     // refresh token은 익명화 전 "원래 이메일" 키로 삭제되어야 한다
     verify(redisTemplate).delete("refresh:test@test.com");
+  }
+
+  @Test
+  @DisplayName("애플 유저 탈퇴 시 refresh token으로 revoke를 호출하고 키를 삭제한다")
+  void deleteAccount_apple_revokes() {
+    Long userId = 1L;
+    User user =
+        User.builder()
+            .email("apple-user@privaterelay.appleid.com")
+            .nickname("a")
+            .role(Role.ROLE_USER)
+            .provider(Provider.APPLE)
+            .build();
+    org.springframework.test.util.ReflectionTestUtils.setField(user, "id", userId);
+    given(userRepository.findById(userId)).willReturn(java.util.Optional.of(user));
+    given(redisTemplate.opsForValue()).willReturn(valueOperations);
+    given(valueOperations.get("apple:refresh:" + userId))
+        .willReturn("com.replan.service|apple-refresh-token");
+
+    userService.deleteAccount(userId);
+
+    verify(appleAuthClient).revoke("com.replan.service", "apple-refresh-token");
+    verify(redisTemplate).delete("apple:refresh:" + userId);
+  }
+
+  @Test
+  @DisplayName("revoke가 실패해도 탈퇴(soft delete)는 진행된다")
+  void deleteAccount_apple_revokeFails_stillWithdraws() {
+    Long userId = 1L;
+    User user =
+        User.builder()
+            .email("apple-user@privaterelay.appleid.com")
+            .nickname("a")
+            .role(Role.ROLE_USER)
+            .provider(Provider.APPLE)
+            .build();
+    org.springframework.test.util.ReflectionTestUtils.setField(user, "id", userId);
+    given(userRepository.findById(userId)).willReturn(java.util.Optional.of(user));
+    given(redisTemplate.opsForValue()).willReturn(valueOperations);
+    given(valueOperations.get("apple:refresh:" + userId))
+        .willReturn("com.replan.service|apple-refresh-token");
+    org.mockito.BDDMockito.willThrow(new RuntimeException("apple down"))
+        .given(appleAuthClient)
+        .revoke(anyString(), anyString());
+
+    userService.deleteAccount(userId);
+
+    // 탈퇴는 진행됨 — 데이터 soft delete가 호출됐는지로 확인
+    verify(todoRepository)
+        .softDeleteAllByUserId(
+            org.mockito.ArgumentMatchers.eq(userId), org.mockito.ArgumentMatchers.any());
+    verify(redisTemplate).delete("apple:refresh:" + userId);
   }
 
   @Test

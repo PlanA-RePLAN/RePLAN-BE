@@ -23,6 +23,7 @@ import org.mockito.quality.Strictness;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.client.RestClient;
 import plana.replan.domain.auth.dto.LoginResponseDto;
 import plana.replan.domain.auth.dto.OAuthRegisterRequestDto;
@@ -131,6 +132,56 @@ class AuthServiceRegisterTest {
                     .isEqualTo(UserErrorCode.INVALID_TEMP_TOKEN));
 
     verify(userRepository, never()).save(any(User.class));
+  }
+
+  @Test
+  @DisplayName("애플 신규 가입 완료 시 임시 refresh token을 userId 키로 옮기고 임시 키를 삭제한다")
+  void register_apple_movesRefreshToken() {
+    String tempToken = "temp-uuid";
+    String email = "apple-user@privaterelay.appleid.com";
+    given(valueOperations.get("oauth-temp:" + tempToken)).willReturn(email + ":APPLE");
+    given(valueOperations.get("apple-refresh-temp:" + email))
+        .willReturn("com.replan.service|apple-refresh-token");
+    given(userRepository.existsByNickname(anyString())).willReturn(false);
+    User saved =
+        User.builder()
+            .email(email)
+            .nickname("nick")
+            .role(Role.ROLE_USER)
+            .provider(Provider.APPLE)
+            .build();
+    ReflectionTestUtils.setField(saved, "id", 1L);
+    given(userRepository.save(any(User.class))).willReturn(saved);
+
+    authService.register(new OAuthRegisterRequestDto("nick", null), tempToken);
+
+    verify(valueOperations)
+        .set("apple:refresh:" + saved.getId(), "com.replan.service|apple-refresh-token");
+    verify(redisTemplate).delete("apple-refresh-temp:" + email);
+  }
+
+  @Test
+  @DisplayName("애플 가입인데 임시 refresh token이 없으면(만료 등) INVALID_TEMP_TOKEN으로 가입 실패")
+  void register_apple_missingRefresh_throws() {
+    String tempToken = "temp-uuid";
+    String email = "apple-user@privaterelay.appleid.com";
+    given(valueOperations.get("oauth-temp:" + tempToken)).willReturn(email + ":APPLE");
+    given(valueOperations.get("apple-refresh-temp:" + email)).willReturn(null);
+    given(userRepository.existsByNickname(anyString())).willReturn(false);
+    User saved =
+        User.builder()
+            .email(email)
+            .nickname("nick")
+            .role(Role.ROLE_USER)
+            .provider(Provider.APPLE)
+            .build();
+    ReflectionTestUtils.setField(saved, "id", 1L);
+    given(userRepository.save(any(User.class))).willReturn(saved);
+
+    assertThatThrownBy(
+            () -> authService.register(new OAuthRegisterRequestDto("nick", null), tempToken))
+        .isInstanceOf(CustomException.class)
+        .hasFieldOrPropertyWithValue("errorCode", UserErrorCode.INVALID_TEMP_TOKEN);
   }
 
   @Test
