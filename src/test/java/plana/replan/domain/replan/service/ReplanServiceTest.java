@@ -397,6 +397,32 @@ class ReplanServiceTest {
   }
 
   @Test
+  void MODIFY_ROUTINE_재생성된_오늘회차에_리플랜링크를_단다() {
+    Todo anchor = ownedTodo(42L, 1L);
+    given(anchor.getId()).willReturn(42L);
+    given(anchor.getDueDate()).willReturn(LocalDateTime.of(2026, 6, 25, 11, 0)); // 실패 전
+    given(anchor.getChildren()).willReturn(List.of());
+    Routine routine = org.mockito.Mockito.mock(Routine.class);
+    given(anchor.getRoutine()).willReturn(routine);
+    given(routine.getRoutineType()).willReturn(RoutineType.DAILY);
+    given(routine.getRoutineTime()).willReturn(LocalTime.of(7, 30));
+    given(routine.getTag()).willReturn(null);
+    given(todoRepository.findById(42L)).willReturn(Optional.of(anchor));
+    given(replanRepository.save(any(Replan.class))).willAnswer(inv -> inv.getArgument(0));
+    given(routineService.occursToday(routine)).willReturn(true);
+    Todo newInstance = org.mockito.Mockito.mock(Todo.class);
+    given(todoRepository.findFirstUpcomingMotherTodoByRoutine(any(), any()))
+        .willReturn(Optional.of(newInstance));
+
+    ReplanOperation op =
+        new ReplanOperation(
+            ReplanAction.MODIFY_ROUTINE, 42L, "새 제목", null, null, null, null, null, List.of());
+    replanService.save(1L, new ReplanSaveRequest(42L, List.of("GOAL_NO_PRIORITY"), List.of(op)));
+
+    then(newInstance).should().linkReplan(any(Replan.class));
+  }
+
+  @Test
   void MODIFY_ROUTINE_실패후면_회차를_비활성화하고_재생성안한다() {
     Todo anchor = ownedTodo(42L, 1L);
     given(anchor.getId()).willReturn(42L);
