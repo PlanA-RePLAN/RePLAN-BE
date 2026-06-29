@@ -20,13 +20,12 @@ class ReplanQuestionRegistryTest {
   }
 
   @Test
-  void 시작이_어려운_사유는_칩_질문과_보기를_준다() {
-    List<ReplanQuestion> questions =
-        ReplanQuestionRegistry.forReasonCodes(List.of("MENTAL_HARD_TO_START"));
-
-    assertThat(questions).hasSize(1);
-    assertThat(questions.get(0).type()).isEqualTo(QuestionType.CHIP);
-    assertThat(questions.get(0).chips()).contains("무엇부터 시작할지 몰라서");
+  void 시작막막_사유는_칩_되묻기가_아니라_트리_3단계라_추가질문이_없다() {
+    // CHIP 평탄화: 시작막막의 세부 사유(무엇부터/시간에너지/완벽)는 3단계 트리 선택으로 처리하므로
+    // 칩 되묻기 질문이 사라졌다.
+    assertThat(ReplanQuestionRegistry.forReasonCodes(List.of("MENTAL_HARD_TO_START"))).isEmpty();
+    // 3단계 코드도 부모(시작막막)에 질문이 없으니 추가 질문 없이 바로 추천으로 간다.
+    assertThat(ReplanQuestionRegistry.forReasonCodes(List.of("MENTAL_START_WHERE"))).isEmpty();
   }
 
   @Test

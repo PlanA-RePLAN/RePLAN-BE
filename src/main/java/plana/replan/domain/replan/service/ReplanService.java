@@ -141,11 +141,13 @@ public class ReplanService {
         if (a == null) {
           continue; // 답변 배열에 null이 섞여 와도 500으로 터지지 않도록 건너뛴다.
         }
+        // 소유권 검증을 통과한 투두만 추려, ID와 라벨이 같은 집합을 가리키게 한다.
+        // (남의/없는 투두 ID가 섞여 와도 라벨만 거르고 ID는 원본을 넘기면 둘이 어긋나 잘못된 추천이 만들어질 수 있음)
+        List<Todo> ownedTodos = resolveOwnedTodos(a.selectedTodoIds(), anchor.getUser().getId());
+        List<Long> ownedIds = ownedTodos.stream().map(Todo::getId).toList();
         List<String> todoLabels =
-            resolveSelectedTodoLabels(a.selectedTodoIds(), anchor.getUser().getId());
-        answerInputs.add(
-            new RecommendInput.AnswerInput(
-                a.key(), a.text(), a.selectedTodoIds(), a.selectedChips(), todoLabels));
+            ownedTodos.stream().map(t -> t.getId() + ":" + t.getTitle()).toList();
+        answerInputs.add(new RecommendInput.AnswerInput(a.key(), a.text(), ownedIds, todoLabels));
       }
     }
     return new RecommendInput(
@@ -162,18 +164,19 @@ public class ReplanService {
         refreshCount);
   }
 
-  private List<String> resolveSelectedTodoLabels(List<Long> todoIds, Long userId) {
+  /** 선택한 투두 ID 중 해당 사용자의 것만 추려 엔티티로 반환한다(없거나 남의 것은 제외). */
+  private List<Todo> resolveOwnedTodos(List<Long> todoIds, Long userId) {
     if (todoIds == null || todoIds.isEmpty()) {
       return List.of();
     }
-    List<String> labels = new ArrayList<>();
+    List<Todo> result = new ArrayList<>();
     for (Long id : todoIds) {
       todoRepository
           .findById(id)
           .filter(t -> t.getUser().getId().equals(userId))
-          .ifPresent(t -> labels.add(id + ":" + t.getTitle()));
+          .ifPresent(result::add);
     }
-    return labels;
+    return result;
   }
 
   List<String> toReasonLabels(List<String> codes) {

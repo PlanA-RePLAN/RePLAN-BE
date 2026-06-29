@@ -16,9 +16,5 @@ public record RecommendInput(
     int refreshCount) {
 
   public record AnswerInput(
-      String key,
-      String text,
-      List<Long> selectedTodoIds,
-      List<String> selectedChips,
-      List<String> selectedTodoLabels) {}
+      String key, String text, List<Long> selectedTodoIds, List<String> selectedTodoLabels) {}
 }
