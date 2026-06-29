@@ -8,6 +8,7 @@ import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -221,8 +222,9 @@ public class ReplanService {
           anchorHandled = true;
         }
         case CREATE_ROUTINE -> {
-          applyCreateRoutine(op, anchor, replan);
-          replacementCreated = true;
+          // 회차 투두가 실제로 만들어졌을 때만 "앵커를 치울 대체가 생겼다"고 본다.
+          // (루틴 종료일이 이미 지나 회차가 안 생기면 앵커를 비활성화하면 안 된다 — 원본까지 사라짐)
+          replacementCreated |= applyCreateRoutine(op, anchor, replan);
         }
       }
     }
@@ -494,7 +496,8 @@ public class ReplanService {
     }
   }
 
-  private void applyCreateRoutine(ReplanOperation op, Todo anchor, Replan replan) {
+  /** 새 루틴을 만들고 가까운 회차 투두를 리플랜에 연결한다. 회차 투두가 실제로 만들어졌으면 true. */
+  private boolean applyCreateRoutine(ReplanOperation op, Todo anchor, Replan replan) {
     if (op.routineType() == null) {
       throw new CustomException(ReplanErrorCode.REPLAN_INVALID_OPERATION);
     }
@@ -517,9 +520,11 @@ public class ReplanService {
     routine.linkReplan(replan);
     routineRepository.save(routine);
     routineService.createTodoTreeFromMother(routine);
-    todoRepository
-        .findFirstUpcomingMotherTodoByRoutine(routine, LocalDate.now(clock).atStartOfDay())
-        .ifPresent(instanceTodo -> instanceTodo.linkReplan(replan));
+    Optional<Todo> instance =
+        todoRepository.findFirstUpcomingMotherTodoByRoutine(
+            routine, LocalDate.now(clock).atStartOfDay());
+    instance.ifPresent(instanceTodo -> instanceTodo.linkReplan(replan));
+    return instance.isPresent();
   }
 
   private void validateRecurrence(RoutineType type, Integer routineDate) {

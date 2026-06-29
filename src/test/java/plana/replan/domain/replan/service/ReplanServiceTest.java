@@ -517,6 +517,35 @@ class ReplanServiceTest {
   }
 
   @Test
+  void CREATE_ROUTINE이_회차를_못만들면_마감지난_앵커를_치우지_않는다() {
+    // 루틴 종료일이 이미 지나 회차 투두가 안 생기는 경우, 앵커를 비활성화하면
+    // 원본도 대체도 없이 사라지므로 앵커를 건드리면 안 된다.
+    Todo anchor = ownedTodo(42L, 1L);
+    given(anchor.getDueDate()).willReturn(LocalDateTime.of(2026, 6, 1, 10, 0)); // 과거(실패 후)
+    given(todoRepository.findById(42L)).willReturn(Optional.of(anchor));
+    given(replanRepository.save(any(Replan.class))).willAnswer(inv -> inv.getArgument(0));
+    // 회차 투두가 만들어지지 않음
+    given(todoRepository.findFirstUpcomingMotherTodoByRoutine(any(), any()))
+        .willReturn(Optional.empty());
+
+    ReplanOperation op =
+        new ReplanOperation(
+            ReplanAction.CREATE_ROUTINE,
+            null,
+            "스트레칭",
+            "2020-01-01",
+            "20:00",
+            null,
+            "DAILY",
+            null,
+            List.of());
+    replanService.save(1L, new ReplanSaveRequest(42L, List.of("CONDITION_PAIN"), List.of(op)));
+
+    then(anchor).should(never()).deactivate();
+    then(anchor).should(never()).softDelete();
+  }
+
+  @Test
   void CREATE_ROUTINE은_종료일이_있으면_루틴_종료일로_저장한다() {
     Todo todo = ownedTodo(42L, 1L);
     given(todoRepository.findById(42L)).willReturn(Optional.of(todo));
