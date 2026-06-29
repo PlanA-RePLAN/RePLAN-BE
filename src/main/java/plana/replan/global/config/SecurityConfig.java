@@ -93,6 +93,11 @@ public class SecurityConfig {
     config.addAllowedOrigin("http://localhost:3000");
     config.addAllowedOrigin("http://localhost:5173");
     config.addAllowedOrigin("https://re-plan-fe.vercel.app");
+    // Capacitor 네이티브 앱(iOS/Android) webview origin 허용
+    config.addAllowedOrigin("capacitor://localhost");
+    config.addAllowedOrigin("ionic://localhost");
+    config.addAllowedOrigin("http://localhost");
+    config.addAllowedOrigin("https://localhost");
     config.addAllowedMethod("*");
     config.addAllowedHeader("*");
     config.setAllowCredentials(true);
