@@ -377,7 +377,8 @@ class ReplanServiceTest {
     given(anchor.getRoutine()).willReturn(routine);
     given(todoRepository.findById(42L)).willReturn(Optional.of(anchor));
     given(replanRepository.save(any(Replan.class))).willAnswer(inv -> inv.getArgument(0));
-    given(routineService.willMaterializeToday(routine)).willReturn(false); // 오늘 회차 안 만들어짐
+    given(routineService.willCreateUpcomingOccurrence(routine))
+        .willReturn(false); // 종료일 경과 → 다음 회차 안 만들어짐
 
     ReplanOperation op =
         new ReplanOperation(
@@ -419,7 +420,7 @@ class ReplanServiceTest {
     given(routine.getTag()).willReturn(null);
     given(todoRepository.findById(42L)).willReturn(Optional.of(anchor));
     given(replanRepository.save(any(Replan.class))).willAnswer(inv -> inv.getArgument(0));
-    given(routineService.willMaterializeToday(routine)).willReturn(true);
+    given(routineService.willCreateUpcomingOccurrence(routine)).willReturn(true);
     given(todoRepository.findFirstUpcomingMotherTodoByRoutine(any(), any()))
         .willReturn(Optional.of(org.mockito.Mockito.mock(Todo.class)));
 
@@ -445,7 +446,7 @@ class ReplanServiceTest {
     given(routine.getTag()).willReturn(null);
     given(todoRepository.findById(42L)).willReturn(Optional.of(anchor));
     given(replanRepository.save(any(Replan.class))).willAnswer(inv -> inv.getArgument(0));
-    given(routineService.willMaterializeToday(routine)).willReturn(true);
+    given(routineService.willCreateUpcomingOccurrence(routine)).willReturn(true);
     Todo newInstance = org.mockito.Mockito.mock(Todo.class);
     given(todoRepository.findFirstUpcomingMotherTodoByRoutine(any(), any()))
         .willReturn(Optional.of(newInstance));

@@ -746,33 +746,31 @@ class RoutineServiceTest {
                     .isEqualTo(RoutineErrorCode.ROUTINE_NOT_FOUND));
   }
 
-  // ========== willMaterializeToday ==========
+  // ========== willCreateUpcomingOccurrence ==========
 
   @Test
-  void willMaterializeToday_DAILY_종료일없으면_참() {
+  void willCreateUpcomingOccurrence_종료일없으면_참() {
+    // 종료일이 없으면(무기한 반복) 다음 회차를 항상 만든다.
     Routine daily = org.mockito.Mockito.mock(Routine.class);
-    given(daily.getRoutineType()).willReturn(RoutineType.DAILY);
-    assertThat(routineService.willMaterializeToday(daily)).isTrue();
+    assertThat(routineService.willCreateUpcomingOccurrence(daily)).isTrue();
   }
 
   @Test
-  void willMaterializeToday_WEEKLY는_오늘_요일_비트가_켜져야_참() {
-    Routine wk = org.mockito.Mockito.mock(Routine.class);
-    given(wk.getRoutineType()).willReturn(RoutineType.WEEKLY);
-    // TEST_DATE = 2024-01-15 = 월요일(getDayOfWeek().getValue()=1) → 비트 1<<0 = 1
-    given(wk.getRoutineDate()).willReturn(1);
-    assertThat(routineService.willMaterializeToday(wk)).isTrue();
-    given(wk.getRoutineDate()).willReturn(2); // 화요일 비트만 → 오늘(월) 아님
-    assertThat(routineService.willMaterializeToday(wk)).isFalse();
+  void willCreateUpcomingOccurrence_다음회차가_종료일_이내면_참() {
+    Routine daily = org.mockito.Mockito.mock(Routine.class);
+    given(daily.getRoutineType()).willReturn(RoutineType.DAILY);
+    // TEST_DATE = 2024-01-15. DAILY의 다음 회차는 오늘. 종료일이 오늘이면 만든다.
+    given(daily.getDueDate()).willReturn(LocalDateTime.of(2024, 1, 15, 0, 0));
+    assertThat(routineService.willCreateUpcomingOccurrence(daily)).isTrue();
   }
 
   @Test
-  void willMaterializeToday_반복종료일이_지났으면_거짓() {
+  void willCreateUpcomingOccurrence_다음회차가_종료일_지나면_거짓() {
     Routine daily = org.mockito.Mockito.mock(Routine.class);
     given(daily.getRoutineType()).willReturn(RoutineType.DAILY);
-    // TEST_DATE = 2024-01-15. 종료일이 2024-01-10이면 이미 지나 회차를 만들지 않는다.
+    // TEST_DATE = 2024-01-15. 종료일이 2024-01-10이면 다음 회차(오늘)가 종료일을 넘어 만들지 않는다.
     given(daily.getDueDate()).willReturn(LocalDateTime.of(2024, 1, 10, 0, 0));
-    assertThat(routineService.willMaterializeToday(daily)).isFalse();
+    assertThat(routineService.willCreateUpcomingOccurrence(daily)).isFalse();
   }
 
   // ========== generateDailyTodos with override ==========

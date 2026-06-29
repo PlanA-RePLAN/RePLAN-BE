@@ -474,11 +474,12 @@ public class ReplanService {
     // 빠진다(리플랜 횟수 누락). 그래서 대체할 살아있는 새 회차가 있을 때만 소프트 삭제하고
     // 리플랜을 그 새 회차로 옮겨 달며, 새 회차가 없으면 비활성화로 남겨 리플랜이 사라지지 않게 한다.
     boolean failedBefore = !isOverdue(anchor);
-    if (failedBefore && routineService.willMaterializeToday(routine)) {
-      // 실패 전 + 오늘 회차가 실제로 만들어짐 → 옛 회차는 소프트 삭제(통계 제외)하고 오늘 회차를 새 규칙대로 재생성한다.
+    if (failedBefore && routineService.willCreateUpcomingOccurrence(routine)) {
+      // 실패 전 + 새 규칙의 다음 회차가 만들어짐 → 옛 회차는 소프트 삭제(통계 제외)하고,
+      // 새 규칙의 다음 회차(오늘 또는 가까운 미래)를 곧바로 만들어 리플랜을 그 회차로 옮긴다.
       retire(anchor);
       routineService.createTodoTreeFromMother(routine);
-      // willMaterializeToday가 true면 위 호출이 반드시 회차를 만든다. 만에 하나 못 찾으면 옛 회차를
+      // willCreateUpcomingOccurrence가 true면 위 호출이 반드시 회차를 만든다. 만에 하나 못 찾으면 옛 회차를
       // 소프트 삭제한 채 리플랜이 갈 곳을 잃으므로, 차라리 예외로 트랜잭션을 되돌려 데이터 유실을 막는다.
       Todo instance =
           todoRepository
@@ -487,7 +488,7 @@ public class ReplanService {
       instance.linkReplan(replan);
       replan.relinkTodo(instance);
     } else if (failedBefore) {
-      // 실패 전이지만 새 규칙에 오늘 회차가 없어 대체 투두가 없다.
+      // 실패 전이지만 반복 종료일이 지나 다음 회차가 더는 만들어지지 않는다(루틴이 사실상 끝남).
       // 소프트 삭제하면 리플랜이 통계에서 사라지므로, 회차와 하위 회차를 비활성화로 남긴다.
       anchor.getChildren().forEach(Todo::deactivate);
       anchor.deactivate();
