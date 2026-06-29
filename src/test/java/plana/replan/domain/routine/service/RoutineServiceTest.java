@@ -746,6 +746,26 @@ class RoutineServiceTest {
                     .isEqualTo(RoutineErrorCode.ROUTINE_NOT_FOUND));
   }
 
+  // ========== occursToday ==========
+
+  @Test
+  void occursToday_DAILY는_항상_참() {
+    Routine daily = org.mockito.Mockito.mock(Routine.class);
+    given(daily.getRoutineType()).willReturn(RoutineType.DAILY);
+    assertThat(routineService.occursToday(daily)).isTrue();
+  }
+
+  @Test
+  void occursToday_WEEKLY는_오늘_요일_비트가_켜져야_참() {
+    Routine wk = org.mockito.Mockito.mock(Routine.class);
+    given(wk.getRoutineType()).willReturn(RoutineType.WEEKLY);
+    // TEST_DATE = 2024-01-15 = 월요일(getDayOfWeek().getValue()=1) → 비트 1<<0 = 1
+    given(wk.getRoutineDate()).willReturn(1);
+    assertThat(routineService.occursToday(wk)).isTrue();
+    given(wk.getRoutineDate()).willReturn(2); // 화요일 비트만 → 오늘(월) 아님
+    assertThat(routineService.occursToday(wk)).isFalse();
+  }
+
   // ========== generateDailyTodos with override ==========
 
   @Test

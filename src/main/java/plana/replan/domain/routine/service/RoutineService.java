@@ -290,6 +290,11 @@ public class RoutineService {
         });
   }
 
+  /** 오늘이 이 루틴의 회차일인지. 리플랜에서 "오늘 회차를 재생성할지" 판단에 쓴다. */
+  public boolean occursToday(Routine routine) {
+    return isOccurrenceDay(routine, LocalDate.now(clock));
+  }
+
   private boolean isOccurrenceDay(Routine routine, LocalDate today) {
     return switch (routine.getRoutineType()) {
       case DAILY -> true;
