@@ -474,17 +474,18 @@ public class ReplanService {
     // 빠진다(리플랜 횟수 누락). 그래서 대체할 살아있는 새 회차가 있을 때만 소프트 삭제하고
     // 리플랜을 그 새 회차로 옮겨 달며, 새 회차가 없으면 비활성화로 남겨 리플랜이 사라지지 않게 한다.
     boolean failedBefore = !isOverdue(anchor);
-    if (failedBefore && routineService.occursToday(routine)) {
-      // 실패 전 + 오늘도 회차 → 옛 회차는 소프트 삭제(통계 제외)하고 오늘 회차를 새 규칙대로 재생성
+    if (failedBefore && routineService.willMaterializeToday(routine)) {
+      // 실패 전 + 오늘 회차가 실제로 만들어짐 → 옛 회차는 소프트 삭제(통계 제외)하고 오늘 회차를 새 규칙대로 재생성한다.
       retire(anchor);
       routineService.createTodoTreeFromMother(routine);
-      todoRepository
-          .findFirstUpcomingMotherTodoByRoutine(routine, LocalDate.now(clock).atStartOfDay())
-          .ifPresent(
-              instance -> {
-                instance.linkReplan(replan);
-                replan.relinkTodo(instance);
-              });
+      // willMaterializeToday가 true면 위 호출이 반드시 회차를 만든다. 만에 하나 못 찾으면 옛 회차를
+      // 소프트 삭제한 채 리플랜이 갈 곳을 잃으므로, 차라리 예외로 트랜잭션을 되돌려 데이터 유실을 막는다.
+      Todo instance =
+          todoRepository
+              .findFirstUpcomingMotherTodoByRoutine(routine, LocalDate.now(clock).atStartOfDay())
+              .orElseThrow(() -> new CustomException(ReplanErrorCode.REPLAN_INVALID_OPERATION));
+      instance.linkReplan(replan);
+      replan.relinkTodo(instance);
     } else if (failedBefore) {
       // 실패 전이지만 새 규칙에 오늘 회차가 없어 대체 투두가 없다.
       // 소프트 삭제하면 리플랜이 통계에서 사라지므로, 회차와 하위 회차를 비활성화로 남긴다.

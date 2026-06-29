@@ -290,9 +290,18 @@ public class RoutineService {
         });
   }
 
-  /** 오늘이 이 루틴의 회차일인지. 리플랜에서 "오늘 회차를 재생성할지" 판단에 쓴다. */
-  public boolean occursToday(Routine routine) {
-    return isOccurrenceDay(routine, LocalDate.now(clock));
+  /**
+   * 오늘 이 루틴의 회차 투두가 실제로 만들어질지 판단한다. 오늘이 회차일이고(반복 요일/일자 일치), 반복 종료일이 지나지 않았어야 한다 — {@link
+   * #createTodoTreeFromMother(Routine)}가 실제로 회차를 만드는 조건과 동일하다. 리플랜에서 "옛 회차를 치우고 오늘 회차를 새로 만들지"를
+   * 결정하는 데 쓴다(만들 수 없으면 옛 회차를 삭제하면 안 된다).
+   */
+  public boolean willMaterializeToday(Routine routine) {
+    LocalDate today = LocalDate.now(clock);
+    if (!isOccurrenceDay(routine, today)) {
+      return false;
+    }
+    // 반복 종료일이 오늘보다 이전이면 회차를 만들지 않는다(createTodoTreeFromMother와 같은 규칙).
+    return routine.getDueDate() == null || !today.isAfter(routine.getDueDate().toLocalDate());
   }
 
   private boolean isOccurrenceDay(Routine routine, LocalDate today) {

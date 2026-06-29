@@ -746,24 +746,33 @@ class RoutineServiceTest {
                     .isEqualTo(RoutineErrorCode.ROUTINE_NOT_FOUND));
   }
 
-  // ========== occursToday ==========
+  // ========== willMaterializeToday ==========
 
   @Test
-  void occursToday_DAILY는_항상_참() {
+  void willMaterializeToday_DAILY_종료일없으면_참() {
     Routine daily = org.mockito.Mockito.mock(Routine.class);
     given(daily.getRoutineType()).willReturn(RoutineType.DAILY);
-    assertThat(routineService.occursToday(daily)).isTrue();
+    assertThat(routineService.willMaterializeToday(daily)).isTrue();
   }
 
   @Test
-  void occursToday_WEEKLY는_오늘_요일_비트가_켜져야_참() {
+  void willMaterializeToday_WEEKLY는_오늘_요일_비트가_켜져야_참() {
     Routine wk = org.mockito.Mockito.mock(Routine.class);
     given(wk.getRoutineType()).willReturn(RoutineType.WEEKLY);
     // TEST_DATE = 2024-01-15 = 월요일(getDayOfWeek().getValue()=1) → 비트 1<<0 = 1
     given(wk.getRoutineDate()).willReturn(1);
-    assertThat(routineService.occursToday(wk)).isTrue();
+    assertThat(routineService.willMaterializeToday(wk)).isTrue();
     given(wk.getRoutineDate()).willReturn(2); // 화요일 비트만 → 오늘(월) 아님
-    assertThat(routineService.occursToday(wk)).isFalse();
+    assertThat(routineService.willMaterializeToday(wk)).isFalse();
+  }
+
+  @Test
+  void willMaterializeToday_반복종료일이_지났으면_거짓() {
+    Routine daily = org.mockito.Mockito.mock(Routine.class);
+    given(daily.getRoutineType()).willReturn(RoutineType.DAILY);
+    // TEST_DATE = 2024-01-15. 종료일이 2024-01-10이면 이미 지나 회차를 만들지 않는다.
+    given(daily.getDueDate()).willReturn(LocalDateTime.of(2024, 1, 10, 0, 0));
+    assertThat(routineService.willMaterializeToday(daily)).isFalse();
   }
 
   // ========== generateDailyTodos with override ==========
