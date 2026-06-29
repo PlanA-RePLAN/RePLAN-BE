@@ -8,6 +8,7 @@ import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -26,6 +27,7 @@ import plana.replan.domain.replan.exception.ReplanErrorCode;
 import plana.replan.domain.replan.repository.ReplanRepository;
 import plana.replan.domain.routine.entity.Routine;
 import plana.replan.domain.routine.entity.RoutineType;
+import plana.replan.domain.routine.repository.RoutineOverrideRepository;
 import plana.replan.domain.routine.repository.RoutineRepository;
 import plana.replan.domain.routine.service.RoutineService;
 import plana.replan.domain.tag.entity.Tag;
@@ -53,6 +55,7 @@ public class ReplanService {
   private final Clock clock;
   private final RoutineRepository routineRepository;
   private final RoutineService routineService;
+  private final RoutineOverrideRepository routineOverrideRepository;
 
   /**
    * 2단계 선택(+선택적 추가질문 답변)을 받아, 추가 질문이 필요하면 질문을, 충분하면 추천을 반환한다. 질문이 필요한지는 {@link
@@ -199,31 +202,37 @@ public class ReplanService {
       return;
     }
 
-    boolean anyAdd = false;
-    boolean anchorModifiedInPlace = false;
-
+    boolean anchorHandled = false;
+    boolean replacementCreated = false;
     for (ReplanOperation op : req.acceptedOperations()) {
       validateOperation(op);
       switch (op.action()) {
         case ADD -> {
           applyAdd(op, anchor, replan);
-          anyAdd = true;
+          replacementCreated = true;
         }
         case MODIFY_TODO -> {
           applyModifyTodo(op, anchor, replan);
           if (op.targetTodoId() != null && op.targetTodoId().equals(anchor.getId())) {
-            anchorModifiedInPlace = true;
+            anchorHandled = true;
           }
         }
-        case MODIFY_ROUTINE -> applyModifyRoutine(op, anchor, replan);
-        case CREATE_ROUTINE -> applyCreateRoutine(op, anchor, replan);
+        case MODIFY_ROUTINE -> {
+          applyModifyRoutine(op, anchor, replan);
+          anchorHandled = true;
+        }
+        case CREATE_ROUTINE -> {
+          // 회차 투두가 실제로 만들어졌을 때만 "앵커를 치울 대체가 생겼다"고 본다.
+          // (루틴 종료일이 이미 지나 회차가 안 생기면 앵커를 비활성화하면 안 된다 — 원본까지 사라짐)
+          replacementCreated |= applyCreateRoutine(op, anchor, replan);
+        }
       }
     }
 
-    // 마감 지난 일반 투두(앵커)를 ADD로 대체한 경우에만 한 번 숨긴다.
-    // MODIFY_TODO로 앵커 자체를 수정했다면 숨기지 않는다.
-    if (anchor.getRoutine() == null && isOverdue(anchor) && anyAdd && !anchorModifiedInPlace) {
-      anchor.deactivate();
+    // 마감 지난(실패 후) 앵커를 ADD/CREATE_ROUTINE으로 대체한 경우에만 앵커를 치운다(비활성화).
+    // 미래(실패 전) 앵커의 ADD는 보조 투두 추가일 수 있으므로 앵커를 건드리지 않는다.
+    if (!anchorHandled && isOverdue(anchor) && replacementCreated) {
+      retire(anchor);
     }
   }
 
@@ -304,21 +313,96 @@ public class ReplanService {
         todoRepository
             .findById(op.targetTodoId())
             .orElseThrow(() -> new CustomException(ReplanErrorCode.REPLAN_TODO_NOT_FOUND));
-    // 우선순위 등으로 앵커 외 다른 투두를 수정할 수 있으나, 반드시 같은 사용자 소유여야 한다
     if (!target.getUser().getId().equals(anchor.getUser().getId())) {
       throw new CustomException(ReplanErrorCode.REPLAN_TODO_NOT_FOUND);
     }
-    if (op.title() != null) {
-      target.updateTitle(op.title());
+    // 루틴 회차는 MODIFY_TODO로 고치지 않는다(루틴 변경은 MODIFY_ROUTINE 담당).
+    // 같은 (routine_id, due_date) 슬롯에 새 행을 만들면 partial unique index와 충돌하고,
+    // 분리 후 슬롯이 비면 스케줄러가 회차를 중복 생성하므로 거부한다.
+    if (target.getRoutine() != null) {
+      throw new CustomException(ReplanErrorCode.REPLAN_INVALID_OPERATION);
     }
-    // dueDate/dueTime 중 하나라도 지정된 경우에만 업데이트한다 — 제목만 바꾸는 op이면 기존 마감일을 보존
-    if (op.dueDate() != null || op.dueTime() != null) {
-      target.updateDueDate(resolveModifiedDueDate(target, op));
+    // 하위 투두를 미리 스냅샷해두고 새 부모로 옮긴 뒤 부모만 치운다.
+    // retire(target)을 그대로 쓰면 하위 투두까지 소프트 삭제돼 사용자의 서브태스크가 모두 사라진다.
+    List<Todo> children = new ArrayList<>(target.getChildren());
+    Todo newTodo = recreateFromModify(target, op, replan);
+    children.forEach(child -> child.updateParent(newTodo));
+    retireWithoutChildren(target);
+    // 수정 대상을 소프트 삭제하는 경우(실패 전), 그 투두를 가리키던 리플랜들이
+    // @SQLRestriction(deleted_at IS NULL) 때문에 리플랜 조회에서 통째로 사라진다.
+    // 이번에 만든 리플랜뿐 아니라, 같은 투두를 이전에 리플랜해 달려 있던 리플랜까지 모두
+    // 살아있는 새 투두로 옮겨 달아 월간 통계(리플랜 횟수 등)에 빠짐없이 집계되게 한다.
+    // (실패 후 비활성화는 투두가 살아 있어 옮길 필요가 없다.)
+    if (!isOverdue(target)) {
+      // 이번 리플랜은 앵커를 가리키므로, 앵커 자신을 수정한 경우에만 새 투두로 옮긴다.
+      // (앵커가 아닌 다른 투두 수정이면 이번 리플랜은 여전히 살아있는 앵커를 가리켜야 한다.)
+      if (target == anchor) {
+        replan.relinkTodo(newTodo);
+      }
+      // 그 투두에 이전부터 달려 있던 다른 리플랜들도 빠짐없이 새 투두로 옮긴다.
+      relinkReplansTo(target, newTodo);
     }
-    if (op.tagId() != null) {
-      target.updateTag(resolveTag(op.tagId(), target.getUser().getId()));
+  }
+
+  /**
+   * {@code from} 투두를 가리키던 리플랜(메모)을 모두 {@code to} 투두로 옮겨 단다. 같은 투두를 한 달에 여러 번 리플랜하면 리플랜이 여러 개 달릴 수
+   * 있는데, 그 투두를 소프트 삭제하면 달려 있던 리플랜이 전부 통계에서 사라진다. 그래서 소프트 삭제 직전에 호출해 모든 리플랜을 살아있는 새 투두로 옮긴다.
+   */
+  private void relinkReplansTo(Todo from, Todo to) {
+    replanRepository.findByTodo(from).forEach(r -> r.relinkTodo(to));
+  }
+
+  /**
+   * 기존 투두를 (하위 투두까지 함께) 치운다: 마감 지났으면 비활성화(통계에 실패로 남김), 아니면 소프트 삭제(통계에서 제외). 부모만 치우고 자식을 두면 상태가
+   * 어긋나므로 두 경로 모두 자식을 함께 처리한다.
+   */
+  private void retire(Todo target) {
+    if (isOverdue(target)) {
+      target.getChildren().forEach(Todo::deactivate);
+      target.deactivate();
+    } else {
+      target.getChildren().forEach(Todo::softDelete);
+      target.softDelete();
     }
-    target.linkReplan(replan);
+  }
+
+  /**
+   * 투두 자신만 치운다(하위 투두는 건드리지 않음): 마감 지났으면 비활성화, 아니면 소프트 삭제. MODIFY_TODO에서 하위 투두를 새 부모로 옮긴 뒤 원래 부모를 치울
+   * 때 사용한다.
+   */
+  private void retireWithoutChildren(Todo target) {
+    if (isOverdue(target)) {
+      target.deactivate();
+    } else {
+      target.softDelete();
+    }
+  }
+
+  /**
+   * op가 지정한 필드만 바꾸고 나머지는 기존 투두에서 물려받아 새 투두를 만든다. (루틴 회차는 applyModifyTodo에서 이미 거부되므로 여기서는 일반 투두만
+   * 다룬다.)
+   */
+  private Todo recreateFromModify(Todo target, ReplanOperation op, Replan replan) {
+    String title = op.title() != null ? op.title() : target.getTitle();
+    LocalDateTime dueDate =
+        (op.dueDate() != null || op.dueTime() != null)
+            ? resolveModifiedDueDate(target, op)
+            : target.getDueDate();
+    Tag tag =
+        op.tagId() != null ? resolveTag(op.tagId(), target.getUser().getId()) : target.getTag();
+    Todo created =
+        Todo.builder()
+            .title(title)
+            .dueDate(dueDate)
+            .sortOrder(target.getSortOrder())
+            .isPinned(target.isPinned())
+            .user(target.getUser())
+            .tag(tag)
+            .goal(target.getGoal())
+            .parent(target.getParent())
+            .build();
+    created.linkReplan(replan);
+    return todoRepository.save(created);
   }
 
   /** 앵커의 마감이 지났는지 확인한다. */
@@ -375,6 +459,12 @@ public class ReplanService {
     if (routine == null) {
       throw new CustomException(ReplanErrorCode.REPLAN_TODO_NOT_FOUND);
     }
+    // 하위 루틴 회차는 규칙(반복 유형/요일/시각/태그)을 따로 가지지 않고 엄마 루틴을 그대로 따른다.
+    // 따라서 루틴 규칙 변경(MODIFY_ROUTINE)은 엄마 루틴 회차에만 의미가 있으므로 하위 루틴 회차는 거부한다.
+    // (엄마 루틴 수정 API·루틴 오버라이드도 동일하게 하위 루틴을 거부한다.)
+    if (routine.isChild()) {
+      throw new CustomException(ReplanErrorCode.REPLAN_INVALID_OPERATION);
+    }
     Tag tag =
         op.tagId() != null ? resolveTag(op.tagId(), anchor.getUser().getId()) : routine.getTag();
     RoutineType effectiveType =
@@ -399,22 +489,51 @@ public class ReplanService {
         tag);
     routine.linkReplan(replan);
 
-    // 이번 회차 투두(앵커)가 미완료면 새 규칙에 맞춰 동기화, 완료면 그대로 둔다
-    if (!anchor.isCompleted()) {
-      if (op.title() != null) {
-        anchor.updateTitle(op.title());
-      }
-      if (op.dueDate() != null || op.dueTime() != null) {
-        anchor.updateDueDate(resolveModifiedDueDate(anchor, op));
-      }
-      if (op.tagId() != null) {
-        anchor.updateTag(tag);
-      }
-      anchor.linkReplan(replan);
+    // 미래 회차 수정기록 폐기(옛 규칙 기준이라 의미 없어짐)
+    routineOverrideRepository.deleteByRoutineAndOverrideDateGreaterThanEqual(
+        routine, LocalDate.now(clock));
+
+    // 이번 회차(앵커) 치우기.
+    // 주의: 위에서 만든 Replan은 anchor를 가리킨다. 실패 전이라고 anchor를 소프트 삭제하면
+    // @SQLRestriction(deleted_at IS NULL) 때문에 월간 리포트의 리플랜 조회에서 이 리플랜이 통째로
+    // 빠진다(리플랜 횟수 누락). 그래서 대체할 살아있는 새 회차가 있을 때만 소프트 삭제하고
+    // 리플랜을 그 새 회차로 옮겨 달며, 새 회차가 없으면 비활성화로 남겨 리플랜이 사라지지 않게 한다.
+    boolean failedBefore = !isOverdue(anchor);
+    if (failedBefore && routineService.willCreateUpcomingOccurrence(routine)) {
+      // 실패 전 + 새 규칙의 다음 회차가 만들어짐 → 옛 회차는 소프트 삭제(통계 제외)하고,
+      // 새 규칙의 다음 회차(오늘 또는 가까운 미래)를 곧바로 만들어 리플랜을 그 회차로 옮긴다.
+      retire(anchor);
+      routineService.createTodoTreeFromMother(routine);
+      // willCreateUpcomingOccurrence가 true면 위 호출이 반드시 회차를 만든다.
+      // 만에 하나 못 찾으면 옛 회차를 소프트 삭제한 채 리플랜이 갈 곳을 잃으므로, 예외로 트랜잭션을 되돌려 데이터 유실을 막는다.
+      Todo instance =
+          todoRepository
+              .findFirstUpcomingMotherTodoByRoutine(routine, LocalDate.now(clock).atStartOfDay())
+              .orElseThrow(() -> new CustomException(ReplanErrorCode.REPLAN_INVALID_OPERATION));
+      // 같은 슬롯에 회차가 이미 있어 createTodoTreeFromMother가 새로 만들지 않은 경우(no-op)에도
+      // 그 회차가 옛 규칙 내용으로 남지 않도록 제목·태그를 새 루틴 값으로 동기화한다(updateMotherRoutine과 동일).
+      instance.updateTitle(routine.getTitle());
+      instance.updateTag(routine.getTag());
+      instance.getChildren().forEach(child -> child.updateTag(routine.getTag()));
+      instance.linkReplan(replan);
+      // 이번 리플랜은 메모리에서 바로 새 회차로 옮기고,
+      // 같은 회차(앵커)에 이전부터 달려 있던 다른 리플랜들도 빠짐없이 새 회차로 옮긴다.
+      // (앵커를 위에서 소프트 삭제했으므로 옮기지 않으면 그 리플랜들이 통계에서 사라진다.)
+      replan.relinkTodo(instance);
+      relinkReplansTo(anchor, instance);
+    } else if (failedBefore) {
+      // 실패 전이지만 반복 종료일이 지나 다음 회차가 더는 만들어지지 않는다(루틴이 사실상 끝남).
+      // 소프트 삭제하면 리플랜이 통계에서 사라지므로, 회차와 하위 회차를 비활성화로 남긴다.
+      anchor.getChildren().forEach(Todo::deactivate);
+      anchor.deactivate();
+    } else {
+      // 실패 후 → 비활성화(통계에 실패로 남김). 앵커가 살아있어 리플랜도 정상 집계된다.
+      retire(anchor);
     }
   }
 
-  private void applyCreateRoutine(ReplanOperation op, Todo anchor, Replan replan) {
+  /** 새 루틴을 만들고 가까운 회차 투두를 리플랜에 연결한다. 회차 투두가 실제로 만들어졌으면 true. */
+  private boolean applyCreateRoutine(ReplanOperation op, Todo anchor, Replan replan) {
     if (op.routineType() == null) {
       throw new CustomException(ReplanErrorCode.REPLAN_INVALID_OPERATION);
     }
@@ -437,9 +556,11 @@ public class ReplanService {
     routine.linkReplan(replan);
     routineRepository.save(routine);
     routineService.createTodoTreeFromMother(routine);
-    todoRepository
-        .findFirstUpcomingMotherTodoByRoutine(routine, LocalDate.now(clock).atStartOfDay())
-        .ifPresent(instanceTodo -> instanceTodo.linkReplan(replan));
+    Optional<Todo> instance =
+        todoRepository.findFirstUpcomingMotherTodoByRoutine(
+            routine, LocalDate.now(clock).atStartOfDay());
+    instance.ifPresent(instanceTodo -> instanceTodo.linkReplan(replan));
+    return instance.isPresent();
   }
 
   private void validateRecurrence(RoutineType type, Integer routineDate) {
