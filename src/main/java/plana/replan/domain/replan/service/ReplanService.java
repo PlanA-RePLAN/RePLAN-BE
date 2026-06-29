@@ -314,6 +314,12 @@ public class ReplanService {
     if (!target.getUser().getId().equals(anchor.getUser().getId())) {
       throw new CustomException(ReplanErrorCode.REPLAN_TODO_NOT_FOUND);
     }
+    // 루틴 회차는 MODIFY_TODO로 고치지 않는다(루틴 변경은 MODIFY_ROUTINE 담당).
+    // 같은 (routine_id, due_date) 슬롯에 새 행을 만들면 partial unique index와 충돌하고,
+    // 분리 후 슬롯이 비면 스케줄러가 회차를 중복 생성하므로 거부한다.
+    if (target.getRoutine() != null) {
+      throw new CustomException(ReplanErrorCode.REPLAN_INVALID_OPERATION);
+    }
     // 하위 투두를 미리 스냅샷해두고 새 부모로 옮긴 뒤 부모만 치운다.
     // retire(target)을 그대로 쓰면 하위 투두까지 소프트 삭제돼 사용자의 서브태스크가 모두 사라진다.
     List<Todo> children = new ArrayList<>(target.getChildren());
@@ -345,8 +351,8 @@ public class ReplanService {
   }
 
   /**
-   * op가 지정한 필드만 바꾸고 나머지는 기존 투두에서 물려받아 새 투두를 만든다. 루틴 회차의 경우 루틴 연결을 그대로 유지해 스케줄러가 같은 날짜에 회차를 중복 생성하지
-   * 않도록 한다.
+   * op가 지정한 필드만 바꾸고 나머지는 기존 투두에서 물려받아 새 투두를 만든다. (루틴 회차는 applyModifyTodo에서 이미 거부되므로 여기서는 일반 투두만
+   * 다룬다.)
    */
   private Todo recreateFromModify(Todo target, ReplanOperation op, Replan replan) {
     String title = op.title() != null ? op.title() : target.getTitle();
@@ -366,7 +372,6 @@ public class ReplanService {
             .tag(tag)
             .goal(target.getGoal())
             .parent(target.getParent())
-            .routine(target.getRoutine())
             .build();
     created.linkReplan(replan);
     return todoRepository.save(created);
