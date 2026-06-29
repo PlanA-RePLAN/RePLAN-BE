@@ -344,7 +344,10 @@ public class ReplanService {
     }
   }
 
-  /** op가 지정한 필드만 바꾸고 나머지는 기존 투두에서 물려받아 새 투두를 만든다(루틴 연결 없음). */
+  /**
+   * op가 지정한 필드만 바꾸고 나머지는 기존 투두에서 물려받아 새 투두를 만든다. 루틴 회차의 경우 루틴 연결을 그대로 유지해 스케줄러가 같은 날짜에 회차를 중복 생성하지
+   * 않도록 한다.
+   */
   private Todo recreateFromModify(Todo target, ReplanOperation op, Replan replan) {
     String title = op.title() != null ? op.title() : target.getTitle();
     LocalDateTime dueDate =
@@ -363,6 +366,7 @@ public class ReplanService {
             .tag(tag)
             .goal(target.getGoal())
             .parent(target.getParent())
+            .routine(target.getRoutine())
             .build();
     created.linkReplan(replan);
     return todoRepository.save(created);

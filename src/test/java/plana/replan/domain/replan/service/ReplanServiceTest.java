@@ -1008,4 +1008,35 @@ class ReplanServiceTest {
             CustomException.class,
             e -> assertThat(e.getErrorCode()).isEqualTo(ReplanErrorCode.REPLAN_INVALID_OPERATION));
   }
+
+  @Test
+  void MODIFY_TODO_루틴회차_수정시_루틴연결을_유지한다() {
+    Routine routine = org.mockito.Mockito.mock(Routine.class);
+    Todo anchor = ownedTodo(42L, 1L);
+    given(anchor.getId()).willReturn(42L);
+    given(anchor.getDueDate()).willReturn(LocalDateTime.of(2026, 6, 25, 11, 0)); // 실패 전
+    given(anchor.getChildren()).willReturn(List.of());
+    given(anchor.getRoutine()).willReturn(routine);
+    given(todoRepository.findById(42L)).willReturn(Optional.of(anchor));
+    given(replanRepository.save(any(Replan.class))).willAnswer(inv -> inv.getArgument(0));
+    given(todoRepository.save(any(Todo.class))).willAnswer(inv -> inv.getArgument(0));
+    org.mockito.ArgumentCaptor<Todo> captor = org.mockito.ArgumentCaptor.forClass(Todo.class);
+
+    ReplanOperation modify =
+        new ReplanOperation(
+            ReplanAction.MODIFY_TODO,
+            42L,
+            "가벼운 스트레칭",
+            "2026-07-02",
+            null,
+            null,
+            null,
+            null,
+            List.of());
+    replanService.save(
+        1L, new ReplanSaveRequest(42L, List.of("GOAL_NO_PRIORITY"), List.of(modify)));
+
+    then(todoRepository).should().save(captor.capture());
+    assertThat(captor.getValue().getRoutine()).isSameAs(routine);
+  }
 }
