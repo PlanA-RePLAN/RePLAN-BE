@@ -33,6 +33,7 @@ import plana.replan.domain.replan.exception.ReplanErrorCode;
 import plana.replan.domain.replan.repository.ReplanRepository;
 import plana.replan.domain.routine.entity.Routine;
 import plana.replan.domain.routine.entity.RoutineType;
+import plana.replan.domain.routine.repository.RoutineOverrideRepository;
 import plana.replan.domain.routine.repository.RoutineRepository;
 import plana.replan.domain.routine.service.RoutineService;
 import plana.replan.domain.tag.entity.Tag;
@@ -51,6 +52,7 @@ class ReplanServiceTest {
   @Mock private TagRepository tagRepository;
   @Mock private RoutineRepository routineRepository;
   @Mock private RoutineService routineService;
+  @Mock private RoutineOverrideRepository routineOverrideRepository;
 
   private final Clock clock = Clock.fixed(Instant.parse("2026-06-18T00:00:00Z"), ZoneId.of("UTC"));
 
@@ -66,7 +68,8 @@ class ReplanServiceTest {
             tagRepository,
             clock,
             routineRepository,
-            routineService);
+            routineService,
+            routineOverrideRepository);
   }
 
   private Todo ownedTodo(Long todoId, Long userId) {
@@ -331,74 +334,89 @@ class ReplanServiceTest {
   }
 
   @Test
-  void MODIFY_ROUTINE은_루틴_규칙을_수정한다() {
-    Todo todo = ownedTodo(42L, 1L);
-    given(todo.getId()).willReturn(42L);
+  void MODIFY_ROUTINE은_규칙수정_미래override폐기_회차치우기를_한다() {
+    Todo anchor = ownedTodo(42L, 1L);
+    given(anchor.getId()).willReturn(42L);
+    given(anchor.getDueDate()).willReturn(LocalDateTime.of(2026, 6, 25, 11, 0)); // 실패 전
+    given(anchor.getChildren()).willReturn(List.of());
     Routine routine = org.mockito.Mockito.mock(Routine.class);
-    given(todo.getRoutine()).willReturn(routine);
-    given(todo.isCompleted()).willReturn(false);
-    given(todoRepository.findById(42L)).willReturn(Optional.of(todo));
+    given(anchor.getRoutine()).willReturn(routine);
+    given(todoRepository.findById(42L)).willReturn(Optional.of(anchor));
     given(replanRepository.save(any(Replan.class))).willAnswer(inv -> inv.getArgument(0));
+    given(routineService.occursToday(routine)).willReturn(false); // 새 규칙에 오늘 없음 → 재생성 안 함
 
     ReplanOperation op =
         new ReplanOperation(
             ReplanAction.MODIFY_ROUTINE,
             42L,
-            "영단어 50개 암기",
+            "영단어 50개",
             null,
             "11:15",
             null,
             "WEEKLY",
             62,
             List.of());
-    ReplanSaveRequest req = new ReplanSaveRequest(42L, List.of("INTERRUPT_LATE_END"), List.of(op));
-
-    replanService.save(1L, req);
+    replanService.save(1L, new ReplanSaveRequest(42L, List.of("INTERRUPT_LATE_END"), List.of(op)));
 
     then(routine)
         .should()
         .update(
-            eq("영단어 50개 암기"),
-            any(),
-            eq(RoutineType.WEEKLY),
-            eq(62),
-            eq(LocalTime.of(11, 15)),
-            any());
+            eq("영단어 50개"), any(), eq(RoutineType.WEEKLY), eq(62), eq(LocalTime.of(11, 15)), any());
     then(routine).should().linkReplan(any(Replan.class));
-    then(todo).should().linkReplan(any(Replan.class));
+    then(routineOverrideRepository)
+        .should()
+        .deleteByRoutineAndOverrideDateGreaterThanEqual(eq(routine), any());
+    then(anchor).should().softDelete(); // 실패 전 회차 삭제
+    then(routineService).should(never()).createTodoTreeFromMother(any()); // 오늘 회차 아님
   }
 
   @Test
-  void 루틴_수정_시_미지정_필드는_기존값_유지된다() {
-    Todo todo = ownedTodo(42L, 1L);
-    given(todo.getId()).willReturn(42L);
+  void MODIFY_ROUTINE_실패전이고_오늘이_회차면_오늘회차를_재생성한다() {
+    Todo anchor = ownedTodo(42L, 1L);
+    given(anchor.getId()).willReturn(42L);
+    given(anchor.getDueDate()).willReturn(LocalDateTime.of(2026, 6, 25, 11, 0)); // 실패 전
+    given(anchor.getChildren()).willReturn(List.of());
     Routine routine = org.mockito.Mockito.mock(Routine.class);
-    given(todo.getRoutine()).willReturn(routine);
-    given(todo.isCompleted()).willReturn(false);
-    given(todoRepository.findById(42L)).willReturn(Optional.of(todo));
-    given(replanRepository.save(any(Replan.class))).willAnswer(inv -> inv.getArgument(0));
-    // op에서 title만 지정, 나머지는 null → 기존 루틴 값으로 fallback
+    given(anchor.getRoutine()).willReturn(routine);
     given(routine.getRoutineType()).willReturn(RoutineType.DAILY);
     given(routine.getRoutineTime()).willReturn(LocalTime.of(7, 30));
     given(routine.getTag()).willReturn(null);
+    given(todoRepository.findById(42L)).willReturn(Optional.of(anchor));
+    given(replanRepository.save(any(Replan.class))).willAnswer(inv -> inv.getArgument(0));
+    given(routineService.occursToday(routine)).willReturn(true);
+    given(todoRepository.findFirstUpcomingMotherTodoByRoutine(any(), any()))
+        .willReturn(Optional.empty());
 
     ReplanOperation op =
         new ReplanOperation(
             ReplanAction.MODIFY_ROUTINE, 42L, "새 제목", null, null, null, null, null, List.of());
-    ReplanSaveRequest req = new ReplanSaveRequest(42L, List.of("GOAL_NO_PRIORITY"), List.of(op));
+    replanService.save(1L, new ReplanSaveRequest(42L, List.of("GOAL_NO_PRIORITY"), List.of(op)));
 
-    replanService.save(1L, req);
+    then(anchor).should().softDelete();
+    then(routineService).should().createTodoTreeFromMother(routine);
+  }
 
-    // DAILY는 반복 날짜를 null로 정규화하므로 routineDate는 null로 들어간다
-    then(routine)
-        .should()
-        .update(
-            eq("새 제목"),
-            any(),
-            eq(RoutineType.DAILY),
-            org.mockito.ArgumentMatchers.isNull(),
-            eq(LocalTime.of(7, 30)),
-            any());
+  @Test
+  void MODIFY_ROUTINE_실패후면_회차를_비활성화하고_재생성안한다() {
+    Todo anchor = ownedTodo(42L, 1L);
+    given(anchor.getId()).willReturn(42L);
+    given(anchor.getDueDate()).willReturn(LocalDateTime.of(2026, 6, 1, 11, 0)); // 과거(실패 후)
+    Routine routine = org.mockito.Mockito.mock(Routine.class);
+    given(anchor.getRoutine()).willReturn(routine);
+    given(routine.getRoutineType()).willReturn(RoutineType.DAILY);
+    given(routine.getRoutineTime()).willReturn(null);
+    given(routine.getTag()).willReturn(null);
+    given(todoRepository.findById(42L)).willReturn(Optional.of(anchor));
+    given(replanRepository.save(any(Replan.class))).willAnswer(inv -> inv.getArgument(0));
+
+    ReplanOperation op =
+        new ReplanOperation(
+            ReplanAction.MODIFY_ROUTINE, 42L, "새 제목", null, null, null, null, null, List.of());
+    replanService.save(1L, new ReplanSaveRequest(42L, List.of("GOAL_NO_PRIORITY"), List.of(op)));
+
+    then(anchor).should().deactivate();
+    then(anchor).should(never()).softDelete();
+    then(routineService).should(never()).createTodoTreeFromMother(any());
   }
 
   @Test
@@ -848,44 +866,5 @@ class ReplanServiceTest {
         .isInstanceOfSatisfying(
             CustomException.class,
             e -> assertThat(e.getErrorCode()).isEqualTo(ReplanErrorCode.REPLAN_INVALID_OPERATION));
-  }
-
-  @Test
-  void MODIFY_ROUTINE_태그변경은_미완료_현재투두에도_반영된다() {
-    // ownedTodo가 내부적으로 User mock(getId()→1L)을 anchor.getUser()에 연결해 둔다
-    Todo anchor = ownedTodo(42L, 1L);
-    given(anchor.getId()).willReturn(42L);
-    Routine routine = org.mockito.Mockito.mock(Routine.class);
-    given(anchor.getRoutine()).willReturn(routine);
-    given(anchor.isCompleted()).willReturn(false);
-    given(todoRepository.findById(42L)).willReturn(Optional.of(anchor));
-    given(replanRepository.save(any(Replan.class))).willAnswer(inv -> inv.getArgument(0));
-    given(routine.getRoutineType()).willReturn(RoutineType.DAILY);
-    given(routine.getRoutineDate()).willReturn(null);
-    given(routine.getRoutineTime()).willReturn(null);
-
-    // tag의 소유자 id가 anchor와 동일한 1L이어야 resolveTag 통과
-    Tag tag = org.mockito.Mockito.mock(Tag.class);
-    User tagOwner = org.mockito.Mockito.mock(User.class);
-    given(tagOwner.getId()).willReturn(1L);
-    given(tag.getUser()).willReturn(tagOwner);
-    given(tagRepository.findById(10L)).willReturn(Optional.of(tag));
-
-    ReplanOperation op =
-        new ReplanOperation(
-            ReplanAction.MODIFY_ROUTINE,
-            42L,
-            null,
-            null,
-            null,
-            10L, // tagId 지정
-            null,
-            null,
-            List.of());
-    ReplanSaveRequest req = new ReplanSaveRequest(42L, List.of("GOAL_NO_PRIORITY"), List.of(op));
-
-    replanService.save(1L, req);
-
-    then(anchor).should().updateTag(tag);
   }
 }

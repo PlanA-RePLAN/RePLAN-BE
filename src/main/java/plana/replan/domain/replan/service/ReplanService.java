@@ -26,6 +26,7 @@ import plana.replan.domain.replan.exception.ReplanErrorCode;
 import plana.replan.domain.replan.repository.ReplanRepository;
 import plana.replan.domain.routine.entity.Routine;
 import plana.replan.domain.routine.entity.RoutineType;
+import plana.replan.domain.routine.repository.RoutineOverrideRepository;
 import plana.replan.domain.routine.repository.RoutineRepository;
 import plana.replan.domain.routine.service.RoutineService;
 import plana.replan.domain.tag.entity.Tag;
@@ -53,6 +54,7 @@ public class ReplanService {
   private final Clock clock;
   private final RoutineRepository routineRepository;
   private final RoutineService routineService;
+  private final RoutineOverrideRepository routineOverrideRepository;
 
   /**
    * 2단계 선택(+선택적 추가질문 답변)을 받아, 추가 질문이 필요하면 질문을, 충분하면 추천을 반환한다. 질문이 필요한지는 {@link
@@ -419,18 +421,20 @@ public class ReplanService {
         tag);
     routine.linkReplan(replan);
 
-    // 이번 회차 투두(앵커)가 미완료면 새 규칙에 맞춰 동기화, 완료면 그대로 둔다
-    if (!anchor.isCompleted()) {
-      if (op.title() != null) {
-        anchor.updateTitle(op.title());
-      }
-      if (op.dueDate() != null || op.dueTime() != null) {
-        anchor.updateDueDate(resolveModifiedDueDate(anchor, op));
-      }
-      if (op.tagId() != null) {
-        anchor.updateTag(tag);
-      }
-      anchor.linkReplan(replan);
+    // 미래 회차 수정기록 폐기(옛 규칙 기준이라 의미 없어짐)
+    routineOverrideRepository.deleteByRoutineAndOverrideDateGreaterThanEqual(
+        routine, LocalDate.now(clock));
+
+    // 이번 회차(앵커) 치우기 — 실패 전 삭제 / 실패 후 비활성화
+    boolean failedBefore = !isOverdue(anchor);
+    retire(anchor);
+
+    // 실패 전 + 새 규칙에 오늘이 포함되면 오늘 회차를 새 규칙대로 재생성
+    if (failedBefore && routineService.occursToday(routine)) {
+      routineService.createTodoTreeFromMother(routine);
+      todoRepository
+          .findFirstUpcomingMotherTodoByRoutine(routine, LocalDate.now(clock).atStartOfDay())
+          .ifPresent(instance -> instance.linkReplan(replan));
     }
   }
 
