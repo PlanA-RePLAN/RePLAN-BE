@@ -746,6 +746,33 @@ class RoutineServiceTest {
                     .isEqualTo(RoutineErrorCode.ROUTINE_NOT_FOUND));
   }
 
+  // ========== willCreateUpcomingOccurrence ==========
+
+  @Test
+  void willCreateUpcomingOccurrence_종료일없으면_참() {
+    // 종료일이 없으면(무기한 반복) 다음 회차를 항상 만든다.
+    Routine daily = org.mockito.Mockito.mock(Routine.class);
+    assertThat(routineService.willCreateUpcomingOccurrence(daily)).isTrue();
+  }
+
+  @Test
+  void willCreateUpcomingOccurrence_다음회차가_종료일_이내면_참() {
+    Routine daily = org.mockito.Mockito.mock(Routine.class);
+    given(daily.getRoutineType()).willReturn(RoutineType.DAILY);
+    // TEST_DATE = 2024-01-15. DAILY의 다음 회차는 오늘. 종료일이 오늘이면 만든다.
+    given(daily.getDueDate()).willReturn(LocalDateTime.of(2024, 1, 15, 0, 0));
+    assertThat(routineService.willCreateUpcomingOccurrence(daily)).isTrue();
+  }
+
+  @Test
+  void willCreateUpcomingOccurrence_다음회차가_종료일_지나면_거짓() {
+    Routine daily = org.mockito.Mockito.mock(Routine.class);
+    given(daily.getRoutineType()).willReturn(RoutineType.DAILY);
+    // TEST_DATE = 2024-01-15. 종료일이 2024-01-10이면 다음 회차(오늘)가 종료일을 넘어 만들지 않는다.
+    given(daily.getDueDate()).willReturn(LocalDateTime.of(2024, 1, 10, 0, 0));
+    assertThat(routineService.willCreateUpcomingOccurrence(daily)).isFalse();
+  }
+
   // ========== generateDailyTodos with override ==========
 
   @Test

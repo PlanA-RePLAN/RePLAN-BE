@@ -290,6 +290,19 @@ public class RoutineService {
         });
   }
 
+  /**
+   * {@link #createTodoTreeFromMother(Routine)}가 이 루틴의 다음 회차 투두를 실제로 만들지 판단한다. 다음 회차(오늘 또는 가까운 미래)가
+   * 반복 종료일을 넘지 않으면 만든다 — createTodoTreeFromMother와 같은 규칙이다. 리플랜에서 "옛 회차를 치우고 새 회차로 옮길 수 있는지"를 결정하는
+   * 데 쓴다(만들 수 없으면 옛 회차를 삭제하면 안 된다).
+   */
+  public boolean willCreateUpcomingOccurrence(Routine routine) {
+    if (routine.getDueDate() == null) {
+      return true; // 무기한 반복 → 다음 회차를 항상 만든다
+    }
+    LocalDate next = nextOccurrence(routine, LocalDate.now(clock));
+    return !next.isAfter(routine.getDueDate().toLocalDate());
+  }
+
   private boolean isOccurrenceDay(Routine routine, LocalDate today) {
     return switch (routine.getRoutineType()) {
       case DAILY -> true;
