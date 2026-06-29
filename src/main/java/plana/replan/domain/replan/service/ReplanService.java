@@ -337,9 +337,13 @@ public class ReplanService {
     }
   }
 
-  /** 기존 투두를 사용자 화면에서 치운다: 마감 지났으면 비활성화(통계에 실패로 남김), 아니면 소프트 삭제(통계에서 제외). */
+  /**
+   * 기존 투두를 (하위 투두까지 함께) 치운다: 마감 지났으면 비활성화(통계에 실패로 남김), 아니면 소프트 삭제(통계에서 제외). 부모만 치우고 자식을 두면 상태가
+   * 어긋나므로 두 경로 모두 자식을 함께 처리한다.
+   */
   private void retire(Todo target) {
     if (isOverdue(target)) {
+      target.getChildren().forEach(Todo::deactivate);
       target.deactivate();
     } else {
       target.getChildren().forEach(Todo::softDelete);
@@ -491,6 +495,11 @@ public class ReplanService {
           todoRepository
               .findFirstUpcomingMotherTodoByRoutine(routine, LocalDate.now(clock).atStartOfDay())
               .orElseThrow(() -> new CustomException(ReplanErrorCode.REPLAN_INVALID_OPERATION));
+      // 같은 슬롯에 회차가 이미 있어 createTodoTreeFromMother가 새로 만들지 않은 경우(no-op)에도
+      // 그 회차가 옛 규칙 내용으로 남지 않도록 제목·태그를 새 루틴 값으로 동기화한다(updateMotherRoutine과 동일).
+      instance.updateTitle(routine.getTitle());
+      instance.updateTag(routine.getTag());
+      instance.getChildren().forEach(child -> child.updateTag(routine.getTag()));
       instance.linkReplan(replan);
       replan.relinkTodo(instance);
     } else if (failedBefore) {

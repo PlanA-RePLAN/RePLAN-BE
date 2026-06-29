@@ -247,7 +247,10 @@ class ReplanServiceTest {
 
     then(anchor).should().softDelete(); // 실패 전이므로 삭제
     then(anchor).should(never()).deactivate();
-    then(todoRepository).should().save(any(Todo.class)); // 새 투두 생성
+    // 원본 앵커가 아니라 "새로 만든" 투두를 저장해야 한다(같은 인스턴스를 다시 저장하면 안 됨)
+    org.mockito.ArgumentCaptor<Todo> savedTodo = org.mockito.ArgumentCaptor.forClass(Todo.class);
+    then(todoRepository).should().save(savedTodo.capture());
+    assertThat(savedTodo.getValue()).isNotSameAs(anchor);
   }
 
   @Test
@@ -314,7 +317,10 @@ class ReplanServiceTest {
     replanService.save(1L, req);
 
     then(target).should().softDelete();
-    then(todoRepository).should().save(any(Todo.class));
+    // 원본 대상이 아니라 새로 만든 투두를 저장해야 한다
+    org.mockito.ArgumentCaptor<Todo> savedTodo = org.mockito.ArgumentCaptor.forClass(Todo.class);
+    then(todoRepository).should().save(savedTodo.capture());
+    assertThat(savedTodo.getValue()).isNotSameAs(target);
   }
 
   @Test
@@ -398,9 +404,13 @@ class ReplanServiceTest {
         .update(
             eq("영단어 50개"), any(), eq(RoutineType.WEEKLY), eq(62), eq(LocalTime.of(11, 15)), any());
     then(routine).should().linkReplan(any(Replan.class));
+    // 오늘 이후 override만 지워야 한다(과거/오늘 것을 같이 지우면 안 됨). 컷오프 = 오늘(clock=2026-06-18).
+    org.mockito.ArgumentCaptor<java.time.LocalDate> cutoff =
+        org.mockito.ArgumentCaptor.forClass(java.time.LocalDate.class);
     then(routineOverrideRepository)
         .should()
-        .deleteByRoutineAndOverrideDateGreaterThanEqual(eq(routine), any());
+        .deleteByRoutineAndOverrideDateGreaterThanEqual(eq(routine), cutoff.capture());
+    assertThat(cutoff.getValue()).isEqualTo(java.time.LocalDate.of(2026, 6, 18));
     // 새 규칙에 오늘 회차가 없어 대체 투두가 없다 → 소프트 삭제하면 리플랜이 통계에서 사라지므로 비활성화로 남긴다
     then(anchor).should().deactivate();
     then(anchor).should(never()).softDelete();
@@ -490,10 +500,12 @@ class ReplanServiceTest {
   }
 
   @Test
-  void MODIFY_ROUTINE_실패후면_회차를_비활성화하고_재생성안한다() {
+  void MODIFY_ROUTINE_실패후면_회차와_하위회차를_함께_비활성화하고_재생성안한다() {
     Todo anchor = ownedTodo(42L, 1L);
     given(anchor.getId()).willReturn(42L);
     given(anchor.getDueDate()).willReturn(LocalDateTime.of(2026, 6, 1, 11, 0)); // 과거(실패 후)
+    Todo subOccurrence = org.mockito.Mockito.mock(Todo.class); // 루틴 회차의 하위 회차
+    given(anchor.getChildren()).willReturn(List.of(subOccurrence));
     Routine routine = org.mockito.Mockito.mock(Routine.class);
     given(anchor.getRoutine()).willReturn(routine);
     given(routine.getRoutineType()).willReturn(RoutineType.DAILY);
@@ -509,6 +521,7 @@ class ReplanServiceTest {
 
     then(anchor).should().deactivate();
     then(anchor).should(never()).softDelete();
+    then(subOccurrence).should().deactivate(); // 하위 회차도 함께 비활성화돼 부모와 상태가 맞아야 한다
     then(routineService).should(never()).createTodoTreeFromMother(any());
   }
 
