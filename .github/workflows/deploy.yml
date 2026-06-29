@@ -68,11 +68,29 @@ jobs:
             aws ssm get-parameter --name /replan/prod/AWS_S3_BUCKET --query Parameter.Value --output text --region ${{ secrets.AWS_REGION }} | xargs -I{} echo "AWS_S3_BUCKET={}" >> /home/ubuntu/app/.env
             aws ssm get-parameter --name /replan/prod/AWS_CLOUDFRONT_DOMAIN --query Parameter.Value --output text --region ${{ secrets.AWS_REGION }} | xargs -I{} echo "AWS_CLOUDFRONT_DOMAIN={}" >> /home/ubuntu/app/.env
             aws ssm get-parameter --name /replan/prod/GOOGLE_WEB_CLIENT_ID --with-decryption --query Parameter.Value --output text --region ${{ secrets.AWS_REGION }} | xargs -I{} echo "GOOGLE_WEB_CLIENT_ID={}" >> /home/ubuntu/app/.env
+            # 파라미터가 "없을 때(ParameterNotFound)"만 빈 값으로 허용하고,
+            # 권한 오류·경로 오타·AWS 장애 등 다른 실패는 배포를 중단한다.
+            get_optional_ssm() {
+              local name="$1"
+              local value
+              local err
+              err="$(mktemp)"
+              if value="$(aws ssm get-parameter --name "$name" --with-decryption --query Parameter.Value --output text --region ${{ secrets.AWS_REGION }} 2>"$err")"; then
+                printf '%s' "$value"
+              elif grep -q 'ParameterNotFound' "$err"; then
+                printf ''
+              else
+                cat "$err" >&2
+                rm -f "$err"
+                exit 1
+              fi
+              rm -f "$err"
+            }
             # 구글 iOS/Android 클라이언트 ID는 아직 없을 수 있으므로(없으면 빈 값으로 두고 배포 계속)
-            GOOGLE_IOS_CLIENT_ID="$(aws ssm get-parameter --name /replan/prod/GOOGLE_IOS_CLIENT_ID --with-decryption --query Parameter.Value --output text --region ${{ secrets.AWS_REGION }} 2>/dev/null || true)"
-            echo "GOOGLE_IOS_CLIENT_ID=${GOOGLE_IOS_CLIENT_ID}" >> /home/ubuntu/app/.env
-            GOOGLE_ANDROID_CLIENT_ID="$(aws ssm get-parameter --name /replan/prod/GOOGLE_ANDROID_CLIENT_ID --with-decryption --query Parameter.Value --output text --region ${{ secrets.AWS_REGION }} 2>/dev/null || true)"
-            echo "GOOGLE_ANDROID_CLIENT_ID=${GOOGLE_ANDROID_CLIENT_ID}" >> /home/ubuntu/app/.env
+            GOOGLE_IOS_CLIENT_ID="$(get_optional_ssm /replan/prod/GOOGLE_IOS_CLIENT_ID)"
+            printf 'GOOGLE_IOS_CLIENT_ID=%s\n' "$GOOGLE_IOS_CLIENT_ID" >> /home/ubuntu/app/.env
+            GOOGLE_ANDROID_CLIENT_ID="$(get_optional_ssm /replan/prod/GOOGLE_ANDROID_CLIENT_ID)"
+            printf 'GOOGLE_ANDROID_CLIENT_ID=%s\n' "$GOOGLE_ANDROID_CLIENT_ID" >> /home/ubuntu/app/.env
             aws ssm get-parameter --name /replan/prod/REDIS_HOST --query Parameter.Value --output text --region ${{ secrets.AWS_REGION }} | xargs -I{} echo "REDIS_HOST={}" >> /home/ubuntu/app/.env
             aws ssm get-parameter --name /replan/prod/REDIS_PORT --query Parameter.Value --output text --region ${{ secrets.AWS_REGION }} | xargs -I{} echo "REDIS_PORT={}" >> /home/ubuntu/app/.env
             aws ssm get-parameter --name /replan/prod/GEMINI_API_KEY --query Parameter.Value --output text --region ${{ secrets.AWS_REGION }} | xargs -I{} echo "GEMINI_API_KEY={}" >> /home/ubuntu/app/.env
