@@ -326,6 +326,13 @@ public class ReplanService {
     Todo newTodo = recreateFromModify(target, op, replan);
     children.forEach(child -> child.updateParent(newTodo));
     retireWithoutChildren(target);
+    // 앵커 자신을 소프트 삭제하는 경우(실패 전), 위에서 만든 Replan이 가리키던 앵커가
+    // @SQLRestriction(deleted_at IS NULL) 때문에 리플랜 조회에서 사라진다.
+    // 리플랜을 살아있는 새 투두로 옮겨 달아 월간 통계(리플랜 횟수 등)에 정상 집계되게 한다.
+    // (앵커가 아닌 다른 투두 수정이나 실패 후 비활성화는 앵커가 살아있어 옮길 필요가 없다.)
+    if (target == anchor && !isOverdue(target)) {
+      replan.relinkTodo(newTodo);
+    }
   }
 
   /** 기존 투두를 사용자 화면에서 치운다: 마감 지났으면 비활성화(통계에 실패로 남김), 아니면 소프트 삭제(통계에서 제외). */
@@ -459,16 +466,31 @@ public class ReplanService {
     routineOverrideRepository.deleteByRoutineAndOverrideDateGreaterThanEqual(
         routine, LocalDate.now(clock));
 
-    // 이번 회차(앵커) 치우기 — 실패 전 삭제 / 실패 후 비활성화
+    // 이번 회차(앵커) 치우기.
+    // 주의: 위에서 만든 Replan은 anchor를 가리킨다. 실패 전이라고 anchor를 소프트 삭제하면
+    // @SQLRestriction(deleted_at IS NULL) 때문에 월간 리포트의 리플랜 조회에서 이 리플랜이 통째로
+    // 빠진다(리플랜 횟수 누락). 그래서 대체할 살아있는 새 회차가 있을 때만 소프트 삭제하고
+    // 리플랜을 그 새 회차로 옮겨 달며, 새 회차가 없으면 비활성화로 남겨 리플랜이 사라지지 않게 한다.
     boolean failedBefore = !isOverdue(anchor);
-    retire(anchor);
-
-    // 실패 전 + 새 규칙에 오늘이 포함되면 오늘 회차를 새 규칙대로 재생성
     if (failedBefore && routineService.occursToday(routine)) {
+      // 실패 전 + 오늘도 회차 → 옛 회차는 소프트 삭제(통계 제외)하고 오늘 회차를 새 규칙대로 재생성
+      retire(anchor);
       routineService.createTodoTreeFromMother(routine);
       todoRepository
           .findFirstUpcomingMotherTodoByRoutine(routine, LocalDate.now(clock).atStartOfDay())
-          .ifPresent(instance -> instance.linkReplan(replan));
+          .ifPresent(
+              instance -> {
+                instance.linkReplan(replan);
+                replan.relinkTodo(instance);
+              });
+    } else if (failedBefore) {
+      // 실패 전이지만 새 규칙에 오늘 회차가 없어 대체 투두가 없다.
+      // 소프트 삭제하면 리플랜이 통계에서 사라지므로, 회차와 하위 회차를 비활성화로 남긴다.
+      anchor.getChildren().forEach(Todo::deactivate);
+      anchor.deactivate();
+    } else {
+      // 실패 후 → 비활성화(통계에 실패로 남김). 앵커가 살아있어 리플랜도 정상 집계된다.
+      retire(anchor);
     }
   }
 

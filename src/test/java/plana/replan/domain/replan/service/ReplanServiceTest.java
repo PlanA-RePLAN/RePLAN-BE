@@ -227,6 +227,7 @@ class ReplanServiceTest {
     given(anchor.getChildren()).willReturn(List.of());
     given(todoRepository.findById(42L)).willReturn(Optional.of(anchor));
     given(replanRepository.save(any(Replan.class))).willAnswer(inv -> inv.getArgument(0));
+    given(todoRepository.save(any(Todo.class))).willAnswer(inv -> inv.getArgument(0));
 
     ReplanOperation modify =
         new ReplanOperation(
@@ -247,6 +248,39 @@ class ReplanServiceTest {
     then(anchor).should().softDelete(); // 실패 전이므로 삭제
     then(anchor).should(never()).deactivate();
     then(todoRepository).should().save(any(Todo.class)); // 새 투두 생성
+  }
+
+  @Test
+  void MODIFY_TODO_실패전_앵커를_치우면_리플랜은_새_투두를_가리킨다() {
+    // 앵커를 소프트 삭제하면 리플랜이 통계 조회에서 사라지므로, 리플랜은 새 투두를 가리켜야 한다.
+    Todo anchor = ownedTodo(42L, 1L);
+    given(anchor.getId()).willReturn(42L);
+    given(anchor.getDueDate()).willReturn(LocalDateTime.of(2026, 6, 25, 11, 0)); // 실패 전
+    given(anchor.getChildren()).willReturn(List.of());
+    given(todoRepository.findById(42L)).willReturn(Optional.of(anchor));
+    given(replanRepository.save(any(Replan.class))).willAnswer(inv -> inv.getArgument(0));
+    given(todoRepository.save(any(Todo.class))).willAnswer(inv -> inv.getArgument(0));
+    org.mockito.ArgumentCaptor<Replan> replanCaptor =
+        org.mockito.ArgumentCaptor.forClass(Replan.class);
+    org.mockito.ArgumentCaptor<Todo> todoCaptor = org.mockito.ArgumentCaptor.forClass(Todo.class);
+
+    ReplanOperation modify =
+        new ReplanOperation(
+            ReplanAction.MODIFY_TODO,
+            42L,
+            "데이터 분석 1~2강",
+            "2026-07-02",
+            null,
+            null,
+            null,
+            null,
+            List.of());
+    replanService.save(
+        1L, new ReplanSaveRequest(42L, List.of("GOAL_NO_PRIORITY"), List.of(modify)));
+
+    then(replanRepository).should().save(replanCaptor.capture());
+    then(todoRepository).should().save(todoCaptor.capture());
+    assertThat(replanCaptor.getValue().getTodo()).isSameAs(todoCaptor.getValue());
   }
 
   @Test
@@ -366,7 +400,9 @@ class ReplanServiceTest {
     then(routineOverrideRepository)
         .should()
         .deleteByRoutineAndOverrideDateGreaterThanEqual(eq(routine), any());
-    then(anchor).should().softDelete(); // 실패 전 회차 삭제
+    // 새 규칙에 오늘 회차가 없어 대체 투두가 없다 → 소프트 삭제하면 리플랜이 통계에서 사라지므로 비활성화로 남긴다
+    then(anchor).should().deactivate();
+    then(anchor).should(never()).softDelete();
     then(routineService).should(never()).createTodoTreeFromMother(any()); // 오늘 회차 아님
   }
 
@@ -413,6 +449,8 @@ class ReplanServiceTest {
     Todo newInstance = org.mockito.Mockito.mock(Todo.class);
     given(todoRepository.findFirstUpcomingMotherTodoByRoutine(any(), any()))
         .willReturn(Optional.of(newInstance));
+    org.mockito.ArgumentCaptor<Replan> replanCaptor =
+        org.mockito.ArgumentCaptor.forClass(Replan.class);
 
     ReplanOperation op =
         new ReplanOperation(
@@ -420,6 +458,9 @@ class ReplanServiceTest {
     replanService.save(1L, new ReplanSaveRequest(42L, List.of("GOAL_NO_PRIORITY"), List.of(op)));
 
     then(newInstance).should().linkReplan(any(Replan.class));
+    // 리플랜은 소프트 삭제된 앵커가 아니라 재생성된 새 회차를 가리켜야 한다
+    then(replanRepository).should().save(replanCaptor.capture());
+    assertThat(replanCaptor.getValue().getTodo()).isSameAs(newInstance);
   }
 
   @Test
@@ -757,11 +798,13 @@ class ReplanServiceTest {
   @Test
   void MODIFY_TODO_시간만_바꾸면_새투두는_기존_날짜를_유지한다() {
     Todo anchor = ownedTodo(42L, 1L);
+    given(anchor.getId()).willReturn(42L);
     given(anchor.getDueDate()).willReturn(LocalDateTime.of(2026, 6, 25, 10, 0)); // 실패 전
     given(anchor.getTitle()).willReturn("데이터 분석");
     given(anchor.getChildren()).willReturn(List.of());
     given(todoRepository.findById(42L)).willReturn(Optional.of(anchor));
     given(replanRepository.save(any(Replan.class))).willAnswer(inv -> inv.getArgument(0));
+    given(todoRepository.save(any(Todo.class))).willAnswer(inv -> inv.getArgument(0));
     org.mockito.ArgumentCaptor<Todo> captor = org.mockito.ArgumentCaptor.forClass(Todo.class);
 
     ReplanOperation modify =

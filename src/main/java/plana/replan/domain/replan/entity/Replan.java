@@ -41,4 +41,13 @@ public class Replan extends BaseTimeEntity {
     this.failureReason2 = failureReason2;
     this.failureReason3 = failureReason3;
   }
+
+  /**
+   * 리플랜이 가리키는 투두를 바꾼다. 리플랜이 "수정"한 원본 투두를 소프트 삭제(통계 제외)할 때, 삭제된 투두는
+   * {@code @SQLRestriction(deleted_at IS NULL)}으로 모든 조회에서 빠지므로 이 리플랜 자체가 월간 통계 집계에서 사라진다. 그래서 살아있는
+   * 새 투두로 옮겨 달아 리플랜이 정상 집계되게 한다.
+   */
+  public void relinkTodo(Todo todo) {
+    this.todo = Objects.requireNonNull(todo, "투두는 필수입니다.");
+  }
 }
