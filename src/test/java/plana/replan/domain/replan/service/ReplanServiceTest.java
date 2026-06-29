@@ -218,6 +218,7 @@ class ReplanServiceTest {
   @Test
   void MODIFY_TODO는_기존투두를_치우고_새투두를_만든다() {
     Todo anchor = ownedTodo(42L, 1L);
+    given(anchor.getId()).willReturn(42L);
     // 마감 전(2026-06-25) → 실패 전 → softDelete
     given(anchor.getDueDate()).willReturn(LocalDateTime.of(2026, 6, 25, 11, 0));
     given(anchor.getChildren()).willReturn(List.of());
@@ -282,6 +283,7 @@ class ReplanServiceTest {
   @Test
   void MODIFY_TODO_마감_지난_대상은_비활성화된다() {
     Todo anchor = ownedTodo(42L, 1L);
+    given(anchor.getId()).willReturn(42L);
     given(anchor.getDueDate()).willReturn(LocalDateTime.of(2026, 6, 1, 10, 0)); // 과거(실패 후)
     given(anchor.getTitle()).willReturn("데이터 분석");
     given(todoRepository.findById(42L)).willReturn(Optional.of(anchor));
@@ -477,7 +479,6 @@ class ReplanServiceTest {
   @Test
   void 마감_지난_일반투두를_ADD로_대체하면_원본을_숨긴다() {
     Todo todo = ownedTodo(42L, 1L);
-    given(todo.getRoutine()).willReturn(null);
     given(todo.getDueDate()).willReturn(LocalDateTime.of(2026, 6, 1, 10, 0)); // 과거
     given(todoRepository.findById(42L)).willReturn(Optional.of(todo));
     given(replanRepository.save(any(Replan.class))).willAnswer(inv -> inv.getArgument(0));
@@ -501,34 +502,39 @@ class ReplanServiceTest {
   }
 
   @Test
-  void 마감_지난_앵커를_MODIFY하고_ADD도_있으면_원본은_안숨긴다() {
+  void 앵커를_MODIFY로_치우면_post_loop에서_또_치우지_않는다() {
     Todo anchor = ownedTodo(42L, 1L);
     given(anchor.getId()).willReturn(42L);
-    given(anchor.getRoutine()).willReturn(null);
     given(anchor.getDueDate()).willReturn(LocalDateTime.of(2026, 6, 1, 10, 0)); // 과거
     given(todoRepository.findById(42L)).willReturn(Optional.of(anchor));
     given(replanRepository.save(any(Replan.class))).willAnswer(inv -> inv.getArgument(0));
 
     ReplanOperation modifyOp =
         new ReplanOperation(
-            ReplanAction.MODIFY_TODO,
-            42L,
-            "수정된 제목",
-            "2026-06-25",
-            null,
-            null,
-            null,
-            null,
-            List.of());
+            ReplanAction.MODIFY_TODO, 42L, "수정", "2026-06-25", null, null, null, null, List.of());
     ReplanOperation addOp =
         new ReplanOperation(
-            ReplanAction.ADD, null, "추가 투두", "2026-06-26", null, null, null, null, List.of());
-    ReplanSaveRequest req =
-        new ReplanSaveRequest(42L, List.of("GOAL_NO_PRIORITY"), List.of(modifyOp, addOp));
+            ReplanAction.ADD, null, "추가", "2026-06-26", null, null, null, null, List.of());
+    replanService.save(
+        1L, new ReplanSaveRequest(42L, List.of("GOAL_NO_PRIORITY"), List.of(modifyOp, addOp)));
 
-    replanService.save(1L, req);
+    then(anchor).should(times(1)).deactivate(); // MODIFY에서 1번만
+  }
 
-    then(anchor).should(never()).deactivate();
+  @Test
+  void 앵커를_안건드린_ADD만이면_앵커도_치운다() {
+    Todo anchor = ownedTodo(42L, 1L);
+    given(anchor.getDueDate()).willReturn(LocalDateTime.of(2026, 7, 1, 10, 0)); // 미래(실패 전)
+    given(anchor.getChildren()).willReturn(List.of());
+    given(todoRepository.findById(42L)).willReturn(Optional.of(anchor));
+    given(replanRepository.save(any(Replan.class))).willAnswer(inv -> inv.getArgument(0));
+
+    ReplanOperation addOp =
+        new ReplanOperation(
+            ReplanAction.ADD, null, "추가", "2026-07-02", null, null, null, null, List.of());
+    replanService.save(1L, new ReplanSaveRequest(42L, List.of("GOAL_NO_PRIORITY"), List.of(addOp)));
+
+    then(anchor).should().softDelete(); // 앵커는 실패 전이므로 삭제
   }
 
   @Test

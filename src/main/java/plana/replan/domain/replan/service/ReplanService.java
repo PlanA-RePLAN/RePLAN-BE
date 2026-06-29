@@ -199,31 +199,28 @@ public class ReplanService {
       return;
     }
 
-    boolean anyAdd = false;
-    boolean anchorModifiedInPlace = false;
-
+    boolean anchorHandled = false;
     for (ReplanOperation op : req.acceptedOperations()) {
       validateOperation(op);
       switch (op.action()) {
-        case ADD -> {
-          applyAdd(op, anchor, replan);
-          anyAdd = true;
-        }
+        case ADD -> applyAdd(op, anchor, replan);
         case MODIFY_TODO -> {
           applyModifyTodo(op, anchor, replan);
           if (op.targetTodoId() != null && op.targetTodoId().equals(anchor.getId())) {
-            anchorModifiedInPlace = true;
+            anchorHandled = true;
           }
         }
-        case MODIFY_ROUTINE -> applyModifyRoutine(op, anchor, replan);
+        case MODIFY_ROUTINE -> {
+          applyModifyRoutine(op, anchor, replan);
+          anchorHandled = true;
+        }
         case CREATE_ROUTINE -> applyCreateRoutine(op, anchor, replan);
       }
     }
 
-    // 마감 지난 일반 투두(앵커)를 ADD로 대체한 경우에만 한 번 숨긴다.
-    // MODIFY_TODO로 앵커 자체를 수정했다면 숨기지 않는다.
-    if (anchor.getRoutine() == null && isOverdue(anchor) && anyAdd && !anchorModifiedInPlace) {
-      anchor.deactivate();
+    // 어떤 작업도 앵커를 직접 치우지 않았고, 새로 만든 결과가 있으면(=앵커가 대체됨) 앵커를 치운다.
+    if (!req.acceptedOperations().isEmpty() && !anchorHandled) {
+      retire(anchor);
     }
   }
 
