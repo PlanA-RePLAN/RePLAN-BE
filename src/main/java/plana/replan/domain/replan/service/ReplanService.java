@@ -202,10 +202,14 @@ public class ReplanService {
     }
 
     boolean anchorHandled = false;
+    boolean replacementCreated = false;
     for (ReplanOperation op : req.acceptedOperations()) {
       validateOperation(op);
       switch (op.action()) {
-        case ADD -> applyAdd(op, anchor, replan);
+        case ADD -> {
+          applyAdd(op, anchor, replan);
+          replacementCreated = true;
+        }
         case MODIFY_TODO -> {
           applyModifyTodo(op, anchor, replan);
           if (op.targetTodoId() != null && op.targetTodoId().equals(anchor.getId())) {
@@ -216,12 +220,16 @@ public class ReplanService {
           applyModifyRoutine(op, anchor, replan);
           anchorHandled = true;
         }
-        case CREATE_ROUTINE -> applyCreateRoutine(op, anchor, replan);
+        case CREATE_ROUTINE -> {
+          applyCreateRoutine(op, anchor, replan);
+          replacementCreated = true;
+        }
       }
     }
 
-    // 어떤 작업도 앵커를 직접 치우지 않았고, 새로 만든 결과가 있으면(=앵커가 대체됨) 앵커를 치운다.
-    if (!req.acceptedOperations().isEmpty() && !anchorHandled) {
+    // 앵커를 직접 치우지 않았고 ADD/CREATE_ROUTINE으로 대체 투두가 생겼을 때만 앵커를 치운다.
+    // MODIFY_TODO가 앵커가 아닌 다른 투두만 수정한 경우 replacementCreated=false이므로 앵커는 그대로 둔다.
+    if (!anchorHandled && replacementCreated) {
       retire(anchor);
     }
   }
@@ -306,8 +314,12 @@ public class ReplanService {
     if (!target.getUser().getId().equals(anchor.getUser().getId())) {
       throw new CustomException(ReplanErrorCode.REPLAN_TODO_NOT_FOUND);
     }
-    retire(target);
-    recreateFromModify(target, op, replan);
+    // 하위 투두를 미리 스냅샷해두고 새 부모로 옮긴 뒤 부모만 치운다.
+    // retire(target)을 그대로 쓰면 하위 투두까지 소프트 삭제돼 사용자의 서브태스크가 모두 사라진다.
+    List<Todo> children = new ArrayList<>(target.getChildren());
+    Todo newTodo = recreateFromModify(target, op, replan);
+    children.forEach(child -> child.updateParent(newTodo));
+    retireWithoutChildren(target);
   }
 
   /** 기존 투두를 사용자 화면에서 치운다: 마감 지났으면 비활성화(통계에 실패로 남김), 아니면 소프트 삭제(통계에서 제외). */
@@ -316,6 +328,18 @@ public class ReplanService {
       target.deactivate();
     } else {
       target.getChildren().forEach(Todo::softDelete);
+      target.softDelete();
+    }
+  }
+
+  /**
+   * 투두 자신만 치운다(하위 투두는 건드리지 않음): 마감 지났으면 비활성화, 아니면 소프트 삭제. MODIFY_TODO에서 하위 투두를 새 부모로 옮긴 뒤 원래 부모를 치울
+   * 때 사용한다.
+   */
+  private void retireWithoutChildren(Todo target) {
+    if (isOverdue(target)) {
+      target.deactivate();
+    } else {
       target.softDelete();
     }
   }

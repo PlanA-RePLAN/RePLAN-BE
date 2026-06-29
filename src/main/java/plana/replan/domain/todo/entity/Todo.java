@@ -100,6 +100,10 @@ public class Todo extends BaseTimeEntity {
     this.routine = routine;
   }
 
+  public void updateParent(Todo parent) {
+    this.parent = parent;
+  }
+
   public void updatePinned(boolean isPinned) {
     this.isPinned = isPinned;
   }

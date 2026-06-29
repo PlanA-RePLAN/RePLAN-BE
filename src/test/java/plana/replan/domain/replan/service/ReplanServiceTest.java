@@ -582,6 +582,88 @@ class ReplanServiceTest {
   }
 
   @Test
+  void 우선순위_리플랜에서_앵커_아닌_투두만_수정하면_앵커는_건드리지_않는다() {
+    // Bug 1 회귀: ADD/CREATE_ROUTINE 없이 MODIFY_TODO만 있을 때 앵커를 오삭제하던 문제
+    Todo anchor = ownedTodo(42L, 1L);
+    given(todoRepository.findById(42L)).willReturn(Optional.of(anchor));
+
+    User sameUser = org.mockito.Mockito.mock(User.class);
+    given(sameUser.getId()).willReturn(1L);
+    Todo target = org.mockito.Mockito.mock(Todo.class);
+    given(target.getUser()).willReturn(sameUser);
+    given(target.getDueDate()).willReturn(LocalDateTime.of(2026, 6, 25, 11, 0)); // 실패 전
+    given(target.getChildren()).willReturn(List.of());
+    given(todoRepository.findById(99L)).willReturn(Optional.of(target));
+    given(replanRepository.save(any(Replan.class))).willAnswer(inv -> inv.getArgument(0));
+
+    ReplanOperation modifyOp =
+        new ReplanOperation(
+            ReplanAction.MODIFY_TODO,
+            99L, // 앵커(42)가 아닌 다른 투두를 대상으로 한다
+            "[1] 데이터 분석 1~2강",
+            null,
+            null,
+            null,
+            null,
+            null,
+            List.of());
+    ReplanSaveRequest req =
+        new ReplanSaveRequest(42L, List.of("GOAL_NO_PRIORITY"), List.of(modifyOp));
+
+    replanService.save(1L, req);
+
+    // 대체 투두(ADD)가 없으므로 앵커(42)는 건드리지 않아야 한다
+    then(anchor).should(never()).softDelete();
+    then(anchor).should(never()).deactivate();
+    // 대상(99)은 치우고 새 투두로 대체해야 한다
+    then(target).should().softDelete();
+    then(todoRepository).should().save(any(Todo.class));
+  }
+
+  @Test
+  void MODIFY_TODO_부모투두_수정시_하위투두는_새_부모로_옮기고_삭제하지_않는다() {
+    // Bug 2 회귀: 하위 투두가 있는 부모를 수정할 때 하위 투두까지 삭제되던 문제
+    Todo anchor = ownedTodo(42L, 1L);
+    given(anchor.getId()).willReturn(42L);
+    given(anchor.getDueDate()).willReturn(LocalDateTime.of(2026, 6, 25, 11, 0)); // 실패 전
+
+    Todo child1 = org.mockito.Mockito.mock(Todo.class);
+    Todo child2 = org.mockito.Mockito.mock(Todo.class);
+    given(anchor.getChildren()).willReturn(List.of(child1, child2));
+
+    given(todoRepository.findById(42L)).willReturn(Optional.of(anchor));
+    given(replanRepository.save(any(Replan.class))).willAnswer(inv -> inv.getArgument(0));
+    given(todoRepository.save(any(Todo.class))).willAnswer(inv -> inv.getArgument(0));
+
+    ReplanOperation modify =
+        new ReplanOperation(
+            ReplanAction.MODIFY_TODO,
+            42L,
+            "데이터 분석 1~2강",
+            "2026-07-02",
+            "23:59",
+            null,
+            null,
+            null,
+            List.of());
+    ReplanSaveRequest req =
+        new ReplanSaveRequest(42L, List.of("GOAL_NO_PRIORITY"), List.of(modify));
+
+    replanService.save(1L, req);
+
+    // 새로 만들어진 부모 투두를 캡처해서 각 하위 투두가 그걸 부모로 갱신했는지 확인한다
+    org.mockito.ArgumentCaptor<Todo> captor = org.mockito.ArgumentCaptor.forClass(Todo.class);
+    then(todoRepository).should().save(captor.capture());
+    Todo newParent = captor.getValue();
+
+    then(child1).should().updateParent(newParent);
+    then(child2).should().updateParent(newParent);
+    // 하위 투두는 삭제돼서는 안 된다
+    then(child1).should(never()).softDelete();
+    then(child2).should(never()).softDelete();
+  }
+
+  @Test
   void 잘못된_마감형식이면_400() {
     Todo anchor = ownedTodo(42L, 1L);
     given(todoRepository.findById(42L)).willReturn(Optional.of(anchor));
