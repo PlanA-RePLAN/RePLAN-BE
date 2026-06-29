@@ -7,5 +7,4 @@ import java.util.List;
 public record ReplanAnswer(
     @Schema(description = "질문 key", example = "priority_targets") String key,
     @Schema(description = "TEXT 답변", nullable = true, example = "ADsP 4챕터") String text,
-    @Schema(description = "TODO_SELECT 선택 투두 ID 목록", nullable = true) List<Long> selectedTodoIds,
-    @Schema(description = "CHIP 선택 목록", nullable = true) List<String> selectedChips) {}
+    @Schema(description = "TODO_SELECT 선택 투두 ID 목록", nullable = true) List<Long> selectedTodoIds) {}

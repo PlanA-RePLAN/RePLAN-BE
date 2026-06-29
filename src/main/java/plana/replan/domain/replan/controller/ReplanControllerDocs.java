@@ -51,8 +51,7 @@ public interface ReplanControllerDocs {
                                 {
                                   "key": "priority_targets",
                                   "type": "TODO_SELECT",
-                                  "title": "우선순위를 매길 투두를 선택하세요",
-                                  "chips": null
+                                  "title": "우선순위를 매길 투두를 선택하세요"
                                 }
                               ],
                               "operations": []

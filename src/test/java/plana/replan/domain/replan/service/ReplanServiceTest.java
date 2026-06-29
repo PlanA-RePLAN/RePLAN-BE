@@ -150,7 +150,7 @@ class ReplanServiceTest {
         new ReplanRecommendRequest(
             42L,
             List.of("GOAL_NO_PRIORITY"),
-            List.of(new ReplanAnswer("priority_targets", null, List.of(11L), null)),
+            List.of(new ReplanAnswer("priority_targets", null, List.of(11L))),
             null);
 
     ReplanRecommendResponse res = replanService.recommend(1L, req);
@@ -171,7 +171,7 @@ class ReplanServiceTest {
         new ReplanRecommendRequest(
             42L,
             List.of("GOAL_NO_PRIORITY", "CONDITION_PAIN"),
-            List.of(new ReplanAnswer("priority_targets", null, List.of(11L), null)),
+            List.of(new ReplanAnswer("priority_targets", null, List.of(11L))),
             null);
 
     ReplanRecommendResponse res = replanService.recommend(1L, req);
