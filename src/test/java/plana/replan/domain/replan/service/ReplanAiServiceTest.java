@@ -55,7 +55,7 @@ class ReplanAiServiceTest {
             false,
             null,
             List.of("목표 개선 필요", "우선 순위를 정하지 못했어요"),
-            List.of(new RecommendInput.AnswerInput("free", "ADsP 4챕터", null, null, null)),
+            List.of(new RecommendInput.AnswerInput("free", "ADsP 4챕터", null, null)),
             "2026-06-18",
             0);
 
@@ -149,7 +149,6 @@ class ReplanAiServiceTest {
                     "priority_targets",
                     null,
                     List.of(99L, 100L),
-                    null,
                     List.of("99:영단어 100개 암기", "100:독서 30분"))),
             "2026-06-18",
             0);

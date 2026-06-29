@@ -69,9 +69,7 @@ class ReplanControllerTest {
     given(replanService.recommend(eq(1L), any()))
         .willReturn(
             ReplanRecommendResponse.askQuestions(
-                List.of(
-                    new ReplanQuestion(
-                        "priority_targets", QuestionType.TODO_SELECT, "투두 선택", null)),
+                List.of(new ReplanQuestion("priority_targets", QuestionType.TODO_SELECT, "투두 선택")),
                 new ReplanAnchorTodo(
                     42L,
                     "데이터 분석 공부하기",

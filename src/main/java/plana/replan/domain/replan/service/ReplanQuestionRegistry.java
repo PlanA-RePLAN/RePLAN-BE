@@ -20,45 +20,34 @@ public final class ReplanQuestionRegistry {
 
   static {
     // 심리적 저항
-    QUESTIONS.put(
-        "MENTAL_HARD_TO_START",
-        new ReplanQuestion(
-            "mental_start_block",
-            QuestionType.CHIP,
-            "무엇이 가장 막막했나요?",
-            List.of("무엇부터 시작할지 몰라서", "시간이나 에너지가 많이 들 것 같아서", "완벽하게 해내고 싶어서")));
+    // (시작막막의 세부 사유는 칩 되묻기가 아니라 트리 3단계 선택으로 처리하므로 여기 추가 질문이 없다.)
     QUESTIONS.put(
         "MENTAL_DISTRACTION",
         new ReplanQuestion(
-            "distraction_type",
-            QuestionType.TEXT,
-            "어떤 유혹에 시간을 뺏기셨나요? (예: 스마트폰, 유튜브, 갑자기 방 청소 등)",
-            null));
+            "distraction_type", QuestionType.TEXT, "어떤 유혹에 시간을 뺏기셨나요? (예: 스마트폰, 유튜브, 갑자기 방 청소 등)"));
     // 컨디션 난조
     QUESTIONS.put(
         "CONDITION_EXHAUSTED",
-        new ReplanQuestion("focus_time", QuestionType.TEXT, "내일 언제가 가장 집중이 잘 되시나요?", null));
+        new ReplanQuestion("focus_time", QuestionType.TEXT, "내일 언제가 가장 집중이 잘 되시나요?"));
     QUESTIONS.put(
         "CONDITION_SLEEP",
-        new ReplanQuestion("reschedule_date", QuestionType.TEXT, "미룬 할 일은 언제 처리 가능하세요?", null));
+        new ReplanQuestion("reschedule_date", QuestionType.TEXT, "미룬 할 일은 언제 처리 가능하세요?"));
     QUESTIONS.put(
-        "CONDITION_PAIN", new ReplanQuestion("pain_area", QuestionType.TEXT, "어디가 불편하신가요?", null));
+        "CONDITION_PAIN", new ReplanQuestion("pain_area", QuestionType.TEXT, "어디가 불편하신가요?"));
     // 목표/계획 개선
     QUESTIONS.put(
         "GOAL_NO_PLAN",
-        new ReplanQuestion("volume_deadline", QuestionType.TEXT, "전체 분량과 마감일이 어떻게 되나요?", null));
+        new ReplanQuestion("volume_deadline", QuestionType.TEXT, "전체 분량과 마감일이 어떻게 되나요?"));
     QUESTIONS.put(
         "GOAL_TOO_MANY_TODOS",
-        new ReplanQuestion(
-            "defer_todos", QuestionType.TODO_SELECT, "다른 날로 미룰 덜 급한 투두를 선택하세요", null));
+        new ReplanQuestion("defer_todos", QuestionType.TODO_SELECT, "다른 날로 미룰 덜 급한 투두를 선택하세요"));
     QUESTIONS.put(
         "GOAL_NO_PRIORITY",
-        new ReplanQuestion(
-            "priority_targets", QuestionType.TODO_SELECT, "우선순위를 매길 투두를 선택하세요", null));
+        new ReplanQuestion("priority_targets", QuestionType.TODO_SELECT, "우선순위를 매길 투두를 선택하세요"));
     // 예상치 못한 방해
     QUESTIONS.put(
         "INTERRUPT_URGENT",
-        new ReplanQuestion("defer_deadline", QuestionType.TEXT, "이 일을 언제로 미룰까요? (직접 마감 입력)", null));
+        new ReplanQuestion("defer_deadline", QuestionType.TEXT, "이 일을 언제로 미룰까요? (직접 마감 입력)"));
   }
 
   /** 선택한 실패 사유들에 대해 필요한 추가 질문 목록을 반환한다. 같은 질문 key는 중복 제거. 질문이 필요 없으면 빈 목록. */

@@ -144,8 +144,7 @@ public class ReplanService {
         List<String> todoLabels =
             resolveSelectedTodoLabels(a.selectedTodoIds(), anchor.getUser().getId());
         answerInputs.add(
-            new RecommendInput.AnswerInput(
-                a.key(), a.text(), a.selectedTodoIds(), a.selectedChips(), todoLabels));
+            new RecommendInput.AnswerInput(a.key(), a.text(), a.selectedTodoIds(), todoLabels));
       }
     }
     return new RecommendInput(
