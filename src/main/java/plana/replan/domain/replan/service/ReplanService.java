@@ -227,9 +227,9 @@ public class ReplanService {
       }
     }
 
-    // 앵커를 직접 치우지 않았고 ADD/CREATE_ROUTINE으로 대체 투두가 생겼을 때만 앵커를 치운다.
-    // MODIFY_TODO가 앵커가 아닌 다른 투두만 수정한 경우 replacementCreated=false이므로 앵커는 그대로 둔다.
-    if (!anchorHandled && replacementCreated) {
+    // 마감 지난(실패 후) 앵커를 ADD/CREATE_ROUTINE으로 대체한 경우에만 앵커를 치운다(비활성화).
+    // 미래(실패 전) 앵커의 ADD는 보조 투두 추가일 수 있으므로 앵커를 건드리지 않는다.
+    if (!anchorHandled && isOverdue(anchor) && replacementCreated) {
       retire(anchor);
     }
   }

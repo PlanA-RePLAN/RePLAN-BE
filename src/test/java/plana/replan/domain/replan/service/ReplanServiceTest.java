@@ -566,19 +566,21 @@ class ReplanServiceTest {
   }
 
   @Test
-  void 앵커를_안건드린_ADD만이면_앵커도_치운다() {
+  void 미래_앵커에_보조_ADD만이면_앵커는_그대로_둔다() {
+    // 실패 전(미래) 앵커에 ADD는 보조 투두 추가일 수 있으므로 앵커를 치우면 안 된다
     Todo anchor = ownedTodo(42L, 1L);
     given(anchor.getDueDate()).willReturn(LocalDateTime.of(2026, 7, 1, 10, 0)); // 미래(실패 전)
-    given(anchor.getChildren()).willReturn(List.of());
     given(todoRepository.findById(42L)).willReturn(Optional.of(anchor));
     given(replanRepository.save(any(Replan.class))).willAnswer(inv -> inv.getArgument(0));
 
     ReplanOperation addOp =
         new ReplanOperation(
-            ReplanAction.ADD, null, "추가", "2026-07-02", null, null, null, null, List.of());
+            ReplanAction.ADD, null, "조용한 장소 세팅", "2026-07-02", null, null, null, null, List.of());
     replanService.save(1L, new ReplanSaveRequest(42L, List.of("GOAL_NO_PRIORITY"), List.of(addOp)));
 
-    then(anchor).should().softDelete(); // 앵커는 실패 전이므로 삭제
+    then(anchor).should(never()).softDelete();
+    then(anchor).should(never()).deactivate();
+    then(todoRepository).should().save(any(Todo.class)); // 보조 투두는 생성됨
   }
 
   @Test
