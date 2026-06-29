@@ -362,6 +362,7 @@ public class ReplanService {
             .user(target.getUser())
             .tag(tag)
             .goal(target.getGoal())
+            .parent(target.getParent())
             .build();
     created.linkReplan(replan);
     return todoRepository.save(created);

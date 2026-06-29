@@ -666,6 +666,37 @@ class ReplanServiceTest {
   }
 
   @Test
+  void MODIFY_TODO_하위투두_수정시_부모를_유지한다() {
+    Todo parent = org.mockito.Mockito.mock(Todo.class);
+    Todo anchor = ownedTodo(42L, 1L);
+    given(anchor.getId()).willReturn(42L);
+    given(anchor.getDueDate()).willReturn(LocalDateTime.of(2026, 6, 25, 11, 0)); // 실패 전
+    given(anchor.getChildren()).willReturn(List.of());
+    given(anchor.getParent()).willReturn(parent);
+    given(todoRepository.findById(42L)).willReturn(Optional.of(anchor));
+    given(replanRepository.save(any(Replan.class))).willAnswer(inv -> inv.getArgument(0));
+    given(todoRepository.save(any(Todo.class))).willAnswer(inv -> inv.getArgument(0));
+    org.mockito.ArgumentCaptor<Todo> captor = org.mockito.ArgumentCaptor.forClass(Todo.class);
+
+    ReplanOperation modify =
+        new ReplanOperation(
+            ReplanAction.MODIFY_TODO,
+            42L,
+            "수정된 제목",
+            "2026-07-02",
+            null,
+            null,
+            null,
+            null,
+            List.of());
+    replanService.save(
+        1L, new ReplanSaveRequest(42L, List.of("GOAL_NO_PRIORITY"), List.of(modify)));
+
+    then(todoRepository).should().save(captor.capture());
+    assertThat(captor.getValue().getParent()).isSameAs(parent);
+  }
+
+  @Test
   void 잘못된_마감형식이면_400() {
     Todo anchor = ownedTodo(42L, 1L);
     given(todoRepository.findById(42L)).willReturn(Optional.of(anchor));
