@@ -304,21 +304,44 @@ public class ReplanService {
         todoRepository
             .findById(op.targetTodoId())
             .orElseThrow(() -> new CustomException(ReplanErrorCode.REPLAN_TODO_NOT_FOUND));
-    // 우선순위 등으로 앵커 외 다른 투두를 수정할 수 있으나, 반드시 같은 사용자 소유여야 한다
     if (!target.getUser().getId().equals(anchor.getUser().getId())) {
       throw new CustomException(ReplanErrorCode.REPLAN_TODO_NOT_FOUND);
     }
-    if (op.title() != null) {
-      target.updateTitle(op.title());
+    retire(target);
+    recreateFromModify(target, op, replan);
+  }
+
+  /** 기존 투두를 사용자 화면에서 치운다: 마감 지났으면 비활성화(통계에 실패로 남김), 아니면 소프트 삭제(통계에서 제외). */
+  private void retire(Todo target) {
+    if (isOverdue(target)) {
+      target.deactivate();
+    } else {
+      target.getChildren().forEach(Todo::softDelete);
+      target.softDelete();
     }
-    // dueDate/dueTime 중 하나라도 지정된 경우에만 업데이트한다 — 제목만 바꾸는 op이면 기존 마감일을 보존
-    if (op.dueDate() != null || op.dueTime() != null) {
-      target.updateDueDate(resolveModifiedDueDate(target, op));
-    }
-    if (op.tagId() != null) {
-      target.updateTag(resolveTag(op.tagId(), target.getUser().getId()));
-    }
-    target.linkReplan(replan);
+  }
+
+  /** op가 지정한 필드만 바꾸고 나머지는 기존 투두에서 물려받아 새 투두를 만든다(루틴 연결 없음). */
+  private Todo recreateFromModify(Todo target, ReplanOperation op, Replan replan) {
+    String title = op.title() != null ? op.title() : target.getTitle();
+    LocalDateTime dueDate =
+        (op.dueDate() != null || op.dueTime() != null)
+            ? resolveModifiedDueDate(target, op)
+            : target.getDueDate();
+    Tag tag =
+        op.tagId() != null ? resolveTag(op.tagId(), target.getUser().getId()) : target.getTag();
+    Todo created =
+        Todo.builder()
+            .title(title)
+            .dueDate(dueDate)
+            .sortOrder(target.getSortOrder())
+            .isPinned(target.isPinned())
+            .user(target.getUser())
+            .tag(tag)
+            .goal(target.getGoal())
+            .build();
+    created.linkReplan(replan);
+    return todoRepository.save(created);
   }
 
   /** 앵커의 마감이 지났는지 확인한다. */

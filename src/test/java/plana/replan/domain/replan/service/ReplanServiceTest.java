@@ -216,9 +216,12 @@ class ReplanServiceTest {
   }
 
   @Test
-  void MODIFY_TODO는_기존_투두를_제자리_수정한다() {
-    Todo todo = ownedTodo(42L, 1L);
-    given(todoRepository.findById(42L)).willReturn(Optional.of(todo));
+  void MODIFY_TODO는_기존투두를_치우고_새투두를_만든다() {
+    Todo anchor = ownedTodo(42L, 1L);
+    // 마감 전(2026-06-25) → 실패 전 → softDelete
+    given(anchor.getDueDate()).willReturn(LocalDateTime.of(2026, 6, 25, 11, 0));
+    given(anchor.getChildren()).willReturn(List.of());
+    given(todoRepository.findById(42L)).willReturn(Optional.of(anchor));
     given(replanRepository.save(any(Replan.class))).willAnswer(inv -> inv.getArgument(0));
 
     ReplanOperation modify =
@@ -226,7 +229,7 @@ class ReplanServiceTest {
             ReplanAction.MODIFY_TODO,
             42L,
             "데이터 분석 1~2강",
-            "2026-06-20",
+            "2026-07-02",
             "23:59",
             null,
             null,
@@ -237,39 +240,13 @@ class ReplanServiceTest {
 
     replanService.save(1L, req);
 
-    then(todo).should().updateTitle("데이터 분석 1~2강");
-    then(todo).should().linkReplan(any(Replan.class));
-    then(todoRepository).should(never()).save(any(Todo.class));
+    then(anchor).should().softDelete(); // 실패 전이므로 삭제
+    then(anchor).should(never()).deactivate();
+    then(todoRepository).should().save(any(Todo.class)); // 새 투두 생성
   }
 
   @Test
-  void MODIFY_TODO_제목만_바꾸면_마감일은_유지된다() {
-    Todo anchor = ownedTodo(42L, 1L);
-    given(todoRepository.findById(42L)).willReturn(Optional.of(anchor));
-    given(replanRepository.save(any(Replan.class))).willAnswer(inv -> inv.getArgument(0));
-
-    ReplanOperation modify =
-        new ReplanOperation(
-            ReplanAction.MODIFY_TODO,
-            42L,
-            "새 제목",
-            null, // dueDate null
-            null, // dueTime null
-            null,
-            null,
-            null,
-            List.of());
-    ReplanSaveRequest req =
-        new ReplanSaveRequest(42L, List.of("GOAL_NO_PRIORITY"), List.of(modify));
-
-    replanService.save(1L, req);
-
-    then(anchor).should().updateTitle("새 제목");
-    then(anchor).should(never()).updateDueDate(any());
-  }
-
-  @Test
-  void 우선순위_다른_투두도_같은_사용자면_수정된다() {
+  void 우선순위_다른_투두도_같은사용자면_치우고_새로만든다() {
     Todo anchor = ownedTodo(42L, 1L);
     given(todoRepository.findById(42L)).willReturn(Optional.of(anchor));
 
@@ -277,6 +254,8 @@ class ReplanServiceTest {
     given(sameUser.getId()).willReturn(1L);
     Todo target = org.mockito.Mockito.mock(Todo.class);
     given(target.getUser()).willReturn(sameUser);
+    given(target.getDueDate()).willReturn(LocalDateTime.of(2026, 6, 25, 11, 0)); // 실패 전
+    given(target.getChildren()).willReturn(List.of());
     given(todoRepository.findById(99L)).willReturn(Optional.of(target));
     given(replanRepository.save(any(Replan.class))).willAnswer(inv -> inv.getArgument(0));
 
@@ -285,8 +264,8 @@ class ReplanServiceTest {
             ReplanAction.MODIFY_TODO,
             99L,
             "[1] 데이터 분석 1~2강",
-            "2026-06-20",
-            "23:59",
+            null,
+            null,
             null,
             null,
             null,
@@ -296,8 +275,29 @@ class ReplanServiceTest {
 
     replanService.save(1L, req);
 
-    then(target).should().updateTitle("[1] 데이터 분석 1~2강");
-    then(target).should().linkReplan(any(Replan.class));
+    then(target).should().softDelete();
+    then(todoRepository).should().save(any(Todo.class));
+  }
+
+  @Test
+  void MODIFY_TODO_마감_지난_대상은_비활성화된다() {
+    Todo anchor = ownedTodo(42L, 1L);
+    given(anchor.getDueDate()).willReturn(LocalDateTime.of(2026, 6, 1, 10, 0)); // 과거(실패 후)
+    given(anchor.getTitle()).willReturn("데이터 분석");
+    given(todoRepository.findById(42L)).willReturn(Optional.of(anchor));
+    given(replanRepository.save(any(Replan.class))).willAnswer(inv -> inv.getArgument(0));
+
+    ReplanOperation modify =
+        new ReplanOperation(
+            ReplanAction.MODIFY_TODO, 42L, null, "2026-07-02", null, null, null, null, List.of());
+    ReplanSaveRequest req =
+        new ReplanSaveRequest(42L, List.of("GOAL_NO_PRIORITY"), List.of(modify));
+
+    replanService.save(1L, req);
+
+    then(anchor).should().deactivate();
+    then(anchor).should(never()).softDelete();
+    then(todoRepository).should().save(any(Todo.class));
   }
 
   @Test
@@ -589,31 +589,24 @@ class ReplanServiceTest {
             e -> assertThat(e.getErrorCode()).isEqualTo(ReplanErrorCode.REPLAN_INVALID_OPERATION));
   }
 
-  // Fix 2 — 시간만 바꾸면 기존 날짜 보존
   @Test
-  void MODIFY_TODO_시간만_바꾸면_기존_날짜는_유지된다() {
+  void MODIFY_TODO_시간만_바꾸면_새투두는_기존_날짜를_유지한다() {
     Todo anchor = ownedTodo(42L, 1L);
-    given(anchor.getDueDate()).willReturn(java.time.LocalDateTime.of(2026, 6, 20, 10, 0));
+    given(anchor.getDueDate()).willReturn(LocalDateTime.of(2026, 6, 25, 10, 0)); // 실패 전
+    given(anchor.getTitle()).willReturn("데이터 분석");
+    given(anchor.getChildren()).willReturn(List.of());
     given(todoRepository.findById(42L)).willReturn(Optional.of(anchor));
     given(replanRepository.save(any(Replan.class))).willAnswer(inv -> inv.getArgument(0));
+    org.mockito.ArgumentCaptor<Todo> captor = org.mockito.ArgumentCaptor.forClass(Todo.class);
 
     ReplanOperation modify =
         new ReplanOperation(
-            ReplanAction.MODIFY_TODO,
-            42L,
-            null, // 제목 변경 없음
-            null, // dueDate null — 기존 날짜 유지
-            "15:30", // dueTime만 변경
-            null,
-            null,
-            null,
-            List.of());
-    ReplanSaveRequest req =
-        new ReplanSaveRequest(42L, List.of("GOAL_NO_PRIORITY"), List.of(modify));
+            ReplanAction.MODIFY_TODO, 42L, null, null, "15:30", null, null, null, List.of());
+    replanService.save(
+        1L, new ReplanSaveRequest(42L, List.of("GOAL_NO_PRIORITY"), List.of(modify)));
 
-    replanService.save(1L, req);
-
-    then(anchor).should().updateDueDate(java.time.LocalDateTime.of(2026, 6, 20, 15, 30));
+    then(todoRepository).should().save(captor.capture());
+    assertThat(captor.getValue().getDueDate()).isEqualTo(LocalDateTime.of(2026, 6, 25, 15, 30));
   }
 
   // Fix 3 — 실패 이유 개수 검증
