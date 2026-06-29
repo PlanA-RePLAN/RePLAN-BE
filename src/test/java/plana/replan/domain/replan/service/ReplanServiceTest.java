@@ -465,30 +465,28 @@ class ReplanServiceTest {
   }
 
   @Test
-  void MODIFY_ROUTINE_하위루틴_회차면_엄마루틴으로_재생성한다() {
-    // 하위 루틴 회차를 리플랜하면 재생성은 엄마 루틴 기준으로 해야 한다(createTodoTreeFromMother는 엄마 전용 — 하위로 부르면 500).
+  void MODIFY_ROUTINE_하위루틴_회차_대상이면_거부된다() {
+    // 하위 루틴 회차는 규칙을 따로 갖지 않고 엄마 루틴을 따른다 — 루틴 규칙 변경(MODIFY_ROUTINE)은 거부한다.
     Todo anchor = ownedTodo(42L, 1L);
     given(anchor.getId()).willReturn(42L);
-    given(anchor.getDueDate()).willReturn(LocalDateTime.of(2026, 6, 25, 11, 0)); // 실패 전
-    given(anchor.getChildren()).willReturn(List.of());
     Routine child = org.mockito.Mockito.mock(Routine.class);
-    Routine mother = org.mockito.Mockito.mock(Routine.class);
     given(anchor.getRoutine()).willReturn(child);
     given(child.isChild()).willReturn(true);
-    given(child.getParent()).willReturn(mother);
     given(todoRepository.findById(42L)).willReturn(Optional.of(anchor));
     given(replanRepository.save(any(Replan.class))).willAnswer(inv -> inv.getArgument(0));
-    given(routineService.willCreateUpcomingOccurrence(mother)).willReturn(true);
-    given(todoRepository.findFirstUpcomingMotherTodoByRoutine(any(), any()))
-        .willReturn(Optional.of(org.mockito.Mockito.mock(Todo.class)));
 
     ReplanOperation op =
         new ReplanOperation(
             ReplanAction.MODIFY_ROUTINE, 42L, "새 제목", null, null, null, null, null, List.of());
-    replanService.save(1L, new ReplanSaveRequest(42L, List.of("GOAL_NO_PRIORITY"), List.of(op)));
 
-    then(routineService).should().createTodoTreeFromMother(mother); // 하위가 아니라 엄마 루틴으로 재생성
-    then(anchor).should().softDelete();
+    assertThatThrownBy(
+            () ->
+                replanService.save(
+                    1L, new ReplanSaveRequest(42L, List.of("GOAL_NO_PRIORITY"), List.of(op))))
+        .isInstanceOfSatisfying(
+            CustomException.class,
+            e -> assertThat(e.getErrorCode()).isEqualTo(ReplanErrorCode.REPLAN_INVALID_OPERATION));
+    then(routineService).should(never()).createTodoTreeFromMother(any());
   }
 
   @Test

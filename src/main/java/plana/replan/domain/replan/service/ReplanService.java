@@ -440,6 +440,12 @@ public class ReplanService {
     if (routine == null) {
       throw new CustomException(ReplanErrorCode.REPLAN_TODO_NOT_FOUND);
     }
+    // 하위 루틴 회차는 규칙(반복 유형/요일/시각/태그)을 따로 가지지 않고 엄마 루틴을 그대로 따른다.
+    // 따라서 루틴 규칙 변경(MODIFY_ROUTINE)은 엄마 루틴 회차에만 의미가 있으므로 하위 루틴 회차는 거부한다.
+    // (엄마 루틴 수정 API·루틴 오버라이드도 동일하게 하위 루틴을 거부한다.)
+    if (routine.isChild()) {
+      throw new CustomException(ReplanErrorCode.REPLAN_INVALID_OPERATION);
+    }
     Tag tag =
         op.tagId() != null ? resolveTag(op.tagId(), anchor.getUser().getId()) : routine.getTag();
     RoutineType effectiveType =
@@ -474,19 +480,16 @@ public class ReplanService {
     // 빠진다(리플랜 횟수 누락). 그래서 대체할 살아있는 새 회차가 있을 때만 소프트 삭제하고
     // 리플랜을 그 새 회차로 옮겨 달며, 새 회차가 없으면 비활성화로 남겨 리플랜이 사라지지 않게 한다.
     boolean failedBefore = !isOverdue(anchor);
-    // 하위 루틴 회차면 회차 생성/조회는 엄마 루틴 기준으로 한다. createTodoTreeFromMother는 엄마 루틴만 받기 때문이다.
-    Routine motherRoutine = routine.isChild() ? routine.getParent() : routine;
-    if (failedBefore && routineService.willCreateUpcomingOccurrence(motherRoutine)) {
+    if (failedBefore && routineService.willCreateUpcomingOccurrence(routine)) {
       // 실패 전 + 새 규칙의 다음 회차가 만들어짐 → 옛 회차는 소프트 삭제(통계 제외)하고,
       // 새 규칙의 다음 회차(오늘 또는 가까운 미래)를 곧바로 만들어 리플랜을 그 회차로 옮긴다.
       retire(anchor);
-      routineService.createTodoTreeFromMother(motherRoutine);
-      // willCreateUpcomingOccurrence가 true면 위 호출이 반드시 회차를 만든다(엄마 회차가 이미 있으면 그대로 쓴다).
+      routineService.createTodoTreeFromMother(routine);
+      // willCreateUpcomingOccurrence가 true면 위 호출이 반드시 회차를 만든다.
       // 만에 하나 못 찾으면 옛 회차를 소프트 삭제한 채 리플랜이 갈 곳을 잃으므로, 예외로 트랜잭션을 되돌려 데이터 유실을 막는다.
       Todo instance =
           todoRepository
-              .findFirstUpcomingMotherTodoByRoutine(
-                  motherRoutine, LocalDate.now(clock).atStartOfDay())
+              .findFirstUpcomingMotherTodoByRoutine(routine, LocalDate.now(clock).atStartOfDay())
               .orElseThrow(() -> new CustomException(ReplanErrorCode.REPLAN_INVALID_OPERATION));
       instance.linkReplan(replan);
       replan.relinkTodo(instance);
