@@ -328,13 +328,28 @@ public class ReplanService {
     Todo newTodo = recreateFromModify(target, op, replan);
     children.forEach(child -> child.updateParent(newTodo));
     retireWithoutChildren(target);
-    // 앵커 자신을 소프트 삭제하는 경우(실패 전), 위에서 만든 Replan이 가리키던 앵커가
-    // @SQLRestriction(deleted_at IS NULL) 때문에 리플랜 조회에서 사라진다.
-    // 리플랜을 살아있는 새 투두로 옮겨 달아 월간 통계(리플랜 횟수 등)에 정상 집계되게 한다.
-    // (앵커가 아닌 다른 투두 수정이나 실패 후 비활성화는 앵커가 살아있어 옮길 필요가 없다.)
-    if (target == anchor && !isOverdue(target)) {
-      replan.relinkTodo(newTodo);
+    // 수정 대상을 소프트 삭제하는 경우(실패 전), 그 투두를 가리키던 리플랜들이
+    // @SQLRestriction(deleted_at IS NULL) 때문에 리플랜 조회에서 통째로 사라진다.
+    // 이번에 만든 리플랜뿐 아니라, 같은 투두를 이전에 리플랜해 달려 있던 리플랜까지 모두
+    // 살아있는 새 투두로 옮겨 달아 월간 통계(리플랜 횟수 등)에 빠짐없이 집계되게 한다.
+    // (실패 후 비활성화는 투두가 살아 있어 옮길 필요가 없다.)
+    if (!isOverdue(target)) {
+      // 이번 리플랜은 앵커를 가리키므로, 앵커 자신을 수정한 경우에만 새 투두로 옮긴다.
+      // (앵커가 아닌 다른 투두 수정이면 이번 리플랜은 여전히 살아있는 앵커를 가리켜야 한다.)
+      if (target == anchor) {
+        replan.relinkTodo(newTodo);
+      }
+      // 그 투두에 이전부터 달려 있던 다른 리플랜들도 빠짐없이 새 투두로 옮긴다.
+      relinkReplansTo(target, newTodo);
     }
+  }
+
+  /**
+   * {@code from} 투두를 가리키던 리플랜(메모)을 모두 {@code to} 투두로 옮겨 단다. 같은 투두를 한 달에 여러 번 리플랜하면 리플랜이 여러 개 달릴 수
+   * 있는데, 그 투두를 소프트 삭제하면 달려 있던 리플랜이 전부 통계에서 사라진다. 그래서 소프트 삭제 직전에 호출해 모든 리플랜을 살아있는 새 투두로 옮긴다.
+   */
+  private void relinkReplansTo(Todo from, Todo to) {
+    replanRepository.findByTodo(from).forEach(r -> r.relinkTodo(to));
   }
 
   /**
@@ -501,7 +516,11 @@ public class ReplanService {
       instance.updateTag(routine.getTag());
       instance.getChildren().forEach(child -> child.updateTag(routine.getTag()));
       instance.linkReplan(replan);
+      // 이번 리플랜은 메모리에서 바로 새 회차로 옮기고,
+      // 같은 회차(앵커)에 이전부터 달려 있던 다른 리플랜들도 빠짐없이 새 회차로 옮긴다.
+      // (앵커를 위에서 소프트 삭제했으므로 옮기지 않으면 그 리플랜들이 통계에서 사라진다.)
       replan.relinkTodo(instance);
+      relinkReplansTo(anchor, instance);
     } else if (failedBefore) {
       // 실패 전이지만 반복 종료일이 지나 다음 회차가 더는 만들어지지 않는다(루틴이 사실상 끝남).
       // 소프트 삭제하면 리플랜이 통계에서 사라지므로, 회차와 하위 회차를 비활성화로 남긴다.

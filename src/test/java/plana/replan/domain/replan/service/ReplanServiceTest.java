@@ -287,6 +287,36 @@ class ReplanServiceTest {
   }
 
   @Test
+  void MODIFY_TODO_같은_투두를_여러_번_리플랜하면_이전_리플랜도_새_투두로_옮긴다() {
+    // 같은 투두를 한 달에 두 번 리플랜하면 그 투두에 리플랜이 여러 개 달릴 수 있다.
+    // 두 번째 리플랜으로 그 투두를 소프트 삭제할 때 첫 번째 리플랜까지 새 투두로 옮기지 않으면,
+    // 첫 번째 리플랜이 통계 조회에서 사라져 한 달에 두 번 한 리플랜이 한 번으로 잡힌다.
+    Todo anchor = ownedTodo(42L, 1L);
+    given(anchor.getId()).willReturn(42L);
+    given(anchor.getDueDate()).willReturn(LocalDateTime.of(2026, 6, 25, 11, 0)); // 실패 전 → 소프트 삭제
+    given(anchor.getChildren()).willReturn(List.of());
+    given(todoRepository.findById(42L)).willReturn(Optional.of(anchor));
+    given(replanRepository.save(any(Replan.class))).willAnswer(inv -> inv.getArgument(0));
+    given(todoRepository.save(any(Todo.class))).willAnswer(inv -> inv.getArgument(0));
+    // 같은 투두에 이전부터 달려 있던 리플랜(첫 번째 리플랜)
+    Replan previousReplan = org.mockito.Mockito.mock(Replan.class);
+    given(replanRepository.findByTodo(anchor))
+        .willReturn(new java.util.ArrayList<>(List.of(previousReplan)));
+
+    ReplanOperation modify =
+        new ReplanOperation(
+            ReplanAction.MODIFY_TODO, 42L, "데이터 분석 다시", null, null, null, null, null, List.of());
+    replanService.save(
+        1L, new ReplanSaveRequest(42L, List.of("GOAL_NO_PRIORITY"), List.of(modify)));
+
+    then(anchor).should().softDelete();
+    // 이전 리플랜도 새 투두(원본 앵커가 아닌)로 옮겨져야 한다.
+    org.mockito.ArgumentCaptor<Todo> movedTo = org.mockito.ArgumentCaptor.forClass(Todo.class);
+    then(previousReplan).should().relinkTodo(movedTo.capture());
+    assertThat(movedTo.getValue()).isNotSameAs(anchor);
+  }
+
+  @Test
   void 우선순위_다른_투두도_같은사용자면_치우고_새로만든다() {
     Todo anchor = ownedTodo(42L, 1L);
     given(todoRepository.findById(42L)).willReturn(Optional.of(anchor));
@@ -472,6 +502,41 @@ class ReplanServiceTest {
     // 리플랜은 소프트 삭제된 앵커가 아니라 재생성된 새 회차를 가리켜야 한다
     then(replanRepository).should().save(replanCaptor.capture());
     assertThat(replanCaptor.getValue().getTodo()).isSameAs(newInstance);
+  }
+
+  @Test
+  void MODIFY_ROUTINE_같은_회차를_여러_번_리플랜하면_이전_리플랜도_새_회차로_옮긴다() {
+    // 루틴 회차도 같은 회차를 한 달에 두 번 리플랜하면 리플랜이 여러 개 달릴 수 있다.
+    // 두 번째 리플랜으로 옛 회차를 소프트 삭제할 때 첫 번째 리플랜까지 새 회차로 옮기지 않으면,
+    // 첫 번째 리플랜이 통계 조회에서 사라진다(MODIFY_TODO와 동일한 누락).
+    Todo anchor = ownedTodo(42L, 1L);
+    given(anchor.getId()).willReturn(42L);
+    given(anchor.getDueDate()).willReturn(LocalDateTime.of(2026, 6, 25, 11, 0)); // 실패 전 → 소프트 삭제
+    given(anchor.getChildren()).willReturn(List.of());
+    Routine routine = org.mockito.Mockito.mock(Routine.class);
+    given(anchor.getRoutine()).willReturn(routine);
+    given(routine.getRoutineType()).willReturn(RoutineType.DAILY);
+    given(routine.getRoutineTime()).willReturn(LocalTime.of(7, 30));
+    given(routine.getTag()).willReturn(null);
+    given(todoRepository.findById(42L)).willReturn(Optional.of(anchor));
+    given(replanRepository.save(any(Replan.class))).willAnswer(inv -> inv.getArgument(0));
+    given(routineService.willCreateUpcomingOccurrence(routine)).willReturn(true);
+    Todo newInstance = org.mockito.Mockito.mock(Todo.class);
+    given(newInstance.getChildren()).willReturn(List.of());
+    given(todoRepository.findFirstUpcomingMotherTodoByRoutine(any(), any()))
+        .willReturn(Optional.of(newInstance));
+    // 같은 회차(앵커)에 이전부터 달려 있던 리플랜(첫 번째 리플랜)
+    Replan previousReplan = org.mockito.Mockito.mock(Replan.class);
+    given(replanRepository.findByTodo(anchor))
+        .willReturn(new java.util.ArrayList<>(List.of(previousReplan)));
+
+    ReplanOperation op =
+        new ReplanOperation(
+            ReplanAction.MODIFY_ROUTINE, 42L, "새 제목", null, null, null, null, null, List.of());
+    replanService.save(1L, new ReplanSaveRequest(42L, List.of("GOAL_NO_PRIORITY"), List.of(op)));
+
+    // 이전 리플랜도 소프트 삭제된 옛 회차가 아니라 재생성된 새 회차를 가리켜야 한다.
+    then(previousReplan).should().relinkTodo(newInstance);
   }
 
   @Test
