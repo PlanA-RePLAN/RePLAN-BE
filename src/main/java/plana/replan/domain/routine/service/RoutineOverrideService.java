@@ -143,8 +143,9 @@ public class RoutineOverrideService {
               if (todo.isCompleted()) {
                 throw new CustomException(RoutineErrorCode.ROUTINE_OVERRIDE_CANNOT_SKIP_COMPLETED);
               }
-              todo.getChildren().forEach(Todo::softDelete);
-              todo.softDelete();
+              LocalDateTime now = LocalDateTime.now(clock);
+              todo.getChildren().forEach(child -> child.softDelete(now));
+              todo.softDelete(now);
             });
 
     RoutineOverride override = upsert(routine, date);
@@ -170,8 +171,7 @@ public class RoutineOverrideService {
                   .ifPresent(
                       todo -> {
                         todoRepository
-                            .findDeletedChildrenByParentId(
-                                todo.getId(), todo.getDeletedAt().minusSeconds(1))
+                            .findDeletedChildrenByParentId(todo.getId(), todo.getDeletedAt())
                             .forEach(Todo::restore);
                         todo.restore();
                       });

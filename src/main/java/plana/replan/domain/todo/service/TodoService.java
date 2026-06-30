@@ -462,8 +462,9 @@ public class TodoService {
       throw new CustomException(TodoErrorCode.ROUTINE_TODO_USE_ROUTINE_API);
     }
 
-    todo.getChildren().forEach(child -> child.softDelete());
-    todo.softDelete();
+    LocalDateTime now = LocalDateTime.now(clock);
+    todo.getChildren().forEach(child -> child.softDelete(now));
+    todo.softDelete(now);
   }
 
   @Transactional
@@ -489,7 +490,7 @@ public class TodoService {
     }
 
     todoRepository
-        .findDeletedChildrenByParentId(todoId, todo.getDeletedAt().minusSeconds(1))
+        .findDeletedChildrenByParentId(todoId, todo.getDeletedAt())
         .forEach(Todo::restore);
     todo.restore();
   }

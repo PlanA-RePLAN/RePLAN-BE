@@ -109,12 +109,12 @@ public interface TodoRepository extends JpaRepository<Todo, Long> {
   Optional<Todo> findDeletedById(@Param("id") Long id);
 
   // native query: @SQLRestriction("deleted_at IS NULL") 우회 — 삭제된 행 조회용
-  // :since = 부모의 deletedAt - 1초. 부모 삭제 시점에 함께 삭제된 자식만 반환해 독립 삭제 자식 부활을 방지한다.
+  // :deletedAt = 부모와 동일한 softDelete 시각. skip/deleteTodo에서 공통 시각으로 삭제된 자식만 반환한다.
   @Query(
-      value = "SELECT * FROM todo WHERE parent_id = :parentId AND deleted_at >= :since",
+      value = "SELECT * FROM todo WHERE parent_id = :parentId AND deleted_at = :deletedAt",
       nativeQuery = true)
   List<Todo> findDeletedChildrenByParentId(
-      @Param("parentId") Long parentId, @Param("since") LocalDateTime since);
+      @Param("parentId") Long parentId, @Param("deletedAt") LocalDateTime deletedAt);
 
   // native query: @SQLRestriction("deleted_at IS NULL") 우회 — 삭제된 행 조회용
   @Query(
