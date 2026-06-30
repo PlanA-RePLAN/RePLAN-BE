@@ -480,11 +480,17 @@ public class TodoService {
       throw new CustomException(TodoErrorCode.TODO_NOT_FOUND);
     }
 
+    if (todo.getParent() != null) {
+      throw new CustomException(TodoErrorCode.TODO_NOT_FOUND);
+    }
+
     if (todo.getRoutine() != null) {
       throw new CustomException(TodoErrorCode.ROUTINE_TODO_USE_ROUTINE_API);
     }
 
-    todoRepository.findDeletedChildrenByParentId(todoId).forEach(Todo::restore);
+    todoRepository
+        .findDeletedChildrenByParentId(todoId, todo.getDeletedAt().minusSeconds(1))
+        .forEach(Todo::restore);
     todo.restore();
   }
 

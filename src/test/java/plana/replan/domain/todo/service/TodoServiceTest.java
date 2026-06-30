@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -1850,6 +1851,24 @@ class TodoServiceTest {
   }
 
   @Test
+  @DisplayName("restoreTodo - 서브투두 ID로 호출: TODO_NOT_FOUND 예외")
+  void restoreTodo_subTodo_throws() {
+    User user = testUser();
+    Todo parent = testTodo(10L, user);
+    Todo subTodo = deletedTodo(1L, user);
+    ReflectionTestUtils.setField(subTodo, "parent", parent);
+
+    given(todoRepository.findDeletedById(1L)).willReturn(Optional.of(subTodo));
+
+    assertThatThrownBy(() -> todoService.restoreTodo(1L, 1L))
+        .isInstanceOf(CustomException.class)
+        .satisfies(
+            e ->
+                assertThat(((CustomException) e).getErrorCode())
+                    .isEqualTo(TodoErrorCode.TODO_NOT_FOUND));
+  }
+
+  @Test
   @DisplayName("restoreTodo - 루틴 투두: ROUTINE_TODO_USE_ROUTINE_API 예외")
   void restoreTodo_routineTodo_throws() {
     User user = testUser();
@@ -1874,7 +1893,8 @@ class TodoServiceTest {
     Todo todo = deletedTodo(1L, user);
 
     given(todoRepository.findDeletedById(1L)).willReturn(Optional.of(todo));
-    given(todoRepository.findDeletedChildrenByParentId(1L)).willReturn(List.of());
+    given(todoRepository.findDeletedChildrenByParentId(eq(1L), any(LocalDateTime.class)))
+        .willReturn(List.of());
 
     todoService.restoreTodo(1L, 1L);
 
@@ -1890,7 +1910,8 @@ class TodoServiceTest {
     Todo child2 = deletedTodo(11L, user);
 
     given(todoRepository.findDeletedById(1L)).willReturn(Optional.of(parent));
-    given(todoRepository.findDeletedChildrenByParentId(1L)).willReturn(List.of(child1, child2));
+    given(todoRepository.findDeletedChildrenByParentId(eq(1L), any(LocalDateTime.class)))
+        .willReturn(List.of(child1, child2));
 
     todoService.restoreTodo(1L, 1L);
 

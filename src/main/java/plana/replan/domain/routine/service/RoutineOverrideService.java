@@ -3,7 +3,6 @@ package plana.replan.domain.routine.service;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.LocalTime;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -123,6 +122,17 @@ public class RoutineOverrideService {
         routine, override, existingTodo.map(Todo::getId).orElse(null));
   }
 
+  @Transactional(readOnly = true)
+  public RoutineOverrideResponseDto getOverride(Long userId, Long routineId, LocalDate date) {
+    Routine routine = findOwnedMotherRoutine(userId, routineId);
+    Long todoId = findExistingTodo(routine, date).map(Todo::getId).orElse(null);
+
+    return routineOverrideRepository
+        .findByRoutineAndOverrideDate(routine, date)
+        .map(override -> RoutineOverrideResponseDto.of(routine, override, todoId))
+        .orElseGet(() -> RoutineOverrideResponseDto.ofNoOverride(routine, date, todoId));
+  }
+
   @Transactional
   public void skip(Long userId, Long routineId, LocalDate date) {
     Routine routine = findOwnedMotherRoutine(userId, routineId);
@@ -145,17 +155,26 @@ public class RoutineOverrideService {
   public void unskip(Long userId, Long routineId, LocalDate date) {
     Routine routine = findOwnedMotherRoutine(userId, routineId);
 
-    RoutineOverride override = upsert(routine, date);
-    override.unskip();
-
-    LocalDateTime start = date.atStartOfDay();
-    LocalDateTime end = date.plusDays(1).atStartOfDay();
-    todoRepository
-        .findDeletedMotherTodoByRoutineAndDate(routineId, start, end)
+    // skip된 override가 없으면 no-op (ghost override row 생성 방지)
+    routineOverrideRepository
+        .findByRoutineAndOverrideDate(routine, date)
+        .filter(RoutineOverride::isSkipped)
         .ifPresent(
-            todo -> {
-              todoRepository.findDeletedChildrenByParentId(todo.getId()).forEach(Todo::restore);
-              todo.restore();
+            override -> {
+              override.unskip();
+
+              LocalDateTime start = date.atStartOfDay();
+              LocalDateTime end = date.plusDays(1).atStartOfDay();
+              todoRepository
+                  .findDeletedMotherTodoByRoutineAndDate(routineId, start, end)
+                  .ifPresent(
+                      todo -> {
+                        todoRepository
+                            .findDeletedChildrenByParentId(
+                                todo.getId(), todo.getDeletedAt().minusSeconds(1))
+                            .forEach(Todo::restore);
+                        todo.restore();
+                      });
             });
   }
 
@@ -194,7 +213,7 @@ public class RoutineOverrideService {
 
   private Optional<Todo> findExistingTodo(Routine routine, LocalDate date) {
     LocalDateTime start = date.atStartOfDay();
-    LocalDateTime end = date.atTime(LocalTime.MAX);
+    LocalDateTime end = date.plusDays(1).atStartOfDay();
     return todoRepository.findMotherTodoByRoutineAndDate(routine, start, end);
   }
 }

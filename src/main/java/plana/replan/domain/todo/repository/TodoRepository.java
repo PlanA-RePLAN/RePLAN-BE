@@ -104,14 +104,19 @@ public interface TodoRepository extends JpaRepository<Todo, Long> {
           + " AND t.deletedAt IS NULL")
   Optional<Double> findMaxSortOrderByUser(@Param("user") User user);
 
+  // native query: @SQLRestriction("deleted_at IS NULL") 우회 — 삭제된 행 조회용
   @Query(value = "SELECT * FROM todo WHERE id = :id AND deleted_at IS NOT NULL", nativeQuery = true)
   Optional<Todo> findDeletedById(@Param("id") Long id);
 
+  // native query: @SQLRestriction("deleted_at IS NULL") 우회 — 삭제된 행 조회용
+  // :since = 부모의 deletedAt - 1초. 부모 삭제 시점에 함께 삭제된 자식만 반환해 독립 삭제 자식 부활을 방지한다.
   @Query(
-      value = "SELECT * FROM todo WHERE parent_id = :parentId AND deleted_at IS NOT NULL",
+      value = "SELECT * FROM todo WHERE parent_id = :parentId AND deleted_at >= :since",
       nativeQuery = true)
-  List<Todo> findDeletedChildrenByParentId(@Param("parentId") Long parentId);
+  List<Todo> findDeletedChildrenByParentId(
+      @Param("parentId") Long parentId, @Param("since") LocalDateTime since);
 
+  // native query: @SQLRestriction("deleted_at IS NULL") 우회 — 삭제된 행 조회용
   @Query(
       value =
           "SELECT * FROM todo WHERE routine_id = :routineId AND parent_id IS NULL"
