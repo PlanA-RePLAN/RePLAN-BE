@@ -147,6 +147,16 @@ public class RoutineOverrideService {
 
     RoutineOverride override = upsert(routine, date);
     override.unskip();
+
+    LocalDateTime start = date.atStartOfDay();
+    LocalDateTime end = date.plusDays(1).atStartOfDay();
+    todoRepository
+        .findDeletedMotherTodoByRoutineAndDate(routineId, start, end)
+        .ifPresent(
+            todo -> {
+              todoRepository.findDeletedChildrenByParentId(todo.getId()).forEach(Todo::restore);
+              todo.restore();
+            });
   }
 
   private Routine findOwnedMotherRoutine(Long userId, Long routineId) {

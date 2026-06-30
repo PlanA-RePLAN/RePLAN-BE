@@ -104,6 +104,24 @@ public interface TodoRepository extends JpaRepository<Todo, Long> {
           + " AND t.deletedAt IS NULL")
   Optional<Double> findMaxSortOrderByUser(@Param("user") User user);
 
+  @Query(value = "SELECT * FROM todo WHERE id = :id AND deleted_at IS NOT NULL", nativeQuery = true)
+  Optional<Todo> findDeletedById(@Param("id") Long id);
+
+  @Query(
+      value = "SELECT * FROM todo WHERE parent_id = :parentId AND deleted_at IS NOT NULL",
+      nativeQuery = true)
+  List<Todo> findDeletedChildrenByParentId(@Param("parentId") Long parentId);
+
+  @Query(
+      value =
+          "SELECT * FROM todo WHERE routine_id = :routineId AND parent_id IS NULL"
+              + " AND due_date >= :start AND due_date < :end AND deleted_at IS NOT NULL",
+      nativeQuery = true)
+  Optional<Todo> findDeletedMotherTodoByRoutineAndDate(
+      @Param("routineId") Long routineId,
+      @Param("start") LocalDateTime start,
+      @Param("end") LocalDateTime end);
+
   @Query(
       "SELECT t FROM Todo t WHERE t.user = :user AND t.parent IS NULL AND t.replan IS NOT NULL"
           + " AND ((t.dueDate >= :start AND t.dueDate < :end)"
