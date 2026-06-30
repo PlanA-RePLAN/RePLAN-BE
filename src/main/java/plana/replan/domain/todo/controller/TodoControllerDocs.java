@@ -1657,4 +1657,113 @@ public interface TodoControllerDocs {
       @AuthenticationPrincipal Long userId,
       @Parameter(description = "상위 투두 ID", example = "42") @PathVariable Long parentId,
       @Parameter(description = "삭제할 하위 투두 ID", example = "43") @PathVariable Long subTodoId);
+
+  @Operation(
+      summary = "일반 투두 삭제 취소",
+      description =
+          """
+          **호출 주체**: AccessToken을 보유한 인증 사용자
+
+          **요청 방법**: `Authorization: Bearer {accessToken}` 헤더 필수
+
+          삭제된 일반 투두를 복원합니다. 하위 투두도 함께 복원됩니다.
+
+          - 루틴 투두는 이 API로 복원할 수 없습니다. 루틴 투두는 `PATCH /api/routines/{routineId}/overrides/{date}/unskip` 을 사용하세요.
+
+          **Request Headers**
+
+          | 헤더명 | 필수 여부 | 타입 | 설명 |
+          |--------|-----------|------|------|
+          | Authorization | ✅ 필수 | string | `Bearer {accessToken}` 형식의 JWT 액세스 토큰 |
+
+          **Path Variable**
+
+          | 파라미터명 | 필수 여부 | 타입 | 설명 | 예시 |
+          |-----------|-----------|------|------|------|
+          | todoId | ✅ 필수 | integer | 복원할 투두 ID | `1` |
+          """,
+      security = @SecurityRequirement(name = "Bearer Authentication"))
+  @ApiResponses({
+    @ApiResponse(responseCode = "200", description = "삭제 취소 성공"),
+    @ApiResponse(
+        responseCode = "400",
+        description = "루틴 투두에 호출한 경우",
+        content =
+            @Content(
+                examples =
+                    @ExampleObject(
+                        value =
+                            """
+                            {
+                              "status": 400,
+                              "success": false,
+                              "data": null,
+                              "error": {
+                                "code": "ROUTINE_TODO_USE_ROUTINE_API",
+                                "message": "반복 todo는 루틴 API를 통해 수정해주세요.",
+                                "detail": null
+                              }
+                            }
+                            """))),
+    @ApiResponse(
+        responseCode = "404",
+        description = "삭제된 투두를 찾을 수 없음",
+        content =
+            @Content(
+                examples =
+                    @ExampleObject(
+                        value =
+                            """
+                            {
+                              "status": 404,
+                              "success": false,
+                              "data": null,
+                              "error": {
+                                "code": "TODO_NOT_FOUND",
+                                "message": "투두를 찾을 수 없습니다.",
+                                "detail": null
+                              }
+                            }
+                            """))),
+    @ApiResponse(
+        responseCode = "401",
+        description = "AccessToken 없음 또는 만료",
+        content =
+            @Content(
+                examples = {
+                  @ExampleObject(
+                      name = "토큰 없음",
+                      value =
+                          """
+                          {
+                            "status": 401,
+                            "success": false,
+                            "data": null,
+                            "error": {
+                              "code": "EMPTY_TOKEN",
+                              "message": "토큰이 없습니다.",
+                              "detail": null
+                            }
+                          }
+                          """),
+                  @ExampleObject(
+                      name = "만료된 토큰",
+                      value =
+                          """
+                          {
+                            "status": 401,
+                            "success": false,
+                            "data": null,
+                            "error": {
+                              "code": "EXPIRED_TOKEN",
+                              "message": "만료된 토큰입니다.",
+                              "detail": null
+                            }
+                          }
+                          """)
+                }))
+  })
+  ResponseEntity<ApiResult<Void>> restoreTodo(
+      @AuthenticationPrincipal Long userId,
+      @Parameter(description = "복원할 투두 ID", example = "1") @PathVariable Long todoId);
 }

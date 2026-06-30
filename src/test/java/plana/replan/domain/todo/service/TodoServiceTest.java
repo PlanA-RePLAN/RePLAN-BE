@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -1792,5 +1793,130 @@ class TodoServiceTest {
             e ->
                 assertThat(((CustomException) e).getErrorCode())
                     .isEqualTo(TodoErrorCode.ROUTINE_TODO_USE_ROUTINE_API));
+  }
+
+  // ── restoreTodo ─────────────────────────────────────────────────────────────
+
+  private Todo deletedTodo(Long id, User user) {
+    Todo todo = testTodo(id, user);
+    todo.softDelete();
+    return todo;
+  }
+
+  @Test
+  @DisplayName("restoreTodo - userId null: USER_NOT_FOUND 예외")
+  void restoreTodo_nullUserId_throws() {
+    assertThatThrownBy(() -> todoService.restoreTodo(null, 1L))
+        .isInstanceOf(CustomException.class)
+        .satisfies(
+            e ->
+                assertThat(((CustomException) e).getErrorCode())
+                    .isEqualTo(UserErrorCode.USER_NOT_FOUND));
+  }
+
+  @Test
+  @DisplayName("restoreTodo - 삭제된 투두 없음: TODO_NOT_FOUND 예외")
+  void restoreTodo_notFound_throws() {
+    given(todoRepository.findDeletedById(99L)).willReturn(Optional.empty());
+
+    assertThatThrownBy(() -> todoService.restoreTodo(1L, 99L))
+        .isInstanceOf(CustomException.class)
+        .satisfies(
+            e ->
+                assertThat(((CustomException) e).getErrorCode())
+                    .isEqualTo(TodoErrorCode.TODO_NOT_FOUND));
+  }
+
+  @Test
+  @DisplayName("restoreTodo - 다른 유저 소유: TODO_NOT_FOUND 예외")
+  void restoreTodo_otherUserTodo_throws() {
+    User other =
+        User.builder()
+            .email("other@test.com")
+            .nickname("타인")
+            .role(Role.ROLE_USER)
+            .provider(Provider.LOCAL)
+            .build();
+    ReflectionTestUtils.setField(other, "id", 99L);
+    Todo todo = deletedTodo(1L, other);
+
+    given(todoRepository.findDeletedById(1L)).willReturn(Optional.of(todo));
+
+    assertThatThrownBy(() -> todoService.restoreTodo(1L, 1L))
+        .isInstanceOf(CustomException.class)
+        .satisfies(
+            e ->
+                assertThat(((CustomException) e).getErrorCode())
+                    .isEqualTo(TodoErrorCode.TODO_NOT_FOUND));
+  }
+
+  @Test
+  @DisplayName("restoreTodo - 서브투두 ID로 호출: TODO_NOT_FOUND 예외")
+  void restoreTodo_subTodo_throws() {
+    User user = testUser();
+    Todo parent = testTodo(10L, user);
+    Todo subTodo = deletedTodo(1L, user);
+    ReflectionTestUtils.setField(subTodo, "parent", parent);
+
+    given(todoRepository.findDeletedById(1L)).willReturn(Optional.of(subTodo));
+
+    assertThatThrownBy(() -> todoService.restoreTodo(1L, 1L))
+        .isInstanceOf(CustomException.class)
+        .satisfies(
+            e ->
+                assertThat(((CustomException) e).getErrorCode())
+                    .isEqualTo(TodoErrorCode.TODO_NOT_FOUND));
+  }
+
+  @Test
+  @DisplayName("restoreTodo - 루틴 투두: ROUTINE_TODO_USE_ROUTINE_API 예외")
+  void restoreTodo_routineTodo_throws() {
+    User user = testUser();
+    Todo todo = deletedTodo(1L, user);
+    Routine routine = testRoutine(user, RoutineType.DAILY);
+    ReflectionTestUtils.setField(todo, "routine", routine);
+
+    given(todoRepository.findDeletedById(1L)).willReturn(Optional.of(todo));
+
+    assertThatThrownBy(() -> todoService.restoreTodo(1L, 1L))
+        .isInstanceOf(CustomException.class)
+        .satisfies(
+            e ->
+                assertThat(((CustomException) e).getErrorCode())
+                    .isEqualTo(TodoErrorCode.ROUTINE_TODO_USE_ROUTINE_API));
+  }
+
+  @Test
+  @DisplayName("restoreTodo - 성공 (하위 투두 없음): deletedAt null로 복원")
+  void restoreTodo_success_noChildren() {
+    User user = testUser();
+    Todo todo = deletedTodo(1L, user);
+
+    given(todoRepository.findDeletedById(1L)).willReturn(Optional.of(todo));
+    given(todoRepository.findDeletedChildrenByParentId(eq(1L), any(LocalDateTime.class)))
+        .willReturn(List.of());
+
+    todoService.restoreTodo(1L, 1L);
+
+    assertThat(ReflectionTestUtils.getField(todo, "deletedAt")).isNull();
+  }
+
+  @Test
+  @DisplayName("restoreTodo - 성공 (하위 투두 있음): 부모·하위 투두 모두 deletedAt null로 복원")
+  void restoreTodo_success_withChildren() {
+    User user = testUser();
+    Todo parent = deletedTodo(1L, user);
+    Todo child1 = deletedTodo(10L, user);
+    Todo child2 = deletedTodo(11L, user);
+
+    given(todoRepository.findDeletedById(1L)).willReturn(Optional.of(parent));
+    given(todoRepository.findDeletedChildrenByParentId(eq(1L), any(LocalDateTime.class)))
+        .willReturn(List.of(child1, child2));
+
+    todoService.restoreTodo(1L, 1L);
+
+    assertThat(ReflectionTestUtils.getField(parent, "deletedAt")).isNull();
+    assertThat(ReflectionTestUtils.getField(child1, "deletedAt")).isNull();
+    assertThat(ReflectionTestUtils.getField(child2, "deletedAt")).isNull();
   }
 }

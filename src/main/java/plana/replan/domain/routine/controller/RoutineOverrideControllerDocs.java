@@ -400,4 +400,139 @@ public interface RoutineOverrideControllerDocs {
       @Parameter(description = "루틴 ID", example = "1") @PathVariable Long routineId,
       @Parameter(description = "건너뜀을 취소할 날짜 (yyyy-MM-dd)", example = "2026-07-01") @PathVariable
           LocalDate date);
+
+  @Operation(
+      summary = "루틴 인스턴스 디테일 조회",
+      description =
+          """
+          특정 날짜의 루틴 인스턴스 정보를 조회한다.
+
+          - Todo가 이미 생성된 날짜라면 `todoId`가 포함된다.
+          - 미래 날짜(아직 Todo가 없는 경우)라면 `todoId`는 null이다.
+          - override가 없는 경우에도 루틴 기본값으로 응답한다.
+
+          **Request Headers**
+
+          | 헤더명 | 필수 여부 | 타입 | 설명 |
+          |--------|-----------|------|------|
+          | Authorization | ✅ 필수 | string | `Bearer {accessToken}` 형식의 JWT 액세스 토큰 |
+
+          **Path Variables**
+
+          | 파라미터명 | 필수 여부 | 타입 | 설명 | 예시 |
+          |-----------|-----------|------|------|------|
+          | routineId | ✅ 필수 | integer | 루틴 ID | `1` |
+          | date | ✅ 필수 | string | 조회할 날짜 (yyyy-MM-dd 형식) | `2026-07-01` |
+
+          **Response Elements**
+
+          | 필드명 | 타입 | 설명 |
+          |--------|------|------|
+          | routineId | integer | 루틴 ID |
+          | overrideDate | string | 조회 날짜 (yyyy-MM-dd 형식) |
+          | effectiveTitle | string | 실제 적용될 제목 (override 우선) |
+          | effectiveTagId | integer | 실제 적용될 태그 ID. 없으면 null |
+          | effectiveTagTitle | string | 실제 적용될 태그 제목. 없으면 null |
+          | effectiveTagColor | string | 실제 적용될 태그 색상. 없으면 null |
+          | effectiveSortOrder | number | 실제 적용될 정렬 순서 |
+          | isSkipped | boolean | 건너뜀 여부 |
+          | isPinned | boolean | 핀 여부 |
+          | isCompleted | boolean | 완료 여부 |
+          | hasOverride | boolean | override 존재 여부 |
+          | todoId | integer | 생성된 Todo ID. 없으면 null |
+          """,
+      security = @SecurityRequirement(name = "Bearer Authentication"))
+  @ApiResponses({
+    @ApiResponse(
+        responseCode = "200",
+        description = "루틴 인스턴스 디테일 조회 성공",
+        content =
+            @Content(
+                examples =
+                    @ExampleObject(
+                        value =
+                            """
+                            {
+                              "status": 200,
+                              "success": true,
+                              "data": {
+                                "routineId": 1,
+                                "overrideDate": "2026-07-01",
+                                "effectiveTitle": "아침 스트레칭",
+                                "effectiveTagId": 3,
+                                "effectiveTagTitle": "운동",
+                                "effectiveTagColor": "GREEN",
+                                "effectiveSortOrder": 10000.0,
+                                "isSkipped": false,
+                                "isPinned": false,
+                                "isCompleted": false,
+                                "hasOverride": false,
+                                "todoId": 42
+                              },
+                              "error": null
+                            }
+                            """))),
+    @ApiResponse(
+        responseCode = "401",
+        description = "AccessToken 없음 또는 만료",
+        content =
+            @Content(
+                examples = {
+                  @ExampleObject(
+                      name = "토큰 없음",
+                      value =
+                          """
+                          {
+                            "status": 401,
+                            "success": false,
+                            "data": null,
+                            "error": {
+                              "code": "EMPTY_TOKEN",
+                              "message": "토큰이 없습니다.",
+                              "detail": null
+                            }
+                          }
+                          """),
+                  @ExampleObject(
+                      name = "만료된 토큰",
+                      value =
+                          """
+                          {
+                            "status": 401,
+                            "success": false,
+                            "data": null,
+                            "error": {
+                              "code": "EXPIRED_TOKEN",
+                              "message": "만료된 토큰입니다.",
+                              "detail": null
+                            }
+                          }
+                          """)
+                })),
+    @ApiResponse(
+        responseCode = "404",
+        description = "루틴을 찾을 수 없음",
+        content =
+            @Content(
+                examples =
+                    @ExampleObject(
+                        value =
+                            """
+                            {
+                              "status": 404,
+                              "success": false,
+                              "data": null,
+                              "error": {
+                                "code": "ROUTINE_NOT_FOUND",
+                                "message": "루틴을 찾을 수 없습니다.",
+                                "detail": null
+                              }
+                            }
+                            """)))
+  })
+  ResponseEntity<ApiResult<RoutineOverrideResponseDto>> getOverride(
+      @AuthenticationPrincipal Long userId,
+      @Parameter(description = "루틴 ID", example = "1") @PathVariable Long routineId,
+      @Parameter(description = "조회할 날짜 (yyyy-MM-dd)", example = "2026-07-01") @PathVariable
+          LocalDate date);
 }
