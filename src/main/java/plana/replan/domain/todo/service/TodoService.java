@@ -462,8 +462,37 @@ public class TodoService {
       throw new CustomException(TodoErrorCode.ROUTINE_TODO_USE_ROUTINE_API);
     }
 
-    todo.getChildren().forEach(child -> child.softDelete());
-    todo.softDelete();
+    LocalDateTime now = LocalDateTime.now(clock);
+    todo.getChildren().forEach(child -> child.softDelete(now));
+    todo.softDelete(now);
+  }
+
+  @Transactional
+  public void restoreTodo(Long userId, Long todoId) {
+    if (userId == null) {
+      throw new CustomException(UserErrorCode.USER_NOT_FOUND);
+    }
+    Todo todo =
+        todoRepository
+            .findDeletedById(todoId)
+            .orElseThrow(() -> new CustomException(TodoErrorCode.TODO_NOT_FOUND));
+
+    if (!todo.getUser().getId().equals(userId)) {
+      throw new CustomException(TodoErrorCode.TODO_NOT_FOUND);
+    }
+
+    if (todo.getParent() != null) {
+      throw new CustomException(TodoErrorCode.TODO_NOT_FOUND);
+    }
+
+    if (todo.getRoutine() != null) {
+      throw new CustomException(TodoErrorCode.ROUTINE_TODO_USE_ROUTINE_API);
+    }
+
+    todoRepository
+        .findDeletedChildrenByParentId(todoId, todo.getDeletedAt())
+        .forEach(Todo::restore);
+    todo.restore();
   }
 
   @Transactional

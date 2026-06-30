@@ -25,12 +25,29 @@ public record RoutineOverrideResponseDto(
         boolean hasOverride,
     @Schema(description = "이미 배치로 생성된 Todo ID. 없으면 null", example = "42") Long todoId) {
 
+  public static RoutineOverrideResponseDto ofNoOverride(
+      Routine routine, LocalDate date, Long todoId) {
+    Tag tag = resolveTag(routine, null);
+    return new RoutineOverrideResponseDto(
+        routine.getId(),
+        date,
+        routine.getTitle(),
+        tag != null ? tag.getId() : null,
+        tag != null ? tag.getTitle() : null,
+        tag != null ? tag.getColor() : null,
+        routine.getDefaultSortOrder(),
+        false,
+        false,
+        false,
+        false,
+        todoId);
+  }
+
   public static RoutineOverrideResponseDto of(
       Routine routine, RoutineOverride override, Long todoId) {
-    Tag effectiveTag = override.getTag() != null ? override.getTag() : routine.getTag();
-    String effectiveTitle = override.getTitle() != null ? override.getTitle() : routine.getTitle();
-    double effectiveSortOrder =
-        override.getSortOrder() != null ? override.getSortOrder() : routine.getDefaultSortOrder();
+    Tag effectiveTag = resolveTag(routine, override);
+    String effectiveTitle = resolveTitle(routine, override);
+    double effectiveSortOrder = resolveSortOrder(routine, override);
 
     return new RoutineOverrideResponseDto(
         routine.getId(),
@@ -45,5 +62,21 @@ public record RoutineOverrideResponseDto(
         Boolean.TRUE.equals(override.getIsCompleted()),
         true,
         todoId);
+  }
+
+  private static Tag resolveTag(Routine routine, RoutineOverride override) {
+    return (override != null && override.getTag() != null) ? override.getTag() : routine.getTag();
+  }
+
+  private static String resolveTitle(Routine routine, RoutineOverride override) {
+    return (override != null && override.getTitle() != null)
+        ? override.getTitle()
+        : routine.getTitle();
+  }
+
+  private static double resolveSortOrder(Routine routine, RoutineOverride override) {
+    return (override != null && override.getSortOrder() != null)
+        ? override.getSortOrder()
+        : routine.getDefaultSortOrder();
   }
 }

@@ -104,6 +104,29 @@ public interface TodoRepository extends JpaRepository<Todo, Long> {
           + " AND t.deletedAt IS NULL")
   Optional<Double> findMaxSortOrderByUser(@Param("user") User user);
 
+  // native query: @SQLRestriction("deleted_at IS NULL") 우회 — 삭제된 행 조회용
+  @Query(value = "SELECT * FROM todo WHERE id = :id AND deleted_at IS NOT NULL", nativeQuery = true)
+  Optional<Todo> findDeletedById(@Param("id") Long id);
+
+  // native query: @SQLRestriction("deleted_at IS NULL") 우회 — 삭제된 행 조회용
+  // :deletedAt = 부모와 동일한 softDelete 시각. skip/deleteTodo에서 공통 시각으로 삭제된 자식만 반환한다.
+  @Query(
+      value = "SELECT * FROM todo WHERE parent_id = :parentId AND deleted_at = :deletedAt",
+      nativeQuery = true)
+  List<Todo> findDeletedChildrenByParentId(
+      @Param("parentId") Long parentId, @Param("deletedAt") LocalDateTime deletedAt);
+
+  // native query: @SQLRestriction("deleted_at IS NULL") 우회 — 삭제된 행 조회용
+  @Query(
+      value =
+          "SELECT * FROM todo WHERE routine_id = :routineId AND parent_id IS NULL"
+              + " AND due_date >= :start AND due_date < :end AND deleted_at IS NOT NULL",
+      nativeQuery = true)
+  Optional<Todo> findDeletedMotherTodoByRoutineAndDate(
+      @Param("routineId") Long routineId,
+      @Param("start") LocalDateTime start,
+      @Param("end") LocalDateTime end);
+
   @Query(
       "SELECT t FROM Todo t WHERE t.user = :user AND t.parent IS NULL AND t.replan IS NOT NULL"
           + " AND ((t.dueDate >= :start AND t.dueDate < :end)"
