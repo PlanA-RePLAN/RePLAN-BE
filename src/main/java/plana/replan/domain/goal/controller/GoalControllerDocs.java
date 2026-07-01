@@ -1029,6 +1029,8 @@ public interface GoalControllerDocs {
           | todos[].dueTime | string | 마감 시간 (HH:mm 형식). 없으면 null |
           | todos[].routineType | string | RECURRING만: `DAILY` / `WEEKLY` / `MONTHLY`. ONE_TIME이면 null |
           | todos[].routineDate | integer | RECURRING WEEKLY: 요일 bitmask. MONTHLY: 일자. DAILY·ONE_TIME: null |
+          | todos[].tagId | integer | AI가 이 투두에 배정한 태그 ID. 요청한 유저의 실제 태그 중에서 선택됨. 마땅한 태그가 없으면 null |
+          | todos[].tagName | string | 배정된 태그 이름. tagId가 null이면 함께 null |
 
           ---
 
@@ -1060,7 +1062,9 @@ public interface GoalControllerDocs {
                                     "dueDate": "2025-08-25",
                                     "dueTime": null,
                                     "routineType": "DAILY",
-                                    "routineDate": null
+                                    "routineDate": null,
+                                    "tagId": 1,
+                                    "tagName": "Study"
                                   },
                                   {
                                     "type": "ONE_TIME",
@@ -1068,7 +1072,9 @@ public interface GoalControllerDocs {
                                     "dueDate": "2025-06-10",
                                     "dueTime": "08:00",
                                     "routineType": null,
-                                    "routineDate": null
+                                    "routineDate": null,
+                                    "tagId": 1,
+                                    "tagName": "Study"
                                   },
                                   {
                                     "type": "ONE_TIME",
@@ -1076,7 +1082,9 @@ public interface GoalControllerDocs {
                                     "dueDate": "2025-08-24",
                                     "dueTime": null,
                                     "routineType": null,
-                                    "routineDate": null
+                                    "routineDate": null,
+                                    "tagId": null,
+                                    "tagName": null
                                   }
                                 ]
                               },
