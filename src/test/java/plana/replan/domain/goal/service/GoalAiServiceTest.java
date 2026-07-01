@@ -165,6 +165,16 @@ class GoalAiServiceTest {
   }
 
   @Test
+  void 추천파싱_tagId가_문자열_숫자여도_유저태그면_채운다() {
+    String raw =
+        "{\"overallReason\":\"r\",\"todos\":[{\"type\":\"ONE_TIME\",\"title\":\"단어 암기\","
+            + "\"dueDate\":null,\"dueTime\":null,\"routineType\":null,\"routineDate\":null,\"tagId\":\"1\"}]}";
+    TodoRecommendationResponse res = service.parseRecommendResponse(raw, List.of(tag(1L, "Study")));
+    assertThat(res.todos().get(0).tagId()).isEqualTo(1L);
+    assertThat(res.todos().get(0).tagName()).isEqualTo("Study");
+  }
+
+  @Test
   void 추천파싱_AI가_지어낸_tagId면_태그없음으로_처리한다() {
     String raw =
         "{\"overallReason\":\"r\",\"todos\":[{\"type\":\"ONE_TIME\",\"title\":\"단어 암기\","

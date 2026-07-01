@@ -365,9 +365,19 @@ public class GoalAiService {
         Long tagId = null;
         String tagName = null;
         JsonNode tagIdNode = node.path("tagId");
-        if (!tagIdNode.isNull() && !tagIdNode.isMissingNode() && tagIdNode.canConvertToLong()) {
-          Long candidate = tagIdNode.asLong();
-          if (validTags.containsKey(candidate)) {
+        if (!tagIdNode.isNull() && !tagIdNode.isMissingNode()) {
+          // 숫자(1)뿐 아니라 문자열("1")로 온 경우도 받아들인다. LLM이 숫자를 따옴표로 감싸 주는 일이 흔하다.
+          Long candidate = null;
+          if (tagIdNode.canConvertToLong()) {
+            candidate = tagIdNode.asLong();
+          } else if (tagIdNode.isTextual()) {
+            try {
+              candidate = Long.valueOf(tagIdNode.asText().trim());
+            } catch (NumberFormatException ignored) {
+              candidate = null;
+            }
+          }
+          if (candidate != null && validTags.containsKey(candidate)) {
             tagId = candidate;
             tagName = validTags.get(candidate);
           }
