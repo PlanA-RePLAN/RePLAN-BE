@@ -1111,7 +1111,7 @@ class ReplanServiceTest {
   }
 
   @Test
-  void CREATE_ROUTINE_먼슬리인데_날짜범위밖이면_400() {
+  void CREATE_ROUTINE_먼슬리인데_routineDate가_1미만이면_400() {
     Todo todo = ownedTodo(42L, 1L);
     given(todoRepository.findById(42L)).willReturn(Optional.of(todo));
     given(replanRepository.save(any(Replan.class))).willAnswer(inv -> inv.getArgument(0));
@@ -1125,7 +1125,7 @@ class ReplanServiceTest {
             null,
             null,
             "MONTHLY",
-            40, // 31 초과 — 유효하지 않음
+            0, // 비트마스크는 1 이상만 유효 (0은 아무 날도 안 켜진 값)
             List.of());
     ReplanSaveRequest req = new ReplanSaveRequest(42L, List.of("GOAL_NO_PRIORITY"), List.of(op));
 

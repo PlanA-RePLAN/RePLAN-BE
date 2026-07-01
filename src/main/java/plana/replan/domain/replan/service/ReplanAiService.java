@@ -103,7 +103,7 @@ public class ReplanAiService {
            - MODIFY_TODO의 targetTodoId에는 위 '대상 투두 ID'를, 다른 기존 투두 수정(우선순위 등)은 아래 '선택 투두' 목록의 실제 ID만 사용. ID를 임의로 만들지 않는다.
         5. changedFields: 수정(MODIFY_TODO/MODIFY_ROUTINE)에서 바뀐 필드만 {field, before, after}로 채운다. field는 title/dueTime/tag/routineType.
            새로 만드는 ADD·CREATE_ROUTINE은 changedFields를 빈 배열([])로 둔다.
-        6. dueDate는 yyyy-MM-dd 또는 null, dueTime은 HH:mm 또는 null. routineType은 DAILY/WEEKLY/MONTHLY 또는 null, routineDate는 정수 또는 null.
+        6. dueDate는 yyyy-MM-dd 또는 null, dueTime은 HH:mm 또는 null. routineType은 DAILY/WEEKLY/MONTHLY 또는 null. routineDate는 비트마스크 정수 또는 null (DAILY는 null / WEEKLY는 요일 비트마스크: 월1·화2·수4·목8·금16·토32·일64를 합 / MONTHLY는 일자 비트마스크: d일=2^(d-1)을 합, 예 15일=16384, 3일과 20일=4+524288=524292). 절대 달력 날짜(예: 15)를 그대로 쓰지 말 것.
            - CREATE_ROUTINE의 dueDate는 '반복을 끝낼 종료일'을 뜻한다(이 날짜 이후로는 회차를 만들지 않음). 무기한 반복이면 null로 둔다. 새 루틴의 반복 시각은 dueTime으로 지정한다.
 
         반드시 아래 JSON만 출력 (다른 설명 없이):
