@@ -97,8 +97,8 @@ public class TodoController implements TodoControllerDocs {
   }
 
   @Override
-  @PatchMapping("/{todoId}/restore")
-  public ResponseEntity<ApiResult<Void>> restoreTodo(
+  @PatchMapping("/{todoId}/undo")
+  public ResponseEntity<ApiResult<Void>> undoTodo(
       @AuthenticationPrincipal Long userId, @PathVariable Long todoId) {
     todoService.restoreTodo(userId, todoId);
     return ResponseEntity.ok(ApiResult.ok(null));

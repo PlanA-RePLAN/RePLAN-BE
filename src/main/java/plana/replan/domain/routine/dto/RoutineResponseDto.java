@@ -26,8 +26,14 @@ public class RoutineResponseDto {
   @Schema(description = "제목 (override 적용값)", example = "아침 스트레칭")
   private String title;
 
-  @Schema(description = "반복 종료 마감일 (ISO 8601 형식). 없으면 null", example = "2025-12-31T00:00:00")
+  @Schema(
+      description =
+          "해당 날짜 인스턴스 마감 일시 (ISO 8601 형식). instanceDate + routineTime, 없으면 23:59:59. 단건 조회 시 null",
+      example = "2025-06-20T08:00:00")
   private LocalDateTime dueDate;
+
+  @Schema(description = "반복 종료 마감일 (ISO 8601 형식). 없으면 null", example = "2025-12-31T00:00:00")
+  private LocalDateTime repeatEndDate;
 
   @Schema(description = "마감 시각 (HH:mm:ss 형식). 없으면 null", example = "08:00:00")
   private LocalTime routineTime;
@@ -56,16 +62,16 @@ public class RoutineResponseDto {
   private Long todoId;
 
   @Schema(description = "해당 날짜 인스턴스의 정렬 순서", example = "10000.0")
-  private double effectiveSortOrder;
-
-  @Schema(description = "해당 날짜 건너뜀 여부", example = "false")
-  private boolean isSkipped;
+  private double sortOrder;
 
   @Schema(description = "해당 날짜 핀 여부", example = "false")
   private boolean isPinned;
 
   @Schema(description = "해당 날짜 완료 여부", example = "false")
   private boolean isCompleted;
+
+  @Schema(description = "마감 시각이 지났고 미완료인 경우 true", example = "false")
+  private boolean isOverdue;
 
   @Schema(description = "해당 날짜에 override 존재 여부", example = "false")
   private boolean hasOverride;
@@ -74,6 +80,7 @@ public class RoutineResponseDto {
     return new RoutineResponseDto(
         routine.getId(),
         routine.getTitle(),
+        null,
         routine.getDueDate(),
         routine.getRoutineTime(),
         routine.getRoutineType(),
@@ -91,13 +98,12 @@ public class RoutineResponseDto {
   }
 
   public static RoutineResponseDto from(RoutineDateProjection p) {
-    double effectiveSortOrder =
-        p.getOverrideSortOrder() != null ? p.getOverrideSortOrder() : p.getDefaultSortOrder();
     RoutineType type = p.getRoutineType() != null ? RoutineType.valueOf(p.getRoutineType()) : null;
     return new RoutineResponseDto(
         p.getRoutineId(),
         p.getTitle(),
         p.getDueDate(),
+        p.getRepeatEndDate(),
         p.getRoutineTime(),
         type,
         RoutineDays.toDays(type, p.getRoutineDate()),
@@ -106,10 +112,10 @@ public class RoutineResponseDto {
         p.getTagColor(),
         p.getGoalId(),
         p.getTodoId(),
-        effectiveSortOrder,
-        Boolean.TRUE.equals(p.getIsSkipped()),
+        p.getSortOrder() != null ? p.getSortOrder() : 10000.0,
         Boolean.TRUE.equals(p.getIsPinned()),
         Boolean.TRUE.equals(p.getIsCompleted()),
+        Boolean.TRUE.equals(p.getIsOverdue()),
         Boolean.TRUE.equals(p.getHasOverride()));
   }
 }

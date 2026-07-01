@@ -218,6 +218,23 @@ public class RoutineService {
         .collect(Collectors.toList());
   }
 
+  @Transactional(readOnly = true)
+  public Map<String, List<RoutineResponseDto>> getPinnedRoutines(Long userId) {
+    if (userId == null) {
+      throw new CustomException(UserErrorCode.USER_NOT_FOUND);
+    }
+    userRepository
+        .findById(userId)
+        .orElseThrow(() -> new CustomException(UserErrorCode.USER_NOT_FOUND));
+
+    return routineRepository.findPinnedMotherRoutines(userId).stream()
+        .collect(
+            Collectors.groupingBy(
+                p -> p.getOverrideDate().toString(),
+                LinkedHashMap::new,
+                Collectors.mapping(RoutineResponseDto::from, Collectors.toList())));
+  }
+
   /** 엄마 루틴 전용 삭제. 하위 루틴 ID를 넘기면 400(ROUTINE_INVALID_TARGET). */
   @Transactional
   public void deleteMotherRoutine(Long userId, Long routineId) {

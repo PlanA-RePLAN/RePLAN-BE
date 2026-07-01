@@ -179,7 +179,7 @@ class RoutineServiceTest {
     assertThat(result.getRoutineDays()).isNull();
     assertThat(result.getTagId()).isNull();
     assertThat(result.getGoalId()).isNull();
-    assertThat(result.getDueDate()).isNull();
+    assertThat(result.getRepeatEndDate()).isNull();
   }
 
   @Test
@@ -235,7 +235,7 @@ class RoutineServiceTest {
     assertThat(result.getTitle()).isEqualTo("영어 단어");
     assertThat(result.getRoutineType()).isEqualTo(RoutineType.WEEKLY);
     assertThat(result.getRoutineDays()).containsExactly(0, 2, 4);
-    assertThat(result.getDueDate()).isEqualTo(dueDate);
+    assertThat(result.getRepeatEndDate()).isEqualTo(dueDate);
     assertThat(result.getTagId()).isEqualTo(5L);
     assertThat(result.getGoalId()).isEqualTo(2L);
   }
@@ -711,7 +711,7 @@ class RoutineServiceTest {
     assertThat(result.getTitle()).isEqualTo("수정된 루틴");
     assertThat(result.getRoutineType()).isEqualTo(RoutineType.DAILY);
     assertThat(result.getRoutineDays()).isNull();
-    assertThat(result.getDueDate()).isNull();
+    assertThat(result.getRepeatEndDate()).isNull();
     assertThat(result.getTagId()).isNull();
   }
 
@@ -732,7 +732,7 @@ class RoutineServiceTest {
     assertThat(result.getTitle()).isEqualTo("수정된 루틴");
     assertThat(result.getRoutineType()).isEqualTo(RoutineType.WEEKLY);
     assertThat(result.getRoutineDays()).containsExactly(0, 2, 4);
-    assertThat(result.getDueDate()).isEqualTo(dueDate);
+    assertThat(result.getRepeatEndDate()).isEqualTo(dueDate);
     assertThat(result.getTagId()).isEqualTo(5L);
   }
 
