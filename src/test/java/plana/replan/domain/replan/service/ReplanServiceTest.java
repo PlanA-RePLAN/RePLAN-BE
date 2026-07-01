@@ -681,7 +681,7 @@ class ReplanServiceTest {
     given(todoRepository.findById(42L)).willReturn(Optional.of(todo));
     given(replanRepository.save(any(Replan.class))).willAnswer(inv -> inv.getArgument(0));
 
-    // DAILY인데 routineDays가 들어와도 저장 시 null로 정규화돼야 한다
+    // DAILY는 반복 날짜가 없으므로(빈 배열) 저장 시 routineDate가 null이어야 한다
     ReplanOperation op =
         new ReplanOperation(
             ReplanAction.CREATE_ROUTINE,
@@ -691,7 +691,7 @@ class ReplanServiceTest {
             "20:00",
             null,
             "DAILY",
-            java.util.List.of(5),
+            java.util.List.of(),
             List.of());
     ReplanSaveRequest req = new ReplanSaveRequest(42L, List.of("CONDITION_PAIN"), List.of(op));
 

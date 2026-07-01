@@ -58,11 +58,14 @@ class RoutineDaysTest {
   }
 
   @Test
-  @DisplayName("DAILY는 항상 null (배열 무시)")
+  @DisplayName("DAILY는 null 또는 빈 배열만 허용한다")
   void dailyIsNull() {
-    assertThat(RoutineDays.toMask(RoutineType.DAILY, List.of(1, 2))).isNull();
+    assertThat(RoutineDays.toMask(RoutineType.DAILY, null)).isNull();
+    assertThat(RoutineDays.toMask(RoutineType.DAILY, List.of())).isNull();
     assertThat(RoutineDays.toDays(RoutineType.DAILY, 21)).isNull();
     assertThat(RoutineDays.isValid(RoutineType.DAILY, null)).isTrue();
+    assertThat(RoutineDays.isValid(RoutineType.DAILY, List.of())).isTrue();
+    assertThat(RoutineDays.isValid(RoutineType.DAILY, List.of(1, 2))).isFalse();
   }
 
   @Test

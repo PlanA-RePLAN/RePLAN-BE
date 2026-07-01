@@ -183,19 +183,37 @@ class RoutineServiceTest {
   }
 
   @Test
-  void 루틴_생성_DAILY_routineDays_무시됨() {
+  void 루틴_생성_DAILY_빈배열이면_성공() {
     given(userRepository.findById(1L)).willReturn(Optional.of(testUser()));
     given(routineRepository.save(any(Routine.class))).willAnswer(inv -> inv.getArgument(0));
 
-    // DAILY에서 routineDays를 넘겨도 null로 정규화되어 저장됨
+    // DAILY는 빈 배열을 넘겨도(=반복 날짜 없음) null로 저장된다.
     RoutineResponseDto result =
         routineService.createRoutine(
             1L,
             new RoutineCreateRequestDto(
-                "루틴", null, null, RoutineType.DAILY, List.of(3), null, null));
+                "루틴", null, null, RoutineType.DAILY, List.of(), null, null));
 
     assertThat(result.getRoutineType()).isEqualTo(RoutineType.DAILY);
     assertThat(result.getRoutineDays()).isNull();
+  }
+
+  @Test
+  void 루틴_생성_DAILY_routineDays_있으면_400() {
+    given(userRepository.findById(1L)).willReturn(Optional.of(testUser()));
+
+    // DAILY는 반복 날짜가 없어야 한다. 값이 채워져 오면 잘못된 요청으로 400.
+    assertThatThrownBy(
+            () ->
+                routineService.createRoutine(
+                    1L,
+                    new RoutineCreateRequestDto(
+                        "루틴", null, null, RoutineType.DAILY, List.of(3), null, null)))
+        .isInstanceOf(CustomException.class)
+        .satisfies(
+            e ->
+                assertThat(((CustomException) e).getErrorCode())
+                    .isEqualTo(RoutineErrorCode.ROUTINE_INVALID_DATE));
   }
 
   // ========== WEEKLY ==========

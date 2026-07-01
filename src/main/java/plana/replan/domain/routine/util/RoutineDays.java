@@ -24,10 +24,14 @@ public final class RoutineDays {
   private static final int MONTHLY_MIN = 1;
   private static final int MONTHLY_MAX = 31;
 
-  /** WEEKLY/MONTHLY 배열 값이 유효 범위 안이고 비어있지 않은지 검사한다. DAILY는 항상 true(무시). */
+  /** WEEKLY/MONTHLY 배열 값이 유효 범위 안이고 비어있지 않은지 검사한다. DAILY는 null 또는 빈 배열만 허용한다. */
   public static boolean isValid(RoutineType type, List<Integer> days) {
+    if (type == null) {
+      return false;
+    }
     if (type == RoutineType.DAILY) {
-      return true;
+      // DAILY는 반복 날짜가 없어야 한다. 값이 채워져 오면 잘못된 요청이다.
+      return days == null || days.isEmpty();
     }
     if (days == null || days.isEmpty()) {
       return false;

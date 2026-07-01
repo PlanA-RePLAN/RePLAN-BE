@@ -358,13 +358,20 @@ public class GoalAiService {
             if (e.canConvertToInt()) {
               routineDays.add(e.asInt());
             } else if (e.isTextual()) {
-              try {
-                routineDays.add(Integer.valueOf(e.asText().trim()));
-              } catch (NumberFormatException ignored) {
-                // 숫자로 못 바꾸는 원소는 건너뛴다
-              }
+              // 숫자로 못 바꾸면 NumberFormatException → 아래 catch(Exception)에서 파싱 오류로 처리
+              routineDays.add(Integer.valueOf(e.asText().trim()));
+            } else {
+              // 숫자/숫자문자열이 아닌 원소는 잘못된 응답으로 본다.
+              throw new CustomException(GoalErrorCode.GEMINI_PARSE_ERROR);
             }
           }
+        }
+        // ONE_TIME·DAILY는 반복 날짜가 없어야 하고, WEEKLY/MONTHLY는 범위 안의 값이 하나 이상 있어야 한다.
+        // 부분 파싱한 값을 그대로 흘려보내지 않고 여기서 전체를 검증한다.
+        if (!"RECURRING".equals(type) || routineType == null || "DAILY".equals(routineType)) {
+          routineDays = null;
+        } else if (!isValidRecommendedRoutineDays(routineType, routineDays)) {
+          throw new CustomException(GoalErrorCode.GEMINI_PARSE_ERROR);
         }
         // AI가 준 tagId를 유저의 실제 태그 목록으로 검증한다.
         // 실제 태그면 그대로 두고 이름은 DB 기준으로 확정, 아니면(지어낸 값 등) 태그 없이(null) 처리.
@@ -398,6 +405,18 @@ public class GoalAiService {
       log.error("Gemini recommend 응답 파싱 실패: {}", raw, e);
       throw new CustomException(GoalErrorCode.GEMINI_PARSE_ERROR);
     }
+  }
+
+  /** WEEKLY(요일 0~6)/MONTHLY(일자 1~31) 반복 날짜 배열이 비어있지 않고 범위 안인지 검사한다. */
+  private boolean isValidRecommendedRoutineDays(String routineType, List<Integer> routineDays) {
+    if (routineDays == null || routineDays.isEmpty()) {
+      return false;
+    }
+    return switch (routineType) {
+      case "WEEKLY" -> routineDays.stream().allMatch(d -> d >= 0 && d <= 6);
+      case "MONTHLY" -> routineDays.stream().allMatch(d -> d >= 1 && d <= 31);
+      default -> false;
+    };
   }
 
   String callGemini(String prompt) {
