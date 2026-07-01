@@ -28,6 +28,7 @@ import plana.replan.domain.routine.entity.RoutineType;
 import plana.replan.domain.routine.exception.RoutineErrorCode;
 import plana.replan.domain.routine.repository.RoutineOverrideRepository;
 import plana.replan.domain.routine.repository.RoutineRepository;
+import plana.replan.domain.routine.util.RoutineDays;
 import plana.replan.domain.tag.entity.Tag;
 import plana.replan.domain.tag.exception.TagErrorCode;
 import plana.replan.domain.tag.repository.TagRepository;
@@ -58,7 +59,7 @@ public class RoutineService {
             .findById(userId)
             .orElseThrow(() -> new CustomException(UserErrorCode.USER_NOT_FOUND));
 
-    validateRoutineDate(request.routineType(), request.routineDate());
+    validateRoutineDays(request.routineType(), request.routineDays());
 
     Tag tag = null;
     if (request.tagId() != null) {
@@ -76,7 +77,7 @@ public class RoutineService {
               .orElseThrow(() -> new CustomException(GoalErrorCode.GOAL_NOT_FOUND));
     }
 
-    Integer routineDate = request.routineType() == RoutineType.DAILY ? null : request.routineDate();
+    Integer routineDate = RoutineDays.toMask(request.routineType(), request.routineDays());
 
     Routine routine =
         routineRepository.save(
@@ -137,7 +138,7 @@ public class RoutineService {
     if (routine.isChild()) {
       throw new CustomException(RoutineErrorCode.ROUTINE_INVALID_TARGET);
     }
-    validateRoutineDate(request.routineType(), request.routineDate());
+    validateRoutineDays(request.routineType(), request.routineDays());
 
     Tag tag = null;
     if (request.tagId() != null) {
@@ -147,7 +148,7 @@ public class RoutineService {
               .orElseThrow(() -> new CustomException(TagErrorCode.TAG_NOT_FOUND));
     }
 
-    Integer routineDate = request.routineType() == RoutineType.DAILY ? null : request.routineDate();
+    Integer routineDate = RoutineDays.toMask(request.routineType(), request.routineDays());
     routine.update(
         request.title(),
         request.dueDate(),
@@ -437,17 +438,10 @@ public class RoutineService {
     };
   }
 
-  private void validateRoutineDate(RoutineType routineType, Integer routineDate) {
-    if (routineType == RoutineType.WEEKLY) {
-      if (routineDate == null || routineDate < 1 || routineDate > 127) {
-        throw new CustomException(RoutineErrorCode.ROUTINE_INVALID_DATE);
-      }
-    } else if (routineType == RoutineType.MONTHLY) {
-      // 일자 비트마스크(일자 d → 비트 d-1). 1~31일이 비트 0~30에 대응하며 최대값은 int 범위(2^31-1)에 들어간다.
-      // 양의 정수면 비트 31(부호비트)은 켜질 수 없으므로 1 이상만 검증한다.
-      if (routineDate == null || routineDate < 1) {
-        throw new CustomException(RoutineErrorCode.ROUTINE_INVALID_DATE);
-      }
+  private void validateRoutineDays(RoutineType routineType, List<Integer> routineDays) {
+    // WEEKLY: 요일 인덱스(0~6), MONTHLY: 일자(1~31). 비어있거나 범위 밖이면 400. DAILY는 무시.
+    if (!RoutineDays.isValid(routineType, routineDays)) {
+      throw new CustomException(RoutineErrorCode.ROUTINE_INVALID_DATE);
     }
   }
 }

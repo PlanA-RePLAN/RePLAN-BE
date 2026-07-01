@@ -30,6 +30,7 @@ import plana.replan.domain.routine.entity.RoutineType;
 import plana.replan.domain.routine.repository.RoutineOverrideRepository;
 import plana.replan.domain.routine.repository.RoutineRepository;
 import plana.replan.domain.routine.service.RoutineService;
+import plana.replan.domain.routine.util.RoutineDays;
 import plana.replan.domain.tag.entity.Tag;
 import plana.replan.domain.tag.exception.TagErrorCode;
 import plana.replan.domain.tag.repository.TagRepository;
@@ -472,17 +473,25 @@ public class ReplanService {
         op.tagId() != null ? resolveTag(op.tagId(), anchor.getUser().getId()) : routine.getTag();
     RoutineType effectiveType =
         op.routineType() != null ? parseRoutineType(op.routineType()) : routine.getRoutineType();
-    // 반복 유형이 바뀌면 기존 routineDate는 의미가 달라(WEEKLY=요일 비트마스크 ↔ MONTHLY=일자 비트마스크)
-    // 재사용하지 않고, 새 유형에 맞는 routineDate를 op가 명시하도록 강제한다(없으면 아래 검증에서 400).
-    // 유형이 그대로면 생략된 routineDate를 기존 값으로 보완한다.
+    // 반복 유형이 바뀌면 기존 값은 의미가 달라 재사용하지 않고, 새 유형에 맞는 routineDays를 op가 명시하도록 강제한다.
+    // 유형이 그대로이고 op가 routineDays를 생략하면 기존 비트마스크를 그대로 유지한다.
     boolean typeChanged = op.routineType() != null && effectiveType != routine.getRoutineType();
-    Integer effectiveRoutineDate =
-        typeChanged
-            ? op.routineDate()
-            : (op.routineDate() != null ? op.routineDate() : routine.getRoutineDate());
-    validateRecurrence(effectiveType, effectiveRoutineDate);
-    // DAILY는 반복 날짜가 의미 없으므로 null로 정규화한다(다른 루틴 생성 경로와 규약을 맞춘다).
-    effectiveRoutineDate = normalizeRoutineDate(effectiveType, effectiveRoutineDate);
+    Integer effectiveRoutineDate;
+    if (op.routineDays() != null) {
+      if (!RoutineDays.isValid(effectiveType, op.routineDays())) {
+        throw new CustomException(ReplanErrorCode.REPLAN_INVALID_OPERATION);
+      }
+      effectiveRoutineDate = RoutineDays.toMask(effectiveType, op.routineDays());
+    } else {
+      effectiveRoutineDate = typeChanged ? null : routine.getRoutineDate();
+    }
+    // WEEKLY/MONTHLY인데 최종 반복 날짜가 없으면 400. (DAILY는 null이 정상)
+    if (effectiveType != RoutineType.DAILY && effectiveRoutineDate == null) {
+      throw new CustomException(ReplanErrorCode.REPLAN_INVALID_OPERATION);
+    }
+    if (effectiveType == RoutineType.DAILY) {
+      effectiveRoutineDate = null;
+    }
     routine.update(
         op.title() != null ? op.title() : routine.getTitle(),
         routine.getDueDate(),
@@ -541,7 +550,9 @@ public class ReplanService {
       throw new CustomException(ReplanErrorCode.REPLAN_INVALID_OPERATION);
     }
     RoutineType type = parseRoutineType(op.routineType());
-    validateRecurrence(type, op.routineDate());
+    if (!RoutineDays.isValid(type, op.routineDays())) {
+      throw new CustomException(ReplanErrorCode.REPLAN_INVALID_OPERATION);
+    }
     User user = anchor.getUser();
     Tag tag = resolveTag(op.tagId(), user.getId());
     Routine routine =
@@ -551,8 +562,8 @@ public class ReplanService {
             .dueDate(parseRoutineEndDate(op.dueDate()))
             .routineTime(parseTime(op.dueTime()))
             .routineType(type)
-            // DAILY는 반복 날짜가 의미 없으므로 null로 정규화한다(다른 루틴 생성 경로와 규약을 맞춘다).
-            .routineDate(normalizeRoutineDate(type, op.routineDate()))
+            // 배열 → 비트마스크. DAILY는 null.
+            .routineDate(RoutineDays.toMask(type, op.routineDays()))
             .user(user)
             .tag(tag)
             .build();
@@ -564,22 +575,6 @@ public class ReplanService {
             routine, LocalDate.now(clock).atStartOfDay());
     instance.ifPresent(instanceTodo -> instanceTodo.linkReplan(replan));
     return instance.isPresent();
-  }
-
-  private void validateRecurrence(RoutineType type, Integer routineDate) {
-    if (type == RoutineType.WEEKLY
-        && (routineDate == null || routineDate < 1 || routineDate > 127)) {
-      throw new CustomException(ReplanErrorCode.REPLAN_INVALID_OPERATION);
-    }
-    // MONTHLY도 일자 비트마스크(일자 d → 비트 d-1). 양의 정수면 유효(1~31일이 비트 0~30에 대응).
-    if (type == RoutineType.MONTHLY && (routineDate == null || routineDate < 1)) {
-      throw new CustomException(ReplanErrorCode.REPLAN_INVALID_OPERATION);
-    }
-  }
-
-  /** DAILY 루틴은 반복 날짜가 의미 없으므로 항상 null로 둔다(WEEKLY/MONTHLY는 그대로). */
-  private Integer normalizeRoutineDate(RoutineType type, Integer routineDate) {
-    return type == RoutineType.DAILY ? null : routineDate;
   }
 
   private LocalTime parseTime(String time) {

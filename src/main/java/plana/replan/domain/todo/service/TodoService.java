@@ -15,9 +15,9 @@ import plana.replan.domain.goal.entity.Goal;
 import plana.replan.domain.goal.exception.GoalErrorCode;
 import plana.replan.domain.goal.repository.GoalRepository;
 import plana.replan.domain.routine.entity.Routine;
-import plana.replan.domain.routine.entity.RoutineType;
 import plana.replan.domain.routine.exception.RoutineErrorCode;
 import plana.replan.domain.routine.repository.RoutineRepository;
+import plana.replan.domain.routine.util.RoutineDays;
 import plana.replan.domain.tag.entity.Tag;
 import plana.replan.domain.tag.exception.TagErrorCode;
 import plana.replan.domain.tag.repository.TagRepository;
@@ -291,9 +291,10 @@ public class TodoService {
     if (todo.getRoutine() != null || request.getRoutineType() == null) {
       return;
     }
-    validateRoutineDate(request.getRoutineType(), request.getRoutineDate());
-    Integer routineDate =
-        request.getRoutineType() == RoutineType.DAILY ? null : request.getRoutineDate();
+    if (!RoutineDays.isValid(request.getRoutineType(), request.getRoutineDays())) {
+      throw new CustomException(RoutineErrorCode.ROUTINE_INVALID_DATE);
+    }
+    Integer routineDate = RoutineDays.toMask(request.getRoutineType(), request.getRoutineDays());
     Routine newRoutine =
         routineRepository.save(
             Routine.builder()
@@ -305,18 +306,6 @@ public class TodoService {
                 .tag(tag)
                 .build());
     todo.updateRoutine(newRoutine);
-  }
-
-  private void validateRoutineDate(RoutineType routineType, Integer routineDate) {
-    if (routineType == RoutineType.WEEKLY) {
-      if (routineDate == null || routineDate < 1 || routineDate > 127) {
-        throw new CustomException(RoutineErrorCode.ROUTINE_INVALID_DATE);
-      }
-    } else if (routineType == RoutineType.MONTHLY) {
-      if (routineDate == null || routineDate < 1) {
-        throw new CustomException(RoutineErrorCode.ROUTINE_INVALID_DATE);
-      }
-    }
   }
 
   @Transactional(readOnly = true)

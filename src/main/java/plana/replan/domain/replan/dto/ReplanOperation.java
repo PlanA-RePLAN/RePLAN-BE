@@ -20,8 +20,8 @@ public record ReplanOperation(
             example = "WEEKLY")
         String routineType,
     @Schema(
-            description = "반복 날짜(WEEKLY=요일 bitmask, MONTHLY=일자 bitmask). 없으면 null",
+            description = "반복 날짜 배열(WEEKLY=요일 인덱스 월0…일6, MONTHLY=일자 1~31). 없으면 null",
             nullable = true,
-            example = "62")
-        Integer routineDate,
+            example = "[0, 2, 4]")
+        List<Integer> routineDays,
     @Schema(description = "바뀐 필드 목록") List<ChangedField> changedFields) {}

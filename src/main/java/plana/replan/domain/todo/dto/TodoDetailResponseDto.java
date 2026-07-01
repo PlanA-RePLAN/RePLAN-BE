@@ -7,6 +7,7 @@ import java.util.List;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import plana.replan.domain.routine.entity.Routine;
+import plana.replan.domain.routine.util.RoutineDays;
 import plana.replan.domain.tag.entity.Tag;
 import plana.replan.domain.todo.entity.Todo;
 
@@ -41,9 +42,9 @@ public class TodoDetailResponseDto {
   private String routineType;
 
   @Schema(
-      description = "반복 날짜 (WEEKLY: 1-127 비트마스크, MONTHLY: 일자 비트마스크, DAILY 또는 반복 없으면 null)",
-      example = "5")
-  private Integer routineDate;
+      description = "반복 날짜 배열 (WEEKLY: 요일 인덱스 월0…일6, MONTHLY: 일자 1~31, DAILY 또는 반복 없으면 null)",
+      example = "[0, 2, 4]")
+  private List<Integer> routineDays;
 
   @Schema(description = "하위 투두 목록")
   private List<SubTodoDto> subTodos;
@@ -83,7 +84,9 @@ public class TodoDetailResponseDto {
         routine != null && routine.getRoutineType() != null
             ? routine.getRoutineType().name()
             : null,
-        routine != null ? routine.getRoutineDate() : null,
+        routine != null
+            ? RoutineDays.toDays(routine.getRoutineType(), routine.getRoutineDate())
+            : null,
         subTodos);
   }
 }

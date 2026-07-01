@@ -102,14 +102,14 @@ class RoutineControllerTest {
         .andExpect(jsonPath("$.data.routineId").value(1))
         .andExpect(jsonPath("$.data.title").value("아침 스트레칭"))
         .andExpect(jsonPath("$.data.routineType").value("DAILY"))
-        .andExpect(jsonPath("$.data.routineDate").value(nullValue()))
+        .andExpect(jsonPath("$.data.routineDays").value(nullValue()))
         .andExpect(jsonPath("$.data.tagId").value(nullValue()))
         .andExpect(jsonPath("$.data.goalId").value(nullValue()))
         .andExpect(jsonPath("$.error").value(nullValue()));
   }
 
   @Test
-  @DisplayName("WEEKLY 루틴 생성 성공 (전체 필드): routineDate=21, tagId/goalId 포함")
+  @DisplayName("WEEKLY 루틴 생성 성공 (전체 필드): routineDays=[0,2,4], tagId/goalId 포함")
   void createRoutine_weekly_success_fullFields() throws Exception {
     LocalDateTime dueDate = LocalDateTime.of(2025, 12, 31, 0, 0);
     given(routineService.createRoutine(any(), any()))
@@ -120,7 +120,7 @@ class RoutineControllerTest {
                 dueDate,
                 null,
                 RoutineType.WEEKLY,
-                21,
+                java.util.List.of(0, 2, 4),
                 5L,
                 null,
                 null,
@@ -143,7 +143,7 @@ class RoutineControllerTest {
                       "title": "영어 단어",
                       "dueDate": "2025-12-31T00:00:00",
                       "routineType": "WEEKLY",
-                      "routineDate": 21,
+                      "routineDays": [0, 2, 4],
                       "tagId": 5,
                       "goalId": 2
                     }
@@ -152,14 +152,14 @@ class RoutineControllerTest {
         .andExpect(jsonPath("$.success").value(true))
         .andExpect(jsonPath("$.data.routineId").value(2))
         .andExpect(jsonPath("$.data.routineType").value("WEEKLY"))
-        .andExpect(jsonPath("$.data.routineDate").value(21))
+        .andExpect(jsonPath("$.data.routineDays[0]").value(0))
         .andExpect(jsonPath("$.data.tagId").value(5))
         .andExpect(jsonPath("$.data.goalId").value(2))
         .andExpect(jsonPath("$.error").value(nullValue()));
   }
 
   @Test
-  @DisplayName("MONTHLY 루틴 생성 성공: routineDate=15")
+  @DisplayName("MONTHLY 루틴 생성 성공: routineDays=[15]")
   void createRoutine_monthly_success() throws Exception {
     given(routineService.createRoutine(any(), any()))
         .willReturn(
@@ -169,7 +169,7 @@ class RoutineControllerTest {
                 null,
                 null,
                 RoutineType.MONTHLY,
-                15,
+                java.util.List.of(15),
                 null,
                 null,
                 null,
@@ -188,11 +188,11 @@ class RoutineControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(
                     """
-                    { "title": "월간 회고", "routineType": "MONTHLY", "routineDate": 15 }
+                    { "title": "월간 회고", "routineType": "MONTHLY", "routineDays": [15] }
                     """))
         .andExpect(status().isCreated())
         .andExpect(jsonPath("$.data.routineType").value("MONTHLY"))
-        .andExpect(jsonPath("$.data.routineDate").value(15));
+        .andExpect(jsonPath("$.data.routineDays[0]").value(15));
   }
 
   @Test
@@ -262,7 +262,7 @@ class RoutineControllerTest {
   }
 
   @Test
-  @DisplayName("routineDate 범위 오류: status=400, error.code=ROUTINE_INVALID_DATE")
+  @DisplayName("routineDays 범위 오류: status=400, error.code=ROUTINE_INVALID_DATE")
   void createRoutine_invalidRoutineDate() throws Exception {
     willThrow(new CustomException(RoutineErrorCode.ROUTINE_INVALID_DATE))
         .given(routineService)
@@ -275,7 +275,7 @@ class RoutineControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(
                     """
-                    { "title": "루틴", "routineType": "WEEKLY", "routineDate": 128 }
+                    { "title": "루틴", "routineType": "WEEKLY", "routineDays": [7] }
                     """))
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.status").value(400))
@@ -373,7 +373,7 @@ class RoutineControllerTest {
                 dueDate,
                 null,
                 RoutineType.WEEKLY,
-                21,
+                java.util.List.of(0, 2, 4),
                 5L,
                 "영어",
                 "BLUE",
@@ -396,7 +396,7 @@ class RoutineControllerTest {
                       "title": "수정된 루틴",
                       "dueDate": "2025-12-31T00:00:00",
                       "routineType": "WEEKLY",
-                      "routineDate": 21,
+                      "routineDays": [0, 2, 4],
                       "tagId": 5
                     }
                     """))
@@ -404,7 +404,7 @@ class RoutineControllerTest {
         .andExpect(jsonPath("$.success").value(true))
         .andExpect(jsonPath("$.data.title").value("수정된 루틴"))
         .andExpect(jsonPath("$.data.routineType").value("WEEKLY"))
-        .andExpect(jsonPath("$.data.routineDate").value(21))
+        .andExpect(jsonPath("$.data.routineDays[0]").value(0))
         .andExpect(jsonPath("$.data.tagId").value(5))
         .andExpect(jsonPath("$.error").value(nullValue()));
   }
@@ -430,7 +430,7 @@ class RoutineControllerTest {
   }
 
   @Test
-  @DisplayName("routineDate 범위 오류: status=400, error.code=ROUTINE_INVALID_DATE")
+  @DisplayName("routineDays 범위 오류: status=400, error.code=ROUTINE_INVALID_DATE")
   void updateMotherRoutine_invalidRoutineDate() throws Exception {
     willThrow(new CustomException(RoutineErrorCode.ROUTINE_INVALID_DATE))
         .given(routineService)
@@ -443,7 +443,7 @@ class RoutineControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(
                     """
-                    { "title": "수정", "routineType": "WEEKLY", "routineDate": 128 }
+                    { "title": "수정", "routineType": "WEEKLY", "routineDays": [7] }
                     """))
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.error.code").value("ROUTINE_INVALID_DATE"));

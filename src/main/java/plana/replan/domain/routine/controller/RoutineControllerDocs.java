@@ -34,8 +34,8 @@ public interface RoutineControllerDocs {
           `filter`와 `date`를 기준으로 해당 기간의 루틴 목록을 날짜별로 묶어 반환합니다.
 
           - `DAILY` 루틴: 기간 내 모든 날짜에 포함
-          - `WEEKLY` 루틴: 해당 날짜의 요일이 `routineDate` 비트마스크에 포함된 날짜에만 포함
-          - `MONTHLY` 루틴: 해당 날짜의 일(day) 비트가 `routineDate` 비트마스크에 포함된 날짜에만 포함
+          - `WEEKLY` 루틴: 해당 날짜의 요일 인덱스가 `routineDays` 배열에 포함된 날짜에만 포함
+          - `MONTHLY` 루틴: 해당 날짜의 일(day)이 `routineDays` 배열에 포함된 날짜에만 포함
 
           각 루틴에 해당 날짜의 Todo가 이미 생성되어 있으면 `todoId`가 포함되고, 아직 없으면 `null`입니다.
 
@@ -74,7 +74,7 @@ public interface RoutineControllerDocs {
           | dueDate | string | 반복 종료 마감일 (ISO 8601 형식). 없으면 null |
           | routineTime | string | 마감 시각 (HH:mm:ss 형식). 없으면 null |
           | routineType | string | 반복 유형 (`DAILY` / `WEEKLY` / `MONTHLY`) |
-          | routineDate | integer | 반복 날짜 설정값. DAILY는 null, WEEKLY는 요일 비트마스크, MONTHLY는 일자 비트마스크 |
+          | routineDays | integer | 반복 날짜 배열. DAILY는 null, WEEKLY는 요일 인덱스(월0…일6), MONTHLY는 일자(1~31) |
           | tagId | integer | 태그 ID. 없으면 null |
           | tagTitle | string | 태그 제목. 없으면 null |
           | tagColor | string | 태그 색상. 없으면 null |
@@ -103,7 +103,7 @@ public interface RoutineControllerDocs {
                                     "dueDate": null,
                                     "routineTime": "08:00:00",
                                     "routineType": "DAILY",
-                                    "routineDate": null,
+                                    "routineDays": null,
                                     "tagId": null,
                                     "tagTitle": null,
                                     "tagColor": null,
@@ -118,7 +118,7 @@ public interface RoutineControllerDocs {
                                     "dueDate": null,
                                     "routineTime": "08:00:00",
                                     "routineType": "DAILY",
-                                    "routineDate": null,
+                                    "routineDays": null,
                                     "tagId": null,
                                     "tagTitle": null,
                                     "tagColor": null,
@@ -131,7 +131,7 @@ public interface RoutineControllerDocs {
                                     "dueDate": "2025-12-31T00:00:00",
                                     "routineTime": "09:00:00",
                                     "routineType": "WEEKLY",
-                                    "routineDate": 21,
+                                    "routineDays": [0, 2, 4],
                                     "tagId": 3,
                                     "tagTitle": "영어",
                                     "tagColor": "BLUE",
@@ -254,7 +254,7 @@ public interface RoutineControllerDocs {
           | routineType | ✅ 필수 | string | 반복 유형 (`DAILY` / `WEEKLY` / `MONTHLY`) | `"WEEKLY"` |
           | dueDate | ❌ 선택 | string | 반복 종료 마감일 (ISO 8601 형식). 이 날짜 이후로는 반복 생성 안 됨 | `"2025-12-31T00:00:00"` |
           | routineTime | ❌ 선택 | string | 반복되는 날의 마감 시각 (HH:mm:ss 형식). 생략 시 23:59:59 | `"09:00:00"` |
-          | routineDate | ❌ 선택 | integer | 반복 날짜. WEEKLY: 요일 bitmask (월=1, 화=2, 수=4, 목=8, 금=16, 토=32, 일=64). MONTHLY: 일자 bitmask (1일=1, 2일=2, 3일=4 … 여러 날 합산). DAILY: 불필요 | `21` |
+          | routineDays | ❌ 선택 | integer | 반복 날짜 배열. WEEKLY: 요일 인덱스 배열(월=0, 화=1, 수=2, 목=3, 금=4, 토=5, 일=6). MONTHLY: 일자 배열(1~31). DAILY: 불필요 | `[0, 2, 4]` |
           | tagId | ❌ 선택 | integer | 태그 ID | `1` |
           | goalId | ❌ 선택 | integer | 목표 ID | `2` |
 
@@ -262,20 +262,18 @@ public interface RoutineControllerDocs {
 
           ---
 
-          ### routineDate 규칙
+          ### routineDays 규칙
 
-          | routineType | routineDate 의미 | 유효 범위 |
+          | routineType | routineDays 의미 | 예시 |
           |-------------|-----------------|-----------|
-          | `DAILY` | 사용 안 함 (무시) | — |
-          | `WEEKLY` | 요일 bitmask (월=1, 화=2, 수=4, 목=8, 금=16, 토=32, 일=64) | 1 ~ 127 |
-          | `MONTHLY` | 반복할 일자 비트마스크 (여러 날 합산) | 1일=1, 2일=2, 3일=4 … |
-
-          **WEEKLY 예시**: 월+수+금 → 1+4+16 = **21**
+          | `DAILY` | 사용 안 함 (null) | — |
+          | `WEEKLY` | 요일 인덱스 배열 (월=0, 화=1, 수=2, 목=3, 금=4, 토=5, 일=6) | 월·수·금 → [0, 2, 4] |
+          | `MONTHLY` | 반복할 일자 배열 (1~31) | 3·20일 → [3, 20] |
 
           ---
 
           ### 주의사항
-          - `WEEKLY` 또는 `MONTHLY` 타입에서 `routineDate`가 유효 범위를 벗어나면 400 반환
+          - `WEEKLY` 또는 `MONTHLY` 타입에서 `routineDays`가 유효 범위를 벗어나면 400 반환
           - `tagId`가 제공된 경우 해당 태그가 존재하지 않으면 404 반환
           - `goalId`가 제공된 경우 해당 목표가 존재하지 않으면 404 반환
           """,
@@ -300,7 +298,7 @@ public interface RoutineControllerDocs {
                                 "dueDate": "2025-12-31T00:00:00",
                                 "routineTime": "09:00:00",
                                 "routineType": "WEEKLY",
-                                "routineDate": 21,
+                                "routineDays": [0, 2, 4],
                                 "tagId": 1,
                                 "tagTitle": "영어",
                                 "tagColor": "BLUE",
@@ -311,7 +309,7 @@ public interface RoutineControllerDocs {
                             """))),
     @ApiResponse(
         responseCode = "400",
-        description = "입력값 오류 (title/routineType 누락, 또는 routineDate 범위 오류)",
+        description = "입력값 오류 (title/routineType 누락, 또는 routineDays 범위 오류)",
         content =
             @Content(
                 examples = {
@@ -331,7 +329,7 @@ public interface RoutineControllerDocs {
                           }
                           """),
                   @ExampleObject(
-                      name = "routineDate 범위 오류",
+                      name = "routineDays 범위 오류",
                       value =
                           """
                           {
@@ -437,14 +435,14 @@ public interface RoutineControllerDocs {
                                   "dueDate": "2025-12-31T00:00:00",
                                   "routineTime": "09:00:00",
                                   "routineType": "WEEKLY",
-                                  "routineDate": 21,
+                                  "routineDays": [0, 2, 4],
                                   "tagId": 1,
                                   "goalId": 2
                                 }
                                 """),
                         @ExampleObject(
                             name = "DAILY — 필수 필드만",
-                            summary = "DAILY는 routineDate 불필요",
+                            summary = "DAILY는 routineDays 불필요",
                             value =
                                 """
                                 {
@@ -453,14 +451,14 @@ public interface RoutineControllerDocs {
                                 }
                                 """),
                         @ExampleObject(
-                            name = "MONTHLY — 매월 15일 (15일=1<<14=16384)",
+                            name = "MONTHLY — 매월 15일 ([15])",
                             value =
                                 """
                                 {
                                   "title": "월간 회고",
                                   "dueDate": "2025-12-31T00:00:00",
                                   "routineType": "MONTHLY",
-                                  "routineDate": 16384
+                                  "routineDays": [15]
                                 }
                                 """)
                       }))
@@ -474,7 +472,7 @@ public interface RoutineControllerDocs {
           엄마 루틴 아래에 하위 루틴을 추가합니다.
 
           ### 정책
-          - 하위 루틴은 `title`만 자체 값입니다. 스케줄(`routineType`/`routineDate`), `dueDate`, `tag`, `goal`, `user`는 모두 엄마 루틴을 따릅니다.
+          - 하위 루틴은 `title`만 자체 값입니다. 스케줄(`routineType`/`routineDays`), `dueDate`, `tag`, `goal`, `user`는 모두 엄마 루틴을 따릅니다.
           - 1단계 깊이만 허용합니다. 하위 루틴 ID를 `parentId`로 넘기면 404로 거부됩니다.
           - 호출 시점에 엄마 루틴의 살아있는 다음 발생일 Todo가 있으면, 해당 엄마 Todo 아래에 하위 Todo가 즉시 매달립니다. 없으면 다음 스케줄러 사이클에서 함께 생성됩니다.
 
@@ -658,20 +656,20 @@ public interface RoutineControllerDocs {
           | routineType | ✅ 필수 | string | 반복 유형 (`DAILY` / `WEEKLY` / `MONTHLY`) | `"WEEKLY"` |
           | dueDate | ❌ 선택 | string | 반복 종료 마감일 (ISO 8601 형식). null이면 종료일 제거 | `"2025-12-31T00:00:00"` |
           | routineTime | ❌ 선택 | string | 반복되는 날의 마감 시각 (HH:mm:ss 형식). null이면 23:59:59로 처리 | `"09:00:00"` |
-          | routineDate | ❌ 선택 | integer | 반복 날짜. WEEKLY: 요일 bitmask (월=1~일=64). MONTHLY: 일자 bitmask (1일=1, 2일=2, 3일=4 … 여러 날 합산). DAILY: 불필요 | `21` |
+          | routineDays | ❌ 선택 | integer | 반복 날짜 배열. WEEKLY: 요일 인덱스 배열(월=0 … 일=6). MONTHLY: 일자 배열(1~31). DAILY: 불필요 | `[0, 2, 4]` |
           | tagId | ❌ 선택 | integer | 태그 ID. null이면 태그 제거 | `1` |
 
           > ❌ 선택 필드는 생략하거나 null로 전달해도 동일하게 처리됩니다.
 
           ---
 
-          ### routineDate 규칙
+          ### routineDays 규칙
 
-          | routineType | routineDate 의미 | 유효 범위 |
+          | routineType | routineDays 의미 | 예시 |
           |-------------|-----------------|-----------|
-          | `DAILY` | 사용 안 함 (무시) | — |
-          | `WEEKLY` | 요일 bitmask (월=1, 화=2, 수=4, 목=8, 금=16, 토=32, 일=64) | 1 ~ 127 |
-          | `MONTHLY` | 반복할 일자 비트마스크 (여러 날 합산) | 1일=1, 2일=2, 3일=4 … |
+          | `DAILY` | 사용 안 함 (null) | — |
+          | `WEEKLY` | 요일 인덱스 배열 (월=0 … 일=6) | 월·수·금 → [0, 2, 4] |
+          | `MONTHLY` | 반복할 일자 배열 (1~31) | 3·20일 → [3, 20] |
           """,
       security = @SecurityRequirement(name = "Bearer Authentication"))
   @ApiResponses({
@@ -693,7 +691,7 @@ public interface RoutineControllerDocs {
                                 "dueDate": "2025-12-31T00:00:00",
                                 "routineTime": "09:00:00",
                                 "routineType": "WEEKLY",
-                                "routineDate": 21,
+                                "routineDays": [0, 2, 4],
                                 "tagId": 1,
                                 "tagTitle": "영어",
                                 "tagColor": "BLUE",
@@ -704,7 +702,7 @@ public interface RoutineControllerDocs {
                             """))),
     @ApiResponse(
         responseCode = "400",
-        description = "입력값 오류 (title/routineType 누락, 또는 routineDate 범위 오류, 또는 하위 루틴 ID 사용)",
+        description = "입력값 오류 (title/routineType 누락, 또는 routineDays 범위 오류, 또는 하위 루틴 ID 사용)",
         content =
             @Content(
                 examples = {
@@ -724,7 +722,7 @@ public interface RoutineControllerDocs {
                           }
                           """),
                   @ExampleObject(
-                      name = "routineDate 범위 오류",
+                      name = "routineDays 범위 오류",
                       value =
                           """
                           {
@@ -846,13 +844,13 @@ public interface RoutineControllerDocs {
                                   "dueDate": "2025-12-31T00:00:00",
                                   "routineTime": "09:00:00",
                                   "routineType": "WEEKLY",
-                                  "routineDate": 21,
+                                  "routineDays": [0, 2, 4],
                                   "tagId": 1
                                 }
                                 """),
                         @ExampleObject(
                             name = "DAILY — 필수 필드만",
-                            summary = "DAILY는 routineDate 불필요, optional 필드 생략",
+                            summary = "DAILY는 routineDays 불필요, optional 필드 생략",
                             value =
                                 """
                                 {
