@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
@@ -29,6 +30,8 @@ import plana.replan.domain.goal.dto.refine.RefinedField;
 import plana.replan.domain.goal.dto.refine.RefinedNoteItem;
 import plana.replan.domain.goal.dto.refine.RefinedSolution;
 import plana.replan.domain.goal.exception.GoalErrorCode;
+import plana.replan.domain.tag.entity.Tag;
+import plana.replan.domain.tag.repository.TagRepository;
 import plana.replan.global.exception.CustomException;
 
 @Slf4j
@@ -40,6 +43,7 @@ public class GoalAiService {
       "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent";
 
   private final RestClient geminiRestClient;
+  private final TagRepository tagRepository;
   private final ObjectMapper objectMapper = new ObjectMapper();
 
   @Value("${gemini.api-key}")
@@ -195,11 +199,24 @@ public class GoalAiService {
     }
   }
 
-  public TodoRecommendationResponse recommendTodos(TodoRecommendationRequest request) {
+  public TodoRecommendationResponse recommendTodos(Long userId, TodoRecommendationRequest request) {
     validateRefreshCount(request.refreshCount());
-    String prompt = buildRecommendPrompt(request);
+    List<Tag> tags = tagRepository.findAllByUserId(userId);
+    String prompt = buildRecommendPrompt(request, buildTagInfo(tags));
     String raw = callGemini(prompt);
-    return parseRecommendResponse(raw);
+    return parseRecommendResponse(raw, tags);
+  }
+
+  /** 유저 태그 목록을 프롬프트용 문자열로 만든다. 태그가 없으면 "없음". */
+  String buildTagInfo(List<Tag> tags) {
+    if (tags == null || tags.isEmpty()) {
+      return "없음";
+    }
+    StringBuilder sb = new StringBuilder();
+    for (Tag tag : tags) {
+      sb.append("- id=").append(tag.getId()).append(", name=").append(tag.getTitle()).append("\n");
+    }
+    return sb.toString();
   }
 
   /** 새로고침 횟수를 0~3 범위로 검증한다. null은 허용(첫 추천으로 취급). */
@@ -209,7 +226,7 @@ public class GoalAiService {
     }
   }
 
-  String buildRecommendPrompt(TodoRecommendationRequest req) {
+  String buildRecommendPrompt(TodoRecommendationRequest req, String tagInfo) {
     String deadlineInfo = buildDeadlineInfo(req.deadlineDate(), req.deadlineTime());
     String prompt =
         """
@@ -219,6 +236,12 @@ public class GoalAiService {
         마감기한: %s
         솔루션:
         %s
+
+        [사용 가능한 태그 목록]
+        %s
+        각 투두마다 위 목록에서 가장 적절한 태그 하나를 골라 그 태그의 id를 tagId에 넣으세요.
+        - tagId는 반드시 위 목록에 있는 id 중 하나여야 합니다. 목록에 없는 id를 지어내지 마세요.
+        - 마땅한 태그가 없거나 목록이 "없음"이면 tagId는 null로 두세요.
 
         [1단계 — 교재·강의 정보 수집, 투두 생성 전 반드시 먼저 수행]
         솔루션에 교재·강의명이 하나라도 있으면:
@@ -258,9 +281,9 @@ public class GoalAiService {
             - 링크는 Google Search로 확인된 실제 URL만 사용. 확인 불가 시 링크 생략
 
         반드시 아래 JSON만 출력하세요 (다른 설명 없이):
-        {"overallReason":"","todos":[{"type":"","title":"","dueDate":null,"dueTime":null,"routineType":null,"routineDate":null}]}
+        {"overallReason":"","todos":[{"type":"","title":"","dueDate":null,"dueTime":null,"routineType":null,"routineDate":null,"tagId":null}]}
         """
-            .formatted(req.goal(), deadlineInfo, buildSolutionInfo(req.solutions()));
+            .formatted(req.goal(), deadlineInfo, buildSolutionInfo(req.solutions()), tagInfo);
     return prompt + refreshStyleBlock(req.refreshCount() == null ? 0 : req.refreshCount());
   }
 
@@ -304,7 +327,14 @@ public class GoalAiService {
     return deadlineTime;
   }
 
-  private TodoRecommendationResponse parseRecommendResponse(String raw) {
+  TodoRecommendationResponse parseRecommendResponse(String raw, List<Tag> tags) {
+    // 유저의 실제 태그만 담은 (id -> 이름) 맵. AI가 준 tagId 검증·태그명 확정에 사용한다.
+    Map<Long, String> validTags = new LinkedHashMap<>();
+    if (tags != null) {
+      for (Tag tag : tags) {
+        validTags.put(tag.getId(), tag.getTitle());
+      }
+    }
     try {
       String json = extractJson(raw);
       JsonNode root = objectMapper.readTree(json);
@@ -330,7 +360,32 @@ public class GoalAiService {
             throw new CustomException(GoalErrorCode.GEMINI_PARSE_ERROR);
           }
         }
-        todos.add(new RecommendedTodo(type, title, dueDate, dueTime, routineType, routineDate));
+        // AI가 준 tagId를 유저의 실제 태그 목록으로 검증한다.
+        // 실제 태그면 그대로 두고 이름은 DB 기준으로 확정, 아니면(지어낸 값 등) 태그 없이(null) 처리.
+        Long tagId = null;
+        String tagName = null;
+        JsonNode tagIdNode = node.path("tagId");
+        if (!tagIdNode.isNull() && !tagIdNode.isMissingNode()) {
+          // 숫자(1)뿐 아니라 문자열("1")로 온 경우도 받아들인다. LLM이 숫자를 따옴표로 감싸 주는 일이 흔하다.
+          Long candidate = null;
+          if (tagIdNode.canConvertToLong()) {
+            candidate = tagIdNode.asLong();
+          } else if (tagIdNode.isTextual()) {
+            try {
+              candidate = Long.valueOf(tagIdNode.asText().trim());
+            } catch (NumberFormatException ignored) {
+              candidate = null;
+            }
+          }
+          if (candidate != null && validTags.containsKey(candidate)) {
+            tagId = candidate;
+            tagName = validTags.get(candidate);
+          }
+        }
+
+        todos.add(
+            new RecommendedTodo(
+                type, title, dueDate, dueTime, routineType, routineDate, tagId, tagName));
       }
       return new TodoRecommendationResponse(overallReason, todos);
     } catch (Exception e) {

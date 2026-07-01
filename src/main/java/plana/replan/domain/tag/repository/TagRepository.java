@@ -13,6 +13,9 @@ public interface TagRepository extends JpaRepository<Tag, Long> {
 
   List<Tag> findAllByUserOrderByCreatedAtDescIdDesc(User user);
 
+  @Query("SELECT t FROM Tag t WHERE t.user.id = :userId")
+  List<Tag> findAllByUserId(@Param("userId") Long userId);
+
   @Modifying
   @Query("UPDATE Tag t SET t.deletedAt = :now WHERE t.user.id = :userId AND t.deletedAt IS NULL")
   void softDeleteAllByUserId(@Param("userId") Long userId, @Param("now") LocalDateTime now);

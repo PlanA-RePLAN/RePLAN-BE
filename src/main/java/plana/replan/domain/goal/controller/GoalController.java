@@ -74,7 +74,7 @@ public class GoalController implements GoalControllerDocs {
   @PostMapping("/ai/todo-recommendations")
   public ResponseEntity<ApiResult<TodoRecommendationResponse>> recommendTodos(
       @AuthenticationPrincipal Long userId, @Valid @RequestBody TodoRecommendationRequest request) {
-    return ResponseEntity.ok(ApiResult.ok(goalAiService.recommendTodos(request)));
+    return ResponseEntity.ok(ApiResult.ok(goalAiService.recommendTodos(userId, request)));
   }
 
   @Override
