@@ -1463,13 +1463,13 @@ class TodoServiceTest {
       LocalDateTime dueDate,
       Long tagId,
       RoutineType routineType,
-      Integer routineDate) {
+      java.util.List<Integer> routineDays) {
     TodoUpdateRequestDto dto = new TodoUpdateRequestDto();
     ReflectionTestUtils.setField(dto, "title", title);
     ReflectionTestUtils.setField(dto, "dueDate", dueDate);
     ReflectionTestUtils.setField(dto, "tagId", tagId);
     ReflectionTestUtils.setField(dto, "routineType", routineType);
-    ReflectionTestUtils.setField(dto, "routineDate", routineDate);
+    ReflectionTestUtils.setField(dto, "routineDays", routineDays);
     return dto;
   }
 
@@ -1546,7 +1546,7 @@ class TodoServiceTest {
   }
 
   @Test
-  @DisplayName("updateTodo - WEEKLY + routineDate > 127: ROUTINE_INVALID_DATE 예외")
+  @DisplayName("updateTodo - WEEKLY + 범위밖 요일: ROUTINE_INVALID_DATE 예외")
   void updateTodo_weeklyInvalidDate_throws() {
     User user = testUser();
     given(todoRepository.findById(1L)).willReturn(Optional.of(testTodo(1L, user)));
@@ -1554,7 +1554,9 @@ class TodoServiceTest {
     assertThatThrownBy(
             () ->
                 todoService.updateTodo(
-                    1L, 1L, updateTodoRequest("제목", null, null, RoutineType.WEEKLY, 128)))
+                    1L,
+                    1L,
+                    updateTodoRequest("제목", null, null, RoutineType.WEEKLY, java.util.List.of(7))))
         .isInstanceOf(CustomException.class)
         .satisfies(
             e ->
@@ -1563,7 +1565,7 @@ class TodoServiceTest {
   }
 
   @Test
-  @DisplayName("updateTodo - MONTHLY + routineDate = 0: ROUTINE_INVALID_DATE 예외")
+  @DisplayName("updateTodo - MONTHLY + 빈 배열: ROUTINE_INVALID_DATE 예외")
   void updateTodo_monthlyInvalidDate_throws() {
     User user = testUser();
     given(todoRepository.findById(1L)).willReturn(Optional.of(testTodo(1L, user)));
@@ -1571,7 +1573,9 @@ class TodoServiceTest {
     assertThatThrownBy(
             () ->
                 todoService.updateTodo(
-                    1L, 1L, updateTodoRequest("제목", null, null, RoutineType.MONTHLY, 0)))
+                    1L,
+                    1L,
+                    updateTodoRequest("제목", null, null, RoutineType.MONTHLY, java.util.List.of())))
         .isInstanceOf(CustomException.class)
         .satisfies(
             e ->
@@ -1580,7 +1584,7 @@ class TodoServiceTest {
   }
 
   @Test
-  @DisplayName("updateTodo - MONTHLY + 여러 날짜 비트마스크(524292): 루틴 생성 성공")
+  @DisplayName("updateTodo - MONTHLY + 여러 날짜 [3,20]: 루틴 생성 성공")
   void updateTodo_monthlyBitmask_success() {
     User user = testUser();
     given(todoRepository.findById(1L)).willReturn(Optional.of(testTodo(1L, user)));
@@ -1588,7 +1592,7 @@ class TodoServiceTest {
 
     // 3일·20일 = (1<<2)|(1<<19) = 524292 → 31 초과지만 유효한 비트마스크
     todoService.updateTodo(
-        1L, 1L, updateTodoRequest("제목", null, null, RoutineType.MONTHLY, 524292));
+        1L, 1L, updateTodoRequest("제목", null, null, RoutineType.MONTHLY, java.util.List.of(3, 20)));
 
     ArgumentCaptor<Routine> captor = ArgumentCaptor.forClass(Routine.class);
     verify(routineRepository).save(captor.capture());
@@ -1596,7 +1600,7 @@ class TodoServiceTest {
   }
 
   @Test
-  @DisplayName("updateTodo - WEEKLY + routineDate null: ROUTINE_INVALID_DATE 예외")
+  @DisplayName("updateTodo - WEEKLY + routineDays null: ROUTINE_INVALID_DATE 예외")
   void updateTodo_weeklyNullDate_throws() {
     User user = testUser();
     given(todoRepository.findById(1L)).willReturn(Optional.of(testTodo(1L, user)));
@@ -1604,7 +1608,10 @@ class TodoServiceTest {
     assertThatThrownBy(
             () ->
                 todoService.updateTodo(
-                    1L, 1L, updateTodoRequest("제목", null, null, RoutineType.WEEKLY, null)))
+                    1L,
+                    1L,
+                    updateTodoRequest(
+                        "제목", null, null, RoutineType.WEEKLY, (java.util.List<Integer>) null)))
         .isInstanceOf(CustomException.class)
         .satisfies(
             e ->
@@ -1709,7 +1716,9 @@ class TodoServiceTest {
 
     TodoDetailResponseDto result =
         todoService.updateTodo(
-            1L, 1L, updateTodoRequest("제목", null, null, RoutineType.DAILY, null));
+            1L,
+            1L,
+            updateTodoRequest("제목", null, null, RoutineType.DAILY, (java.util.List<Integer>) null));
 
     ArgumentCaptor<Routine> captor = ArgumentCaptor.forClass(Routine.class);
     verify(routineRepository).save(captor.capture());

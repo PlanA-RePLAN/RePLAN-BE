@@ -729,14 +729,14 @@ public interface TodoControllerDocs {
           | dueDate | ❌ 선택 | string | 마감 일시 (ISO 8601 형식). null이면 마감일 제거 | `"2025-12-31T23:59:59"` |
           | tagId | ❌ 선택 | integer | 태그 ID. null이면 태그 제거 | `3` |
           | routineType | ❌ 선택 | string | 반복 유형 (`DAILY`/`WEEKLY`/`MONTHLY`). **이미 반복에 연결된 투두에는 무시됨** | `"WEEKLY"` |
-          | routineDate | ❌ 선택 | integer | 반복 날짜 (WEEKLY: 1-127 비트마스크, MONTHLY: 일자 비트마스크). DAILY는 null. **이미 반복에 연결된 투두에는 무시됨** | `5` |
+          | routineDays | ❌ 선택 | array | 반복 날짜 배열 (WEEKLY: 요일 인덱스(월0…일6), MONTHLY: 일자(1~31)). DAILY는 null. **이미 반복에 연결된 투두에는 무시됨** | `[0, 2]` |
           | routineTime | ❌ 선택 | string | 반복 마감 시각 (HH:mm:ss). **이미 반복에 연결된 투두에는 무시됨** | `"09:00:00"` |
 
           ❌ 선택 필드는 생략하거나 null로 전달해도 동일하게 처리됩니다.
 
           **반복(routine) 처리 규칙**
 
-          `routineType`/`routineDate`/`routineTime`은 **해당 투두에 아직 연결된 Routine이 없을 때만** 새 Routine을 생성해 연결합니다.
+          `routineType`/`routineDays`/`routineTime`은 **해당 투두에 아직 연결된 Routine이 없을 때만** 새 Routine을 생성해 연결합니다.
           이미 Routine이 연결되어 있다면 이 필드들은 무시됩니다 — 반복 시리즈 전체를 수정하려면 `PUT /api/routines/{id}`를 사용하세요.
 
           | 기존 상태 | routineType 값 | 동작 |
@@ -768,7 +768,7 @@ public interface TodoControllerDocs {
                                 "tagTitle": "영어",
                                 "tagColor": "BLUE",
                                 "routineType": "WEEKLY",
-                                "routineDate": 5,
+                                "routineDays": [0, 2],
                                 "subTodos": []
                               },
                               "error": null
@@ -898,7 +898,7 @@ public interface TodoControllerDocs {
                             name = "전체 필드 포함",
                             value =
                                 """
-                                {"title": "토익 단어 50개 외우기", "dueDate": "2025-12-31T23:59:59", "tagId": 3, "routineType": "WEEKLY", "routineDate": 5}
+                                {"title": "토익 단어 50개 외우기", "dueDate": "2025-12-31T23:59:59", "tagId": 3, "routineType": "WEEKLY", "routineDays": [0, 2]}
                                 """),
                         @ExampleObject(
                             name = "필수 필드만 (optional 생략)",
@@ -934,7 +934,7 @@ public interface TodoControllerDocs {
 
           **반환 필드**
           - `routineType`: 루틴에 연결된 투두인 경우 `DAILY` / `WEEKLY` / `MONTHLY`, 일반 투두는 `null`
-          - `routineDate`: WEEKLY이면 요일 비트마스크(1-127), MONTHLY이면 일자 비트마스크, DAILY 또는 루틴 없으면 `null`
+          - `routineDays`: WEEKLY이면 요일 인덱스 배열(월0…일6), MONTHLY이면 일자 배열(1~31), DAILY 또는 루틴 없으면 `null`
           - `tagId`, `tagTitle`, `tagColor`: 태그가 없으면 모두 `null`
           - `subTodos`: 하위 투두 목록 (없으면 빈 배열)
           """,
@@ -961,7 +961,7 @@ public interface TodoControllerDocs {
                                 "tagTitle": "영어",
                                 "tagColor": "BLUE",
                                 "routineType": "DAILY",
-                                "routineDate": null,
+                                "routineDays": null,
                                 "subTodos": [
                                   {
                                     "todoId": 10,

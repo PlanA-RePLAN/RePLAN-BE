@@ -22,9 +22,9 @@ public record TodoItemRequest(
         RoutineType routineType,
     @Schema(
             description =
-                "반복 날짜. RECURRING만 사용. ONE_TIME이면 null. WEEKLY: 요일 bitmask (월=1, 화=2, 수=4, 목=8, 금=16, 토=32, 일=64). MONTHLY: 일자 bitmask (1일=1, 2일=2, 3일=4 … 여러 날 합산). DAILY: null.",
-            example = "null")
-        Integer routineDate,
+                "반복 날짜 배열. RECURRING만 사용. WEEKLY: 요일 인덱스(월=0, 화=1 … 일=6). MONTHLY: 일자(1~31). ONE_TIME: null. DAILY: null 또는 빈 배열([]) — 값이 있으면 400. 예) 월·수·금=[0,2,4], 매월 3·20일=[3,20].",
+            example = "[0, 2, 4]")
+        List<Integer> routineDays,
     @Schema(description = "태그 ID. 없으면 null.", example = "1") Long tagId,
     @Schema(description = "하위 투두 제목 목록. ONE_TIME만 사용 가능.", example = "[\"챕터 1\", \"챕터 2\"]")
         List<String> subTodos,

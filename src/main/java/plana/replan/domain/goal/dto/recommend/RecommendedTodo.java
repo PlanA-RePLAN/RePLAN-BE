@@ -1,6 +1,7 @@
 package plana.replan.domain.goal.dto.recommend;
 
 import io.swagger.v3.oas.annotations.media.Schema;
+import java.util.List;
 
 @Schema(description = "AI 추천 투두 항목")
 public record RecommendedTodo(
@@ -25,10 +26,10 @@ public record RecommendedTodo(
         String routineType,
     @Schema(
             description =
-                "반복 날짜 (RECURRING만 사용). WEEKLY: 요일 bitmask (월=1,화=2,수=4,목=8,금=16,토=32,일=64). MONTHLY: 일자 bitmask (1일=1, 2일=2, 3일=4 … 여러 날 합산). DAILY: null.",
-            example = "62",
+                "반복 날짜 배열 (RECURRING만 사용). WEEKLY: 요일 인덱스(월=0 … 일=6). MONTHLY: 일자(1~31). DAILY: null.",
+            example = "[0, 2, 4]",
             nullable = true)
-        Integer routineDate,
+        List<Integer> routineDays,
     @Schema(
             description = "AI가 이 투두에 배정한 태그 ID. 유저의 실제 태그 중에서 선택되며, 마땅한 태그가 없으면 null",
             example = "1",
