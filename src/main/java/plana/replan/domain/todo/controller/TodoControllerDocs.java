@@ -729,7 +729,7 @@ public interface TodoControllerDocs {
           | dueDate | ❌ 선택 | string | 마감 일시 (ISO 8601 형식). null이면 마감일 제거 | `"2025-12-31T23:59:59"` |
           | tagId | ❌ 선택 | integer | 태그 ID. null이면 태그 제거 | `3` |
           | routineType | ❌ 선택 | string | 반복 유형 (`DAILY`/`WEEKLY`/`MONTHLY`). **이미 반복에 연결된 투두에는 무시됨** | `"WEEKLY"` |
-          | routineDays | ❌ 선택 | integer | 반복 날짜 (WEEKLY: 요일 인덱스 배열(월0…일6), MONTHLY: 일자 배열(1~31)). DAILY는 null. **이미 반복에 연결된 투두에는 무시됨** | `5` |
+          | routineDays | ❌ 선택 | array | 반복 날짜 배열 (WEEKLY: 요일 인덱스(월0…일6), MONTHLY: 일자(1~31)). DAILY는 null. **이미 반복에 연결된 투두에는 무시됨** | `[0, 2]` |
           | routineTime | ❌ 선택 | string | 반복 마감 시각 (HH:mm:ss). **이미 반복에 연결된 투두에는 무시됨** | `"09:00:00"` |
 
           ❌ 선택 필드는 생략하거나 null로 전달해도 동일하게 처리됩니다.
