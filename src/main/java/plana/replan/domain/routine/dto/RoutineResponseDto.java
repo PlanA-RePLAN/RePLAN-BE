@@ -4,10 +4,12 @@ import com.fasterxml.jackson.annotation.JsonAutoDetect;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.util.List;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import plana.replan.domain.routine.entity.Routine;
 import plana.replan.domain.routine.entity.RoutineType;
+import plana.replan.domain.routine.util.RoutineDays;
 
 @Schema(description = "루틴 조회 응답")
 @Getter
@@ -33,8 +35,10 @@ public class RoutineResponseDto {
   @Schema(description = "반복 유형", example = "DAILY")
   private RoutineType routineType;
 
-  @Schema(description = "반복 날짜 설정값. DAILY=null, WEEKLY=요일 비트마스크, MONTHLY=일자 비트마스크", example = "21")
-  private Integer routineDate;
+  @Schema(
+      description = "반복 날짜 배열. DAILY=null, WEEKLY=요일 인덱스(월0…일6), MONTHLY=일자(1~31)",
+      example = "[0, 2, 4]")
+  private List<Integer> routineDays;
 
   @Schema(description = "태그 ID (override 적용값). 없으면 null", example = "3")
   private Long tagId;
@@ -73,7 +77,7 @@ public class RoutineResponseDto {
         routine.getDueDate(),
         routine.getRoutineTime(),
         routine.getRoutineType(),
-        routine.getRoutineDate(),
+        RoutineDays.toDays(routine.getRoutineType(), routine.getRoutineDate()),
         routine.getTag() != null ? routine.getTag().getId() : null,
         routine.getTag() != null ? routine.getTag().getTitle() : null,
         routine.getTag() != null ? routine.getTag().getColor() : null,
@@ -89,13 +93,14 @@ public class RoutineResponseDto {
   public static RoutineResponseDto from(RoutineDateProjection p) {
     double effectiveSortOrder =
         p.getOverrideSortOrder() != null ? p.getOverrideSortOrder() : p.getDefaultSortOrder();
+    RoutineType type = p.getRoutineType() != null ? RoutineType.valueOf(p.getRoutineType()) : null;
     return new RoutineResponseDto(
         p.getRoutineId(),
         p.getTitle(),
         p.getDueDate(),
         p.getRoutineTime(),
-        p.getRoutineType() != null ? RoutineType.valueOf(p.getRoutineType()) : null,
-        p.getRoutineDate(),
+        type,
+        RoutineDays.toDays(type, p.getRoutineDate()),
         p.getTagId(),
         p.getTagTitle(),
         p.getTagColor(),

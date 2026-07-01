@@ -103,11 +103,11 @@ public class ReplanAiService {
            - MODIFY_TODO의 targetTodoId에는 위 '대상 투두 ID'를, 다른 기존 투두 수정(우선순위 등)은 아래 '선택 투두' 목록의 실제 ID만 사용. ID를 임의로 만들지 않는다.
         5. changedFields: 수정(MODIFY_TODO/MODIFY_ROUTINE)에서 바뀐 필드만 {field, before, after}로 채운다. field는 title/dueTime/tag/routineType.
            새로 만드는 ADD·CREATE_ROUTINE은 changedFields를 빈 배열([])로 둔다.
-        6. dueDate는 yyyy-MM-dd 또는 null, dueTime은 HH:mm 또는 null. routineType은 DAILY/WEEKLY/MONTHLY 또는 null. routineDate는 비트마스크 정수 또는 null (DAILY는 null / WEEKLY는 요일 비트마스크: 월1·화2·수4·목8·금16·토32·일64를 합 / MONTHLY는 일자 비트마스크: d일=2^(d-1)을 합, 예 15일=16384, 3일과 20일=4+524288=524292). 절대 달력 날짜(예: 15)를 그대로 쓰지 말 것.
+        6. dueDate는 yyyy-MM-dd 또는 null, dueTime은 HH:mm 또는 null. routineType은 DAILY/WEEKLY/MONTHLY 또는 null. routineDays는 정수 배열 또는 null (DAILY는 null / WEEKLY는 요일 인덱스 배열: 월=0·화=1·수=2·목=3·금=4·토=5·일=6, 예 월·수·금=[0,2,4] / MONTHLY는 일자 배열 1~31, 예 3일·20일=[3,20]).
            - CREATE_ROUTINE의 dueDate는 '반복을 끝낼 종료일'을 뜻한다(이 날짜 이후로는 회차를 만들지 않음). 무기한 반복이면 null로 둔다. 새 루틴의 반복 시각은 dueTime으로 지정한다.
 
         반드시 아래 JSON만 출력 (다른 설명 없이):
-        {"operations":[{"action":"","targetTodoId":null,"title":"","dueDate":null,"dueTime":null,"tagId":null,"routineType":null,"routineDate":null,"changedFields":[{"field":"","before":null,"after":""}]}]}
+        {"operations":[{"action":"","targetTodoId":null,"title":"","dueDate":null,"dueTime":null,"tagId":null,"routineType":null,"routineDays":null,"changedFields":[{"field":"","before":null,"after":""}]}]}
         """
             .formatted(
                 input.today(),
@@ -206,7 +206,7 @@ public class ReplanAiService {
                 textOrNull(op.path("dueTime")),
                 longOrNull(op.path("tagId")),
                 textOrNull(op.path("routineType")),
-                intOrNull(op.path("routineDate")),
+                intListOrNull(op.path("routineDays")),
                 changed));
       }
       return operations;
@@ -235,17 +235,25 @@ public class ReplanAiService {
     throw new IllegalArgumentException("숫자 필드(targetTodoId/tagId)가 숫자가 아닙니다: " + node);
   }
 
-  private Integer intOrNull(JsonNode node) {
+  /** routineDays: 정수 배열. 없으면 null. 각 원소는 숫자/숫자문자열만 허용. */
+  private List<Integer> intListOrNull(JsonNode node) {
     if (node.isNull() || node.isMissingNode()) {
       return null;
     }
-    if (node.isIntegralNumber()) {
-      return node.intValue();
+    if (!node.isArray()) {
+      throw new IllegalArgumentException("routineDays가 배열이 아닙니다: " + node);
     }
-    if (node.isTextual()) {
-      return Integer.parseInt(node.asText().trim());
+    List<Integer> days = new ArrayList<>();
+    for (JsonNode e : node) {
+      if (e.isIntegralNumber()) {
+        days.add(e.intValue());
+      } else if (e.isTextual()) {
+        days.add(Integer.parseInt(e.asText().trim()));
+      } else {
+        throw new IllegalArgumentException("routineDays 원소가 숫자가 아닙니다: " + e);
+      }
     }
-    throw new IllegalArgumentException("숫자 필드(routineDate)가 숫자가 아닙니다: " + node);
+    return days;
   }
 
   private String extractJson(String text) {

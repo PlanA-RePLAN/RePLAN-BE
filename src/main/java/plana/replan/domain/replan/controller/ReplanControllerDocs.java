@@ -79,7 +79,7 @@ public interface ReplanControllerDocs {
                                   "dueTime": "23:59",
                                   "tagId": null,
                                   "routineType": null,
-                                  "routineDate": null,
+                                  "routineDays": null,
                                   "changedFields": [
                                     {"field": "dueDate", "before": "2026-06-25", "after": "2026-06-26"}
                                   ]

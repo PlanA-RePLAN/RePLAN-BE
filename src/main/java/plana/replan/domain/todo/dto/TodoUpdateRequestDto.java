@@ -3,6 +3,7 @@ package plana.replan.domain.todo.dto;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.util.List;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import plana.replan.domain.routine.entity.RoutineType;
@@ -25,9 +26,9 @@ public class TodoUpdateRequestDto {
   private RoutineType routineType;
 
   @Schema(
-      description = "반복 날짜 (WEEKLY: 1-127 비트마스크, MONTHLY: 일자 비트마스크). DAILY는 null",
-      example = "5")
-  private Integer routineDate;
+      description = "반복 날짜 배열 (WEEKLY: 요일 인덱스 월0…일6, MONTHLY: 일자 1~31). DAILY는 null",
+      example = "[0, 2, 4]")
+  private List<Integer> routineDays;
 
   @Schema(description = "반복 시각 (HH:mm:ss). 반복되는 날의 마감 시각. 생략 시 23:59:59로 처리", example = "09:00:00")
   private LocalTime routineTime;

@@ -267,9 +267,9 @@ public class GoalAiService {
         7. 인강 수강처럼 매번 다른 내용을 학습하는 것은 ONE_TIME 투두 여러 개로 생성
         8. 이론 나열 금지. '수기 복습', '문제 풀이', '오답 노트' 등 아웃풋 태스크 반드시 중간에 배치
         9. 마감 D-1~2는 진도 금지. '최종 점검', '백지 복습' 등 마무리 태스크만 배치
-        10. WEEKLY routineDate는 bitmask: 월=1, 화=2, 수=4, 목=8, 금=16, 토=32, 일=64
-        11. MONTHLY routineDate는 일자 비트마스크(1일=1, 2일=2, 3일=4 … d일=2^(d-1)). 여러 날짜면 각 비트를 더한다(예: 3일·20일 = 4 + 524288 = 524292)
-        12. DAILY는 routineDate 불필요 (null)
+        10. WEEKLY routineDays는 요일 인덱스 배열: 월=0, 화=1, 수=2, 목=3, 금=4, 토=5, 일=6 (예: 월·수·금 → [0,2,4])
+        11. MONTHLY routineDays는 일자 배열(1~31): 그 달 며칠에 반복할지 (예: 3일·20일 → [3,20])
+        12. DAILY는 routineDays 불필요 (null)
         13. dueDate는 yyyy-MM-dd 형식 또는 null, dueTime은 HH:mm 형식 또는 null
         14. type은 "ONE_TIME" 또는 "RECURRING"만 허용
         15. routineType은 "DAILY", "WEEKLY", "MONTHLY" 중 하나 (ONE_TIME이면 null)
@@ -281,7 +281,7 @@ public class GoalAiService {
             - 링크는 Google Search로 확인된 실제 URL만 사용. 확인 불가 시 링크 생략
 
         반드시 아래 JSON만 출력하세요 (다른 설명 없이):
-        {"overallReason":"","todos":[{"type":"","title":"","dueDate":null,"dueTime":null,"routineType":null,"routineDate":null,"tagId":null}]}
+        {"overallReason":"","todos":[{"type":"","title":"","dueDate":null,"dueTime":null,"routineType":null,"routineDays":null,"tagId":null}]}
         """
             .formatted(req.goal(), deadlineInfo, buildSolutionInfo(req.solutions()), tagInfo);
     return prompt + refreshStyleBlock(req.refreshCount() == null ? 0 : req.refreshCount());
@@ -295,7 +295,7 @@ public class GoalAiService {
           case 2 -> "2회차(벼락치기): 버퍼 없이 혹은 마이너스로 빡빡하게 잡는다. 가장 핵심 1개(1-Pick) 위주로 줄이고, 어려운 것부터 역순으로 배치한다.";
           case 3 -> "3회차(환경 변경): 분량·난이도는 적정 수준으로 두되, 기존 진행 시간대·요일을 실제로 다른 쪽으로 옮겨 배치한다."
               + " 예: 평일 저녁 → 주말 오전, 평일 → 주말. 각 투두의 dueTime을 기존과 다른 시간대로 바꾸거나"
-              + " routineType/routineDate를 주말(토·일) 쪽으로 옮긴다.";
+              + " routineType/routineDays를 주말(토·일) 쪽으로 옮긴다.";
           default -> null;
         };
     if (line == null) {
@@ -349,15 +349,21 @@ public class GoalAiService {
         String dueTime = node.path("dueTime").isNull() ? null : node.path("dueTime").asText(null);
         String routineType =
             node.path("routineType").isNull() ? null : node.path("routineType").asText(null);
-        Integer routineDate = null;
-        JsonNode routineDateNode = node.path("routineDate");
-        if (!routineDateNode.isNull() && !routineDateNode.isMissingNode()) {
-          if (routineDateNode.isInt()) {
-            routineDate = routineDateNode.intValue();
-          } else if (routineDateNode.isTextual()) {
-            routineDate = Integer.valueOf(routineDateNode.asText());
-          } else {
-            throw new CustomException(GoalErrorCode.GEMINI_PARSE_ERROR);
+        // routineDays: 반복 날짜 배열 (WEEKLY=요일 인덱스 0~6, MONTHLY=일자 1~31). 없으면 null.
+        List<Integer> routineDays = null;
+        JsonNode routineDaysNode = node.path("routineDays");
+        if (routineDaysNode.isArray()) {
+          routineDays = new ArrayList<>();
+          for (JsonNode e : routineDaysNode) {
+            if (e.canConvertToInt()) {
+              routineDays.add(e.asInt());
+            } else if (e.isTextual()) {
+              try {
+                routineDays.add(Integer.valueOf(e.asText().trim()));
+              } catch (NumberFormatException ignored) {
+                // 숫자로 못 바꾸는 원소는 건너뛴다
+              }
+            }
           }
         }
         // AI가 준 tagId를 유저의 실제 태그 목록으로 검증한다.
@@ -385,7 +391,7 @@ public class GoalAiService {
 
         todos.add(
             new RecommendedTodo(
-                type, title, dueDate, dueTime, routineType, routineDate, tagId, tagName));
+                type, title, dueDate, dueTime, routineType, routineDays, tagId, tagName));
       }
       return new TodoRecommendationResponse(overallReason, todos);
     } catch (Exception e) {

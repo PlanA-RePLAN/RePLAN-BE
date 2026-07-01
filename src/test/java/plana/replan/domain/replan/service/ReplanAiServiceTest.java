@@ -20,10 +20,10 @@ class ReplanAiServiceTest {
         "operations":[
           {"action":"MODIFY_TODO","targetTodoId":42,"title":"데이터 분석 1~2강",
            "dueDate":"2026-06-08","dueTime":"23:59","tagId":5,
-           "routineType":null,"routineDate":null,
+           "routineType":null,"routineDays":null,
            "changedFields":[{"field":"title","before":"데이터 분석 공부","after":"데이터 분석 1~2강"}]},
           {"action":"ADD","targetTodoId":null,"title":"3~4강","dueDate":"2026-06-09",
-           "dueTime":null,"tagId":null,"routineType":null,"routineDate":null,
+           "dueTime":null,"tagId":null,"routineType":null,"routineDays":null,
            "changedFields":[{"field":"title","before":null,"after":"3~4강"}]}
         ]} 뒤 텍스트
         """;

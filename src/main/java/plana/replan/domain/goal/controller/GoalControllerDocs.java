@@ -243,7 +243,7 @@ public interface GoalControllerDocs {
           | todos[].dueDate | ❌ 선택 | string | 마감 날짜 (yyyy-MM-dd 형식). ONE_TIME만 사용. | `"2025-06-01"` |
           | todos[].dueTime | ❌ 선택 | string | 마감 시간 (HH:mm 형식). ONE_TIME만 사용. | `"09:00"` |
           | todos[].routineType | ❌ 선택 | string | 반복 유형. RECURRING만 사용. `DAILY` / `WEEKLY` / `MONTHLY` | `"DAILY"` |
-          | todos[].routineDate | ❌ 선택 | integer | 반복 날짜. RECURRING만 사용. WEEKLY: 요일 bitmask, MONTHLY: 일자 bitmask (여러 날 합산), DAILY: null | `null` |
+          | todos[].routineDays | ❌ 선택 | integer | 반복 날짜. RECURRING만 사용. WEEKLY: 요일 bitmask, MONTHLY: 일자 bitmask (여러 날 합산), DAILY: null | `null` |
           | todos[].tagId | ❌ 선택 | integer | 태그 ID | `1` |
           | todos[].subTodos | ❌ 선택 | array | 하위 투두 제목 목록. ONE_TIME만 사용 가능. | `["챕터 1"]` |
           | todos[].subRoutines | ❌ 선택 | array | 하위 루틴 제목 목록. RECURRING만 사용 가능. | `["스트레칭", "유산소"]` |
@@ -388,7 +388,7 @@ public interface GoalControllerDocs {
                                       "dueDate": "2025-06-01",
                                       "dueTime": "09:00",
                                       "routineType": null,
-                                      "routineDate": null,
+                                      "routineDays": null,
                                       "tagId": 1,
                                       "subTodos": ["챕터 1", "챕터 2"]
                                     },
@@ -398,7 +398,7 @@ public interface GoalControllerDocs {
                                       "dueDate": null,
                                       "dueTime": null,
                                       "routineType": "DAILY",
-                                      "routineDate": null,
+                                      "routineDays": null,
                                       "tagId": null,
                                       "subTodos": [],
                                       "subRoutines": ["받아쓰기", "쉐도잉"]
@@ -1028,7 +1028,7 @@ public interface GoalControllerDocs {
           | todos[].dueDate | string | 마감 날짜 (yyyy-MM-dd 형식). 없으면 null |
           | todos[].dueTime | string | 마감 시간 (HH:mm 형식). 없으면 null |
           | todos[].routineType | string | RECURRING만: `DAILY` / `WEEKLY` / `MONTHLY`. ONE_TIME이면 null |
-          | todos[].routineDate | integer | RECURRING WEEKLY: 요일 bitmask. MONTHLY: 일자 bitmask. DAILY·ONE_TIME: null |
+          | todos[].routineDays | integer | RECURRING WEEKLY: 요일 bitmask. MONTHLY: 일자 bitmask. DAILY·ONE_TIME: null |
           | todos[].tagId | integer | AI가 이 투두에 배정한 태그 ID. 요청한 유저의 실제 태그 중에서 선택됨. 마땅한 태그가 없으면 null |
           | todos[].tagName | string | 배정된 태그 이름. tagId가 null이면 함께 null |
 
@@ -1062,7 +1062,7 @@ public interface GoalControllerDocs {
                                     "dueDate": "2025-08-25",
                                     "dueTime": null,
                                     "routineType": "DAILY",
-                                    "routineDate": null,
+                                    "routineDays": null,
                                     "tagId": 1,
                                     "tagName": "Study"
                                   },
@@ -1072,7 +1072,7 @@ public interface GoalControllerDocs {
                                     "dueDate": "2025-06-10",
                                     "dueTime": "08:00",
                                     "routineType": null,
-                                    "routineDate": null,
+                                    "routineDays": null,
                                     "tagId": 1,
                                     "tagName": "Study"
                                   },
@@ -1082,7 +1082,7 @@ public interface GoalControllerDocs {
                                     "dueDate": "2025-08-24",
                                     "dueTime": null,
                                     "routineType": null,
-                                    "routineDate": null,
+                                    "routineDays": null,
                                     "tagId": null,
                                     "tagName": null
                                   }

@@ -980,7 +980,16 @@ class TodoControllerTest {
   void updateTodo_success() throws Exception {
     TodoDetailResponseDto response =
         new TodoDetailResponseDto(
-            1L, "수정된 제목", null, false, 3L, "영어", "BLUE", "WEEKLY", 5, List.of());
+            1L,
+            "수정된 제목",
+            null,
+            false,
+            3L,
+            "영어",
+            "BLUE",
+            "WEEKLY",
+            java.util.List.of(0, 2),
+            List.of());
 
     given(todoService.updateTodo(any(), any(), any())).willReturn(response);
 
@@ -991,7 +1000,7 @@ class TodoControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(
                     """
-                    { "title": "수정된 제목", "tagId": 3, "routineType": "WEEKLY", "routineDate": 5 }
+                    { "title": "수정된 제목", "tagId": 3, "routineType": "WEEKLY", "routineDays": [0, 2] }
                     """))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.status").value(200))
@@ -1099,7 +1108,7 @@ class TodoControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(
                     """
-                    { "title": "수정된 제목", "routineType": "WEEKLY", "routineDate": 200 }
+                    { "title": "수정된 제목", "routineType": "WEEKLY", "routineDays": [7] }
                     """))
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.error.code").value("ROUTINE_INVALID_DATE"))

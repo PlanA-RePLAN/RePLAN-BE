@@ -16,7 +16,6 @@ import plana.replan.domain.goal.dto.create.TodoItemRequest;
 import plana.replan.domain.goal.exception.GoalErrorCode;
 import plana.replan.domain.routine.dto.RoutineCreateRequestDto;
 import plana.replan.domain.routine.dto.SubRoutineCreateRequestDto;
-import plana.replan.domain.routine.entity.RoutineType;
 import plana.replan.domain.routine.service.RoutineService;
 import plana.replan.domain.todo.dto.SubTodoCreateRequestDto;
 import plana.replan.domain.todo.dto.TodoCreateRequestDto;
@@ -116,13 +115,13 @@ public class GoalWithTodosService {
   }
 
   private RoutineCreateRequestDto buildRoutineCreateRequest(TodoItemRequest item, Long goalId) {
-    Integer routineDate = item.routineType() == RoutineType.DAILY ? null : item.routineDate();
+    // routineDays(배열)는 그대로 넘기고, 배열→비트마스크 변환·검증은 RoutineService.createRoutine에서 한다.
     return new RoutineCreateRequestDto(
         item.title(),
         parseDateTime(item.dueDate(), item.dueTime()),
         null,
         item.routineType(),
-        routineDate,
+        item.routineDays(),
         item.tagId(),
         goalId);
   }

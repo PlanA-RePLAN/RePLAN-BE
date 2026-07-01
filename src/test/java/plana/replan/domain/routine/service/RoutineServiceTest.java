@@ -176,24 +176,26 @@ class RoutineServiceTest {
 
     assertThat(result.getTitle()).isEqualTo("아침 스트레칭");
     assertThat(result.getRoutineType()).isEqualTo(RoutineType.DAILY);
-    assertThat(result.getRoutineDate()).isNull();
+    assertThat(result.getRoutineDays()).isNull();
     assertThat(result.getTagId()).isNull();
     assertThat(result.getGoalId()).isNull();
     assertThat(result.getDueDate()).isNull();
   }
 
   @Test
-  void 루틴_생성_DAILY_routineDate_무시됨() {
+  void 루틴_생성_DAILY_routineDays_무시됨() {
     given(userRepository.findById(1L)).willReturn(Optional.of(testUser()));
     given(routineRepository.save(any(Routine.class))).willAnswer(inv -> inv.getArgument(0));
 
-    // DAILY에서 routineDate=999를 넘겨도 null로 정규화되어 저장됨
+    // DAILY에서 routineDays를 넘겨도 null로 정규화되어 저장됨
     RoutineResponseDto result =
         routineService.createRoutine(
-            1L, new RoutineCreateRequestDto("루틴", null, null, RoutineType.DAILY, 999, null, null));
+            1L,
+            new RoutineCreateRequestDto(
+                "루틴", null, null, RoutineType.DAILY, List.of(3), null, null));
 
     assertThat(result.getRoutineType()).isEqualTo(RoutineType.DAILY);
-    assertThat(result.getRoutineDate()).isNull();
+    assertThat(result.getRoutineDays()).isNull();
   }
 
   // ========== WEEKLY ==========
@@ -209,42 +211,47 @@ class RoutineServiceTest {
     RoutineResponseDto result =
         routineService.createRoutine(
             1L,
-            new RoutineCreateRequestDto("영어 단어", dueDate, null, RoutineType.WEEKLY, 21, 5L, 2L));
+            new RoutineCreateRequestDto(
+                "영어 단어", dueDate, null, RoutineType.WEEKLY, List.of(0, 2, 4), 5L, 2L));
 
     assertThat(result.getTitle()).isEqualTo("영어 단어");
     assertThat(result.getRoutineType()).isEqualTo(RoutineType.WEEKLY);
-    assertThat(result.getRoutineDate()).isEqualTo(21);
+    assertThat(result.getRoutineDays()).containsExactly(0, 2, 4);
     assertThat(result.getDueDate()).isEqualTo(dueDate);
     assertThat(result.getTagId()).isEqualTo(5L);
     assertThat(result.getGoalId()).isEqualTo(2L);
   }
 
   @Test
-  void 루틴_생성_WEEKLY_routineDate_경계값_1_성공() {
+  void 루틴_생성_WEEKLY_routineDays_월요일_성공() {
     given(userRepository.findById(1L)).willReturn(Optional.of(testUser()));
     given(routineRepository.save(any(Routine.class))).willAnswer(inv -> inv.getArgument(0));
 
     RoutineResponseDto result =
         routineService.createRoutine(
-            1L, new RoutineCreateRequestDto("루틴", null, null, RoutineType.WEEKLY, 1, null, null));
+            1L,
+            new RoutineCreateRequestDto(
+                "루틴", null, null, RoutineType.WEEKLY, List.of(0), null, null));
 
-    assertThat(result.getRoutineDate()).isEqualTo(1);
+    assertThat(result.getRoutineDays()).containsExactly(0);
   }
 
   @Test
-  void 루틴_생성_WEEKLY_routineDate_경계값_127_성공() {
+  void 루틴_생성_WEEKLY_routineDays_전체요일_성공() {
     given(userRepository.findById(1L)).willReturn(Optional.of(testUser()));
     given(routineRepository.save(any(Routine.class))).willAnswer(inv -> inv.getArgument(0));
 
     RoutineResponseDto result =
         routineService.createRoutine(
-            1L, new RoutineCreateRequestDto("루틴", null, null, RoutineType.WEEKLY, 127, null, null));
+            1L,
+            new RoutineCreateRequestDto(
+                "루틴", null, null, RoutineType.WEEKLY, List.of(0, 1, 2, 3, 4, 5, 6), null, null));
 
-    assertThat(result.getRoutineDate()).isEqualTo(127);
+    assertThat(result.getRoutineDays()).containsExactly(0, 1, 2, 3, 4, 5, 6);
   }
 
   @Test
-  void 루틴_생성_WEEKLY_routineDate_null이면_400() {
+  void 루틴_생성_WEEKLY_routineDays_null이면_400() {
     given(userRepository.findById(1L)).willReturn(Optional.of(testUser()));
 
     assertThatThrownBy(
@@ -263,7 +270,7 @@ class RoutineServiceTest {
   }
 
   @Test
-  void 루틴_생성_WEEKLY_routineDate_0이면_400() {
+  void 루틴_생성_WEEKLY_routineDays_빈배열이면_400() {
     given(userRepository.findById(1L)).willReturn(Optional.of(testUser()));
 
     assertThatThrownBy(
@@ -271,7 +278,7 @@ class RoutineServiceTest {
                 routineService.createRoutine(
                     1L,
                     new RoutineCreateRequestDto(
-                        "루틴", null, null, RoutineType.WEEKLY, 0, null, null)))
+                        "루틴", null, null, RoutineType.WEEKLY, List.of(), null, null)))
         .isInstanceOf(CustomException.class)
         .satisfies(
             e ->
@@ -280,7 +287,7 @@ class RoutineServiceTest {
   }
 
   @Test
-  void 루틴_생성_WEEKLY_routineDate_128이면_400() {
+  void 루틴_생성_WEEKLY_routineDays_범위밖이면_400() {
     given(userRepository.findById(1L)).willReturn(Optional.of(testUser()));
 
     assertThatThrownBy(
@@ -288,7 +295,7 @@ class RoutineServiceTest {
                 routineService.createRoutine(
                     1L,
                     new RoutineCreateRequestDto(
-                        "루틴", null, null, RoutineType.WEEKLY, 128, null, null)))
+                        "루틴", null, null, RoutineType.WEEKLY, List.of(7), null, null)))
         .isInstanceOf(CustomException.class)
         .satisfies(
             e ->
@@ -303,43 +310,43 @@ class RoutineServiceTest {
     given(userRepository.findById(1L)).willReturn(Optional.of(testUser()));
     given(routineRepository.save(any(Routine.class))).willAnswer(inv -> inv.getArgument(0));
 
-    // routineDate는 일자 비트마스크. 15일 = 1 << 14 = 16384 (숫자 15가 아님)
+    // routineDays는 일자 배열. 15일 = [15]
     RoutineResponseDto result =
         routineService.createRoutine(
             1L,
             new RoutineCreateRequestDto(
-                "월간 회고", null, null, RoutineType.MONTHLY, 1 << 14, null, null));
+                "월간 회고", null, null, RoutineType.MONTHLY, List.of(15), null, null));
 
     assertThat(result.getRoutineType()).isEqualTo(RoutineType.MONTHLY);
-    assertThat(result.getRoutineDate()).isEqualTo(16384);
+    assertThat(result.getRoutineDays()).containsExactly(15);
   }
 
   @Test
-  void 루틴_생성_MONTHLY_비트마스크_최솟값_1일_성공() {
+  void 루틴_생성_MONTHLY_1일_성공() {
     given(userRepository.findById(1L)).willReturn(Optional.of(testUser()));
     given(routineRepository.save(any(Routine.class))).willAnswer(inv -> inv.getArgument(0));
 
-    // 1일 = 1 << 0 = 1 (비트마스크 최솟값)
-    RoutineResponseDto result =
-        routineService.createRoutine(
-            1L, new RoutineCreateRequestDto("루틴", null, null, RoutineType.MONTHLY, 1, null, null));
-
-    assertThat(result.getRoutineDate()).isEqualTo(1);
-  }
-
-  @Test
-  void 루틴_생성_MONTHLY_비트마스크_31일_성공() {
-    given(userRepository.findById(1L)).willReturn(Optional.of(testUser()));
-    given(routineRepository.save(any(Routine.class))).willAnswer(inv -> inv.getArgument(0));
-
-    // 31일 = 1 << 30 = 1073741824 (숫자 31이 아님)
     RoutineResponseDto result =
         routineService.createRoutine(
             1L,
             new RoutineCreateRequestDto(
-                "루틴", null, null, RoutineType.MONTHLY, 1 << 30, null, null));
+                "루틴", null, null, RoutineType.MONTHLY, List.of(1), null, null));
 
-    assertThat(result.getRoutineDate()).isEqualTo(1073741824);
+    assertThat(result.getRoutineDays()).containsExactly(1);
+  }
+
+  @Test
+  void 루틴_생성_MONTHLY_31일_성공() {
+    given(userRepository.findById(1L)).willReturn(Optional.of(testUser()));
+    given(routineRepository.save(any(Routine.class))).willAnswer(inv -> inv.getArgument(0));
+
+    RoutineResponseDto result =
+        routineService.createRoutine(
+            1L,
+            new RoutineCreateRequestDto(
+                "루틴", null, null, RoutineType.MONTHLY, List.of(31), null, null));
+
+    assertThat(result.getRoutineDays()).containsExactly(31);
   }
 
   @Test
@@ -360,7 +367,7 @@ class RoutineServiceTest {
   }
 
   @Test
-  void 루틴_생성_MONTHLY_routineDate_0이면_400() {
+  void 루틴_생성_MONTHLY_빈배열이면_400() {
     given(userRepository.findById(1L)).willReturn(Optional.of(testUser()));
 
     assertThatThrownBy(
@@ -368,7 +375,7 @@ class RoutineServiceTest {
                 routineService.createRoutine(
                     1L,
                     new RoutineCreateRequestDto(
-                        "루틴", null, null, RoutineType.MONTHLY, 0, null, null)))
+                        "루틴", null, null, RoutineType.MONTHLY, List.of(), null, null)))
         .isInstanceOf(CustomException.class)
         .satisfies(
             e ->
@@ -381,18 +388,17 @@ class RoutineServiceTest {
     given(userRepository.findById(1L)).willReturn(Optional.of(testUser()));
     given(routineRepository.save(any(Routine.class))).willAnswer(inv -> inv.getArgument(0));
 
-    // 3일·20일 = 비트(2) + 비트(19) = 4 + 524288 = 524292
-    int mask = (1 << 2) | (1 << 19);
     RoutineResponseDto result =
         routineService.createRoutine(
             1L,
-            new RoutineCreateRequestDto("월 2회", null, null, RoutineType.MONTHLY, mask, null, null));
+            new RoutineCreateRequestDto(
+                "월 2회", null, null, RoutineType.MONTHLY, List.of(3, 20), null, null));
 
-    assertThat(result.getRoutineDate()).isEqualTo(524292);
+    assertThat(result.getRoutineDays()).containsExactly(3, 20);
   }
 
   @Test
-  void 루틴_생성_MONTHLY_routineDate_음수면_400() {
+  void 루틴_생성_MONTHLY_범위밖이면_400() {
     given(userRepository.findById(1L)).willReturn(Optional.of(testUser()));
 
     assertThatThrownBy(
@@ -400,7 +406,7 @@ class RoutineServiceTest {
                 routineService.createRoutine(
                     1L,
                     new RoutineCreateRequestDto(
-                        "루틴", null, null, RoutineType.MONTHLY, -1, null, null)))
+                        "루틴", null, null, RoutineType.MONTHLY, List.of(32), null, null)))
         .isInstanceOf(CustomException.class)
         .satisfies(
             e ->
@@ -466,24 +472,26 @@ class RoutineServiceTest {
 
   @Test
   void 루틴_생성_WEEKLY_오늘_요일_포함_Todo_생성됨() {
-    // TEST_DATE = Monday(bit=1). routineDate=1 → Monday만 포함 → 일치
+    // TEST_DATE = Monday. routineDays=[0] → 월요일만 포함 → 일치
     given(userRepository.findById(1L)).willReturn(Optional.of(testUser()));
     given(routineRepository.save(any(Routine.class))).willAnswer(inv -> inv.getArgument(0));
 
     routineService.createRoutine(
-        1L, new RoutineCreateRequestDto("루틴", null, null, RoutineType.WEEKLY, 1, null, null));
+        1L,
+        new RoutineCreateRequestDto("루틴", null, null, RoutineType.WEEKLY, List.of(0), null, null));
 
     verify(todoRepository).saveAndFlush(any(Todo.class));
   }
 
   @Test
   void 루틴_생성_WEEKLY_오늘_요일_미포함이어도_Todo_즉시_생성되고_다음_반복일이_dueDate() {
-    // TEST_DATE = 2024-01-15(Mon). routineDate=2 → Tuesday만 → 다음 발생 = 2024-01-16
+    // TEST_DATE = 2024-01-15(Mon). routineDays=[1] → 화요일만 → 다음 발생 = 2024-01-16
     given(userRepository.findById(1L)).willReturn(Optional.of(testUser()));
     given(routineRepository.save(any(Routine.class))).willAnswer(inv -> inv.getArgument(0));
 
     routineService.createRoutine(
-        1L, new RoutineCreateRequestDto("루틴", null, null, RoutineType.WEEKLY, 2, null, null));
+        1L,
+        new RoutineCreateRequestDto("루틴", null, null, RoutineType.WEEKLY, List.of(1), null, null));
 
     ArgumentCaptor<Todo> captor = ArgumentCaptor.forClass(Todo.class);
     verify(todoRepository).saveAndFlush(captor.capture());
@@ -493,26 +501,28 @@ class RoutineServiceTest {
 
   @Test
   void 루틴_생성_MONTHLY_오늘_날짜_일치_Todo_생성됨() {
-    // TEST_DATE = 15일. routineDate=15일 비트(1<<14=16384) → 일치
+    // TEST_DATE = 15일. routineDays=[15] → 일치
     given(userRepository.findById(1L)).willReturn(Optional.of(testUser()));
     given(routineRepository.save(any(Routine.class))).willAnswer(inv -> inv.getArgument(0));
 
     routineService.createRoutine(
         1L,
-        new RoutineCreateRequestDto("루틴", null, null, RoutineType.MONTHLY, 1 << 14, null, null));
+        new RoutineCreateRequestDto(
+            "루틴", null, null, RoutineType.MONTHLY, List.of(15), null, null));
 
     verify(todoRepository).saveAndFlush(any(Todo.class));
   }
 
   @Test
   void 루틴_생성_MONTHLY_오늘_날짜_불일치여도_Todo_즉시_생성되고_다음_반복일이_dueDate() {
-    // TEST_DATE = 2024-01-15. routineDate=16일 비트(1<<15=32768) → 다음 발생 = 2024-01-16
+    // TEST_DATE = 2024-01-15. routineDays=[16] → 다음 발생 = 2024-01-16
     given(userRepository.findById(1L)).willReturn(Optional.of(testUser()));
     given(routineRepository.save(any(Routine.class))).willAnswer(inv -> inv.getArgument(0));
 
     routineService.createRoutine(
         1L,
-        new RoutineCreateRequestDto("루틴", null, null, RoutineType.MONTHLY, 1 << 15, null, null));
+        new RoutineCreateRequestDto(
+            "루틴", null, null, RoutineType.MONTHLY, List.of(16), null, null));
 
     ArgumentCaptor<Todo> captor = ArgumentCaptor.forClass(Todo.class);
     verify(todoRepository).saveAndFlush(captor.capture());
@@ -682,7 +692,7 @@ class RoutineServiceTest {
 
     assertThat(result.getTitle()).isEqualTo("수정된 루틴");
     assertThat(result.getRoutineType()).isEqualTo(RoutineType.DAILY);
-    assertThat(result.getRoutineDate()).isNull();
+    assertThat(result.getRoutineDays()).isNull();
     assertThat(result.getDueDate()).isNull();
     assertThat(result.getTagId()).isNull();
   }
@@ -698,11 +708,12 @@ class RoutineServiceTest {
         routineService.updateMotherRoutine(
             1L,
             10L,
-            new RoutineUpdateRequestDto("수정된 루틴", dueDate, null, RoutineType.WEEKLY, 21, 5L));
+            new RoutineUpdateRequestDto(
+                "수정된 루틴", dueDate, null, RoutineType.WEEKLY, List.of(0, 2, 4), 5L));
 
     assertThat(result.getTitle()).isEqualTo("수정된 루틴");
     assertThat(result.getRoutineType()).isEqualTo(RoutineType.WEEKLY);
-    assertThat(result.getRoutineDate()).isEqualTo(21);
+    assertThat(result.getRoutineDays()).containsExactly(0, 2, 4);
     assertThat(result.getDueDate()).isEqualTo(dueDate);
     assertThat(result.getTagId()).isEqualTo(5L);
   }
@@ -730,7 +741,7 @@ class RoutineServiceTest {
   }
 
   @Test
-  void 엄마루틴_수정_routineDate_범위오류_400() {
+  void 엄마루틴_수정_routineDays_범위오류_400() {
     Routine routine = motherRoutine();
     given(routineRepository.findById(10L)).willReturn(Optional.of(routine));
 
@@ -739,7 +750,8 @@ class RoutineServiceTest {
                 routineService.updateMotherRoutine(
                     1L,
                     10L,
-                    new RoutineUpdateRequestDto("수정", null, null, RoutineType.WEEKLY, 128, null)))
+                    new RoutineUpdateRequestDto(
+                        "수정", null, null, RoutineType.WEEKLY, List.of(7), null)))
         .isInstanceOf(CustomException.class)
         .satisfies(
             e ->

@@ -425,7 +425,7 @@ class ReplanServiceTest {
             "11:15",
             null,
             "WEEKLY",
-            62,
+            java.util.List.of(1, 2, 3, 4, 5),
             List.of());
     replanService.save(1L, new ReplanSaveRequest(42L, List.of("INTERRUPT_LATE_END"), List.of(op)));
 
@@ -681,10 +681,18 @@ class ReplanServiceTest {
     given(todoRepository.findById(42L)).willReturn(Optional.of(todo));
     given(replanRepository.save(any(Replan.class))).willAnswer(inv -> inv.getArgument(0));
 
-    // DAILY인데 routineDate가 들어와도 저장 시 null로 정규화돼야 한다
+    // DAILY인데 routineDays가 들어와도 저장 시 null로 정규화돼야 한다
     ReplanOperation op =
         new ReplanOperation(
-            ReplanAction.CREATE_ROUTINE, null, "스트레칭", null, "20:00", null, "DAILY", 5, List.of());
+            ReplanAction.CREATE_ROUTINE,
+            null,
+            "스트레칭",
+            null,
+            "20:00",
+            null,
+            "DAILY",
+            java.util.List.of(5),
+            List.of());
     ReplanSaveRequest req = new ReplanSaveRequest(42L, List.of("CONDITION_PAIN"), List.of(op));
 
     replanService.save(1L, req);
@@ -1111,7 +1119,7 @@ class ReplanServiceTest {
   }
 
   @Test
-  void CREATE_ROUTINE_먼슬리인데_routineDate가_1미만이면_400() {
+  void CREATE_ROUTINE_먼슬리인데_routineDays가_비면_400() {
     Todo todo = ownedTodo(42L, 1L);
     given(todoRepository.findById(42L)).willReturn(Optional.of(todo));
     given(replanRepository.save(any(Replan.class))).willAnswer(inv -> inv.getArgument(0));
@@ -1125,7 +1133,7 @@ class ReplanServiceTest {
             null,
             null,
             "MONTHLY",
-            0, // 비트마스크는 1 이상만 유효 (0은 아무 날도 안 켜진 값)
+            java.util.List.of(), // 빈 배열은 유효하지 않음
             List.of());
     ReplanSaveRequest req = new ReplanSaveRequest(42L, List.of("GOAL_NO_PRIORITY"), List.of(op));
 
