@@ -303,20 +303,23 @@ class RoutineServiceTest {
     given(userRepository.findById(1L)).willReturn(Optional.of(testUser()));
     given(routineRepository.save(any(Routine.class))).willAnswer(inv -> inv.getArgument(0));
 
+    // routineDate는 일자 비트마스크. 15일 = 1 << 14 = 16384 (숫자 15가 아님)
     RoutineResponseDto result =
         routineService.createRoutine(
             1L,
-            new RoutineCreateRequestDto("월간 회고", null, null, RoutineType.MONTHLY, 15, null, null));
+            new RoutineCreateRequestDto(
+                "월간 회고", null, null, RoutineType.MONTHLY, 1 << 14, null, null));
 
     assertThat(result.getRoutineType()).isEqualTo(RoutineType.MONTHLY);
-    assertThat(result.getRoutineDate()).isEqualTo(15);
+    assertThat(result.getRoutineDate()).isEqualTo(16384);
   }
 
   @Test
-  void 루틴_생성_MONTHLY_routineDate_경계값_1_성공() {
+  void 루틴_생성_MONTHLY_비트마스크_최솟값_1일_성공() {
     given(userRepository.findById(1L)).willReturn(Optional.of(testUser()));
     given(routineRepository.save(any(Routine.class))).willAnswer(inv -> inv.getArgument(0));
 
+    // 1일 = 1 << 0 = 1 (비트마스크 최솟값)
     RoutineResponseDto result =
         routineService.createRoutine(
             1L, new RoutineCreateRequestDto("루틴", null, null, RoutineType.MONTHLY, 1, null, null));
@@ -325,15 +328,18 @@ class RoutineServiceTest {
   }
 
   @Test
-  void 루틴_생성_MONTHLY_routineDate_경계값_31_성공() {
+  void 루틴_생성_MONTHLY_비트마스크_31일_성공() {
     given(userRepository.findById(1L)).willReturn(Optional.of(testUser()));
     given(routineRepository.save(any(Routine.class))).willAnswer(inv -> inv.getArgument(0));
 
+    // 31일 = 1 << 30 = 1073741824 (숫자 31이 아님)
     RoutineResponseDto result =
         routineService.createRoutine(
-            1L, new RoutineCreateRequestDto("루틴", null, null, RoutineType.MONTHLY, 31, null, null));
+            1L,
+            new RoutineCreateRequestDto(
+                "루틴", null, null, RoutineType.MONTHLY, 1 << 30, null, null));
 
-    assertThat(result.getRoutineDate()).isEqualTo(31);
+    assertThat(result.getRoutineDate()).isEqualTo(1073741824);
   }
 
   @Test
