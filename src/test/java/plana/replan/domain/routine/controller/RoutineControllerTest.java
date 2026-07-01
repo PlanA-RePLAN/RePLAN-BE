@@ -75,6 +75,7 @@ class RoutineControllerTest {
                 "아침 스트레칭",
                 null,
                 null,
+                null,
                 RoutineType.DAILY,
                 null,
                 null,
@@ -117,6 +118,7 @@ class RoutineControllerTest {
             new RoutineResponseDto(
                 2L,
                 "영어 단어",
+                null,
                 dueDate,
                 null,
                 RoutineType.WEEKLY,
@@ -166,6 +168,7 @@ class RoutineControllerTest {
             new RoutineResponseDto(
                 3L,
                 "월간 회고",
+                null,
                 null,
                 null,
                 RoutineType.MONTHLY,
@@ -370,6 +373,7 @@ class RoutineControllerTest {
             new RoutineResponseDto(
                 1L,
                 "수정된 루틴",
+                null,
                 dueDate,
                 null,
                 RoutineType.WEEKLY,

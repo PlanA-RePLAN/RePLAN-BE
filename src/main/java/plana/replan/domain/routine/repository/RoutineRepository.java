@@ -34,31 +34,50 @@ public interface RoutineRepository extends JpaRepository<Routine, Long> {
       nativeQuery = true,
       value =
           """
-          SELECT r.id                                    AS routineId,
-                 COALESCE(ro.title, r.title)             AS title,
-                 r.due_date                              AS dueDate,
-                 r.routine_time                          AS routineTime,
-                 r.routine_type                          AS routineType,
-                 r.routine_date                          AS routineDate,
-                 COALESCE(ro.tag_id, r.tag_id)           AS tagId,
-                 t.title                                 AS tagTitle,
-                 t.color                                 AS tagColor,
-                 r.goal_id                               AS goalId,
-                 td.id                                   AS todoId,
-                 ro.sort_order                           AS overrideSortOrder,
-                 r.default_sort_order                    AS defaultSortOrder,
-                 COALESCE(ro.is_skipped,   FALSE)        AS isSkipped,
-                 COALESCE(ro.is_pinned,    FALSE)        AS isPinned,
-                 COALESCE(ro.is_completed, FALSE)        AS isCompleted,
-                 (ro.id IS NOT NULL)                     AS hasOverride
+          SELECT r.id                                                  AS routineId,
+                 COALESCE(td.title, COALESCE(ro.title, r.title))      AS title,
+                 r.due_date                                            AS repeatEndDate,
+                 COALESCE(td.due_date,
+                   CAST(CAST(:targetDate AS date) + COALESCE(r.routine_time, TIME '23:59:59') AS timestamp)
+                 )                                                     AS dueDate,
+                 r.routine_time                                        AS routineTime,
+                 r.routine_type                                        AS routineType,
+                 r.routine_date                                        AS routineDate,
+                 CASE WHEN td.id IS NOT NULL THEN td.tag_id
+                      ELSE COALESCE(ro.tag_id, r.tag_id)
+                 END                                                   AS tagId,
+                 t.title                                               AS tagTitle,
+                 t.color                                               AS tagColor,
+                 r.goal_id                                             AS goalId,
+                 td.id                                                 AS todoId,
+                 COALESCE(td.sort_order,
+                   COALESCE(ro.sort_order, r.default_sort_order))      AS sortOrder,
+                 (ro.id IS NOT NULL)                                   AS hasOverride,
+                 CASE WHEN td.id IS NOT NULL THEN td.is_pinned
+                      ELSE COALESCE(ro.is_pinned, FALSE)
+                 END                                                   AS isPinned,
+                 CASE WHEN td.id IS NOT NULL THEN td.is_completed
+                      ELSE COALESCE(ro.is_completed, FALSE)
+                 END                                                   AS isCompleted,
+                 ro.override_date                                      AS overrideDate,
+                 (COALESCE(td.due_date,
+                    CAST(CAST(:targetDate AS date) + COALESCE(r.routine_time, TIME '23:59:59') AS timestamp)
+                  ) < NOW()
+                  AND CASE WHEN td.id IS NOT NULL THEN td.is_completed
+                           ELSE COALESCE(ro.is_completed, FALSE)
+                      END = FALSE)                                     AS isOverdue
           FROM routine r
           LEFT JOIN routine_override ro
                  ON ro.routine_id = r.id AND ro.override_date = :targetDate
-          LEFT JOIN tag t ON COALESCE(ro.tag_id, r.tag_id) = t.id AND t.deleted_at IS NULL
           LEFT JOIN todo td ON td.routine_id = r.id
                             AND td.deleted_at IS NULL
                             AND td.parent_id IS NULL
                             AND CAST(td.due_date AS date) = :targetDate
+          LEFT JOIN tag t ON (
+                            CASE WHEN td.id IS NOT NULL THEN td.tag_id
+                                 ELSE COALESCE(ro.tag_id, r.tag_id)
+                            END
+                          ) = t.id AND t.deleted_at IS NULL
           WHERE r.user_id = :userId
             AND r.deleted_at IS NULL
             AND r.parent_id IS NULL
@@ -67,10 +86,70 @@ public interface RoutineRepository extends JpaRepository<Routine, Long> {
               OR (r.routine_type = 'WEEKLY'  AND (r.routine_date & :dayBit) != 0)
               OR (r.routine_type = 'MONTHLY' AND (r.routine_date & :monthDayBit) != 0)
             )
+            AND COALESCE(ro.is_skipped, FALSE) = FALSE
           """)
   List<RoutineDateProjection> findMotherRoutinesByDate(
       @Param("userId") Long userId,
       @Param("dayBit") int dayBit,
       @Param("monthDayBit") int monthDayBit,
       @Param("targetDate") LocalDate targetDate);
+
+  @Query(
+      nativeQuery = true,
+      value =
+          """
+          SELECT r.id                                                  AS routineId,
+                 COALESCE(td.title, COALESCE(ro.title, r.title))      AS title,
+                 r.due_date                                            AS repeatEndDate,
+                 COALESCE(td.due_date,
+                   CAST(ro.override_date + COALESCE(r.routine_time, TIME '23:59:59') AS timestamp)
+                 )                                                     AS dueDate,
+                 r.routine_time                                        AS routineTime,
+                 r.routine_type                                        AS routineType,
+                 r.routine_date                                        AS routineDate,
+                 CASE WHEN td.id IS NOT NULL THEN td.tag_id
+                      ELSE COALESCE(ro.tag_id, r.tag_id)
+                 END                                                   AS tagId,
+                 t.title                                               AS tagTitle,
+                 t.color                                               AS tagColor,
+                 r.goal_id                                             AS goalId,
+                 td.id                                                 AS todoId,
+                 COALESCE(td.sort_order,
+                   COALESCE(ro.sort_order, r.default_sort_order))      AS sortOrder,
+                 TRUE                                                  AS hasOverride,
+                 CASE WHEN td.id IS NOT NULL THEN td.is_pinned
+                      ELSE COALESCE(ro.is_pinned, FALSE)
+                 END                                                   AS isPinned,
+                 CASE WHEN td.id IS NOT NULL THEN td.is_completed
+                      ELSE COALESCE(ro.is_completed, FALSE)
+                 END                                                   AS isCompleted,
+                 ro.override_date                                      AS overrideDate,
+                 (COALESCE(td.due_date,
+                    CAST(ro.override_date + COALESCE(r.routine_time, TIME '23:59:59') AS timestamp)
+                  ) < NOW()
+                  AND CASE WHEN td.id IS NOT NULL THEN td.is_completed
+                           ELSE COALESCE(ro.is_completed, FALSE)
+                      END = FALSE)                                     AS isOverdue
+          FROM routine_override ro
+          INNER JOIN routine r ON r.id = ro.routine_id
+          LEFT JOIN todo td ON td.routine_id = r.id
+                            AND td.deleted_at IS NULL
+                            AND td.parent_id IS NULL
+                            AND CAST(td.due_date AS date) = ro.override_date
+          LEFT JOIN tag t ON (
+                            CASE WHEN td.id IS NOT NULL THEN td.tag_id
+                                 ELSE COALESCE(ro.tag_id, r.tag_id)
+                            END
+                          ) = t.id AND t.deleted_at IS NULL
+          WHERE r.user_id = :userId
+            AND r.deleted_at IS NULL
+            AND r.parent_id IS NULL
+            AND CASE WHEN td.id IS NOT NULL THEN td.is_pinned
+                     ELSE COALESCE(ro.is_pinned, FALSE)
+                END = TRUE
+            AND COALESCE(ro.is_skipped, FALSE) = FALSE
+          ORDER BY ro.override_date ASC,
+                   COALESCE(td.sort_order, COALESCE(ro.sort_order, r.default_sort_order)) ASC
+          """)
+  List<RoutineDateProjection> findPinnedMotherRoutines(@Param("userId") Long userId);
 }

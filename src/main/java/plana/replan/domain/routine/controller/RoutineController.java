@@ -35,6 +35,13 @@ public class RoutineController implements RoutineControllerDocs {
   private final RoutineService routineService;
 
   @Override
+  @GetMapping("/pinned")
+  public ResponseEntity<ApiResult<Map<String, List<RoutineResponseDto>>>> getPinnedRoutines(
+      @AuthenticationPrincipal Long userId) {
+    return ResponseEntity.ok(ApiResult.ok(routineService.getPinnedRoutines(userId)));
+  }
+
+  @Override
   @GetMapping
   public ResponseEntity<ApiResult<Map<String, List<RoutineResponseDto>>>> getRoutinesByFilter(
       @AuthenticationPrincipal Long userId,
