@@ -30,7 +30,7 @@ public record RoutineUpdateRequestDto(
         RoutineType routineType,
     @Schema(
             description =
-                "반복 날짜 배열. WEEKLY: 요일 인덱스(월=0, 화=1, 수=2, 목=3, 금=4, 토=5, 일=6). MONTHLY: 일자(1~31). DAILY: null 또는 빈 배열. 예) 월·수·금=[0,2,4], 매월 3·20일=[3,20].",
+                "반복 날짜 배열. WEEKLY: 요일 인덱스(월=0, 화=1, 수=2, 목=3, 금=4, 토=5, 일=6). MONTHLY: 일자(1~31). DAILY: null 또는 빈 배열([]) — 값이 있으면 400. 예) 월·수·금=[0,2,4], 매월 3·20일=[3,20].",
             example = "[0, 2, 4]")
         List<Integer> routineDays,
     @Schema(description = "태그 ID. null이면 태그 제거", example = "1") Long tagId) {}

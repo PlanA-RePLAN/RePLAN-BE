@@ -243,7 +243,7 @@ public interface GoalControllerDocs {
           | todos[].dueDate | ❌ 선택 | string | 마감 날짜 (yyyy-MM-dd 형식). ONE_TIME만 사용. | `"2025-06-01"` |
           | todos[].dueTime | ❌ 선택 | string | 마감 시간 (HH:mm 형식). ONE_TIME만 사용. | `"09:00"` |
           | todos[].routineType | ❌ 선택 | string | 반복 유형. RECURRING만 사용. `DAILY` / `WEEKLY` / `MONTHLY` | `"DAILY"` |
-          | todos[].routineDays | ❌ 선택 | array | 반복 날짜 배열. RECURRING만 사용. WEEKLY: 요일 인덱스(월=0 … 일=6), MONTHLY: 일자(1~31), DAILY: null 또는 빈 배열([]) | `[0, 2, 4]` |
+          | todos[].routineDays | ❌ 선택 | array | 반복 날짜 배열. RECURRING만 사용. WEEKLY: 요일 인덱스(월=0 … 일=6), MONTHLY: 일자(1~31), DAILY: null 또는 빈 배열([]) — 값이 있으면 400 | `[0, 2, 4]` |
           | todos[].tagId | ❌ 선택 | integer | 태그 ID | `1` |
           | todos[].subTodos | ❌ 선택 | array | 하위 투두 제목 목록. ONE_TIME만 사용 가능. | `["챕터 1"]` |
           | todos[].subRoutines | ❌ 선택 | array | 하위 루틴 제목 목록. RECURRING만 사용 가능. | `["스트레칭", "유산소"]` |
