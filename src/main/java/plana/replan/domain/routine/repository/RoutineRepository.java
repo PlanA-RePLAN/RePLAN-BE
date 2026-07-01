@@ -65,12 +65,12 @@ public interface RoutineRepository extends JpaRepository<Routine, Long> {
             AND (
               r.routine_type = 'DAILY'
               OR (r.routine_type = 'WEEKLY'  AND (r.routine_date & :dayBit) != 0)
-              OR (r.routine_type = 'MONTHLY' AND  r.routine_date = :dayOfMonth)
+              OR (r.routine_type = 'MONTHLY' AND (r.routine_date & :monthDayBit) != 0)
             )
           """)
   List<RoutineDateProjection> findMotherRoutinesByDate(
       @Param("userId") Long userId,
       @Param("dayBit") int dayBit,
-      @Param("dayOfMonth") int dayOfMonth,
+      @Param("monthDayBit") int monthDayBit,
       @Param("targetDate") LocalDate targetDate);
 }

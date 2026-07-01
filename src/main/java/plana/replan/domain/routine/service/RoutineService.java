@@ -211,8 +211,8 @@ public class RoutineService {
 
   private List<RoutineResponseDto> getRoutinesForDate(Long userId, LocalDate date) {
     int dayBit = 1 << (date.getDayOfWeek().getValue() - 1);
-    int dayOfMonth = date.getDayOfMonth();
-    return routineRepository.findMotherRoutinesByDate(userId, dayBit, dayOfMonth, date).stream()
+    int monthDayBit = 1 << (date.getDayOfMonth() - 1);
+    return routineRepository.findMotherRoutinesByDate(userId, dayBit, monthDayBit, date).stream()
         .map(RoutineResponseDto::from)
         .collect(Collectors.toList());
   }
@@ -307,7 +307,7 @@ public class RoutineService {
     return switch (routine.getRoutineType()) {
       case DAILY -> true;
       case WEEKLY -> (routine.getRoutineDate() & (1 << (today.getDayOfWeek().getValue() - 1))) != 0;
-      case MONTHLY -> routine.getRoutineDate().equals(today.getDayOfMonth());
+      case MONTHLY -> (routine.getRoutineDate() & (1 << (today.getDayOfMonth() - 1))) != 0;
     };
   }
 
@@ -423,14 +423,13 @@ public class RoutineService {
         yield today;
       }
       case MONTHLY -> {
-        int day = routine.getRoutineDate();
-        for (int k = 0; k < 12; k++) {
-          LocalDate firstOfMonth = today.withDayOfMonth(1).plusMonths(k);
-          if (firstOfMonth.lengthOfMonth() >= day) {
-            LocalDate candidate = firstOfMonth.withDayOfMonth(day);
-            if (!candidate.isBefore(today)) {
-              yield candidate;
-            }
+        // routineDate는 일자 비트마스크(일자 d → 비트 d-1). 오늘부터 하루씩 훑어
+        // 그 날짜의 일자 비트가 켜진 첫 날을 다음 회차로 잡는다. 짧은 달에 없는 일자(29~31)는 자연히 건너뛴다.
+        int mask = routine.getRoutineDate();
+        for (int i = 0; i < 366; i++) {
+          LocalDate d = today.plusDays(i);
+          if ((mask & (1 << (d.getDayOfMonth() - 1))) != 0) {
+            yield d;
           }
         }
         yield today;
@@ -444,7 +443,9 @@ public class RoutineService {
         throw new CustomException(RoutineErrorCode.ROUTINE_INVALID_DATE);
       }
     } else if (routineType == RoutineType.MONTHLY) {
-      if (routineDate == null || routineDate < 1 || routineDate > 31) {
+      // 일자 비트마스크(일자 d → 비트 d-1). 1~31일이 비트 0~30에 대응하며 최대값은 int 범위(2^31-1)에 들어간다.
+      // 양의 정수면 비트 31(부호비트)은 켜질 수 없으므로 1 이상만 검증한다.
+      if (routineDate == null || routineDate < 1) {
         throw new CustomException(RoutineErrorCode.ROUTINE_INVALID_DATE);
       }
     }

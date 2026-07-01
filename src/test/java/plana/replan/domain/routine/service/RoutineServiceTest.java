@@ -371,7 +371,22 @@ class RoutineServiceTest {
   }
 
   @Test
-  void 루틴_생성_MONTHLY_routineDate_32이면_400() {
+  void 루틴_생성_MONTHLY_여러_날짜_비트마스크_성공() {
+    given(userRepository.findById(1L)).willReturn(Optional.of(testUser()));
+    given(routineRepository.save(any(Routine.class))).willAnswer(inv -> inv.getArgument(0));
+
+    // 3일·20일 = 비트(2) + 비트(19) = 4 + 524288 = 524292
+    int mask = (1 << 2) | (1 << 19);
+    RoutineResponseDto result =
+        routineService.createRoutine(
+            1L,
+            new RoutineCreateRequestDto("월 2회", null, null, RoutineType.MONTHLY, mask, null, null));
+
+    assertThat(result.getRoutineDate()).isEqualTo(524292);
+  }
+
+  @Test
+  void 루틴_생성_MONTHLY_routineDate_음수면_400() {
     given(userRepository.findById(1L)).willReturn(Optional.of(testUser()));
 
     assertThatThrownBy(
@@ -379,7 +394,7 @@ class RoutineServiceTest {
                 routineService.createRoutine(
                     1L,
                     new RoutineCreateRequestDto(
-                        "루틴", null, null, RoutineType.MONTHLY, 32, null, null)))
+                        "루틴", null, null, RoutineType.MONTHLY, -1, null, null)))
         .isInstanceOf(CustomException.class)
         .satisfies(
             e ->
@@ -484,12 +499,13 @@ class RoutineServiceTest {
 
   @Test
   void 루틴_생성_MONTHLY_오늘_날짜_불일치여도_Todo_즉시_생성되고_다음_반복일이_dueDate() {
-    // TEST_DATE = 2024-01-15. routineDate=16 → 다음 발생 = 2024-01-16
+    // TEST_DATE = 2024-01-15. routineDate=16일 비트(1<<15=32768) → 다음 발생 = 2024-01-16
     given(userRepository.findById(1L)).willReturn(Optional.of(testUser()));
     given(routineRepository.save(any(Routine.class))).willAnswer(inv -> inv.getArgument(0));
 
     routineService.createRoutine(
-        1L, new RoutineCreateRequestDto("루틴", null, null, RoutineType.MONTHLY, 16, null, null));
+        1L,
+        new RoutineCreateRequestDto("루틴", null, null, RoutineType.MONTHLY, 1 << 15, null, null));
 
     ArgumentCaptor<Todo> captor = ArgumentCaptor.forClass(Todo.class);
     verify(todoRepository).saveAndFlush(captor.capture());
@@ -573,8 +589,22 @@ class RoutineServiceTest {
 
   @Test
   void generateDailyTodos_MONTHLY_오늘이_해당일_투두_생성됨() {
-    // 오늘=15일, MONTHLY(15일) → isOccurrenceDay = true → 오늘 투두 생성
-    Routine routine = buildRoutine(RoutineType.MONTHLY, 15);
+    // 오늘=15일, MONTHLY(15일 비트=1<<14) → isOccurrenceDay = true → 오늘 투두 생성
+    Routine routine = buildRoutine(RoutineType.MONTHLY, 1 << 14);
+    given(routineRepository.findAllActiveMotherRoutines()).willReturn(List.of(routine));
+
+    routineService.generateDailyTodos();
+
+    ArgumentCaptor<Todo> captor = ArgumentCaptor.forClass(Todo.class);
+    verify(todoRepository).saveAndFlush(captor.capture());
+    assertThat(captor.getValue().getDueDate())
+        .isEqualTo(LocalDate.of(2024, 1, 15).atTime(23, 59, 59));
+  }
+
+  @Test
+  void generateDailyTodos_MONTHLY_여러_날짜_중_오늘이_포함되면_생성됨() {
+    // 오늘=15일. MONTHLY(15일·20일 비트마스크) → isOccurrenceDay = true → 오늘 투두 생성
+    Routine routine = buildRoutine(RoutineType.MONTHLY, (1 << 14) | (1 << 19));
     given(routineRepository.findAllActiveMotherRoutines()).willReturn(List.of(routine));
 
     routineService.generateDailyTodos();
@@ -587,8 +617,8 @@ class RoutineServiceTest {
 
   @Test
   void generateDailyTodos_MONTHLY_오늘이_해당일_아님_생성_안됨() {
-    // 오늘=15일, MONTHLY(16일) → isOccurrenceDay = false
-    Routine routine = buildRoutine(RoutineType.MONTHLY, 16);
+    // 오늘=15일, MONTHLY(16일 비트=1<<15) → isOccurrenceDay = false
+    Routine routine = buildRoutine(RoutineType.MONTHLY, 1 << 15);
     given(routineRepository.findAllActiveMotherRoutines()).willReturn(List.of(routine));
 
     routineService.generateDailyTodos();

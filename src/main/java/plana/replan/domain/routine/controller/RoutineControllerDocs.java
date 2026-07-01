@@ -74,7 +74,7 @@ public interface RoutineControllerDocs {
           | dueDate | string | 반복 종료 마감일 (ISO 8601 형식). 없으면 null |
           | routineTime | string | 마감 시각 (HH:mm:ss 형식). 없으면 null |
           | routineType | string | 반복 유형 (`DAILY` / `WEEKLY` / `MONTHLY`) |
-          | routineDate | integer | 반복 날짜 설정값. DAILY는 null, WEEKLY는 요일 비트마스크, MONTHLY는 일자 |
+          | routineDate | integer | 반복 날짜 설정값. DAILY는 null, WEEKLY는 요일 비트마스크, MONTHLY는 일자 비트마스크 |
           | tagId | integer | 태그 ID. 없으면 null |
           | tagTitle | string | 태그 제목. 없으면 null |
           | tagColor | string | 태그 색상. 없으면 null |
@@ -254,7 +254,7 @@ public interface RoutineControllerDocs {
           | routineType | ✅ 필수 | string | 반복 유형 (`DAILY` / `WEEKLY` / `MONTHLY`) | `"WEEKLY"` |
           | dueDate | ❌ 선택 | string | 반복 종료 마감일 (ISO 8601 형식). 이 날짜 이후로는 반복 생성 안 됨 | `"2025-12-31T00:00:00"` |
           | routineTime | ❌ 선택 | string | 반복되는 날의 마감 시각 (HH:mm:ss 형식). 생략 시 23:59:59 | `"09:00:00"` |
-          | routineDate | ❌ 선택 | integer | 반복 날짜. WEEKLY: 요일 bitmask (월=1, 화=2, 수=4, 목=8, 금=16, 토=32, 일=64). MONTHLY: 일자 (1~31). DAILY: 불필요 | `21` |
+          | routineDate | ❌ 선택 | integer | 반복 날짜. WEEKLY: 요일 bitmask (월=1, 화=2, 수=4, 목=8, 금=16, 토=32, 일=64). MONTHLY: 일자 bitmask (1일=1, 2일=2, 3일=4 … 여러 날 합산). DAILY: 불필요 | `21` |
           | tagId | ❌ 선택 | integer | 태그 ID | `1` |
           | goalId | ❌ 선택 | integer | 목표 ID | `2` |
 
@@ -268,7 +268,7 @@ public interface RoutineControllerDocs {
           |-------------|-----------------|-----------|
           | `DAILY` | 사용 안 함 (무시) | — |
           | `WEEKLY` | 요일 bitmask (월=1, 화=2, 수=4, 목=8, 금=16, 토=32, 일=64) | 1 ~ 127 |
-          | `MONTHLY` | 반복할 일자 | 1 ~ 31 |
+          | `MONTHLY` | 반복할 일자 비트마스크 (여러 날 합산) | 1일=1, 2일=2, 3일=4 … |
 
           **WEEKLY 예시**: 월+수+금 → 1+4+16 = **21**
 
@@ -658,7 +658,7 @@ public interface RoutineControllerDocs {
           | routineType | ✅ 필수 | string | 반복 유형 (`DAILY` / `WEEKLY` / `MONTHLY`) | `"WEEKLY"` |
           | dueDate | ❌ 선택 | string | 반복 종료 마감일 (ISO 8601 형식). null이면 종료일 제거 | `"2025-12-31T00:00:00"` |
           | routineTime | ❌ 선택 | string | 반복되는 날의 마감 시각 (HH:mm:ss 형식). null이면 23:59:59로 처리 | `"09:00:00"` |
-          | routineDate | ❌ 선택 | integer | 반복 날짜. WEEKLY: 요일 bitmask (월=1~일=64). MONTHLY: 일자 (1~31). DAILY: 불필요 | `21` |
+          | routineDate | ❌ 선택 | integer | 반복 날짜. WEEKLY: 요일 bitmask (월=1~일=64). MONTHLY: 일자 bitmask (1일=1, 2일=2, 3일=4 … 여러 날 합산). DAILY: 불필요 | `21` |
           | tagId | ❌ 선택 | integer | 태그 ID. null이면 태그 제거 | `1` |
 
           > ❌ 선택 필드는 생략하거나 null로 전달해도 동일하게 처리됩니다.
@@ -671,7 +671,7 @@ public interface RoutineControllerDocs {
           |-------------|-----------------|-----------|
           | `DAILY` | 사용 안 함 (무시) | — |
           | `WEEKLY` | 요일 bitmask (월=1, 화=2, 수=4, 목=8, 금=16, 토=32, 일=64) | 1 ~ 127 |
-          | `MONTHLY` | 반복할 일자 | 1 ~ 31 |
+          | `MONTHLY` | 반복할 일자 비트마스크 (여러 날 합산) | 1일=1, 2일=2, 3일=4 … |
           """,
       security = @SecurityRequirement(name = "Bearer Authentication"))
   @ApiResponses({

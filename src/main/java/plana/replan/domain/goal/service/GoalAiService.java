@@ -268,7 +268,7 @@ public class GoalAiService {
         8. 이론 나열 금지. '수기 복습', '문제 풀이', '오답 노트' 등 아웃풋 태스크 반드시 중간에 배치
         9. 마감 D-1~2는 진도 금지. '최종 점검', '백지 복습' 등 마무리 태스크만 배치
         10. WEEKLY routineDate는 bitmask: 월=1, 화=2, 수=4, 목=8, 금=16, 토=32, 일=64
-        11. MONTHLY routineDate는 일자(1~31)
+        11. MONTHLY routineDate는 일자 비트마스크(1일=1, 2일=2, 3일=4 … d일=2^(d-1)). 여러 날짜면 각 비트를 더한다(예: 3일·20일 = 4 + 524288 = 524292)
         12. DAILY는 routineDate 불필요 (null)
         13. dueDate는 yyyy-MM-dd 형식 또는 null, dueTime은 HH:mm 형식 또는 null
         14. type은 "ONE_TIME" 또는 "RECURRING"만 허용
