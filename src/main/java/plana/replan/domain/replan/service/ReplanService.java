@@ -472,7 +472,7 @@ public class ReplanService {
         op.tagId() != null ? resolveTag(op.tagId(), anchor.getUser().getId()) : routine.getTag();
     RoutineType effectiveType =
         op.routineType() != null ? parseRoutineType(op.routineType()) : routine.getRoutineType();
-    // 반복 유형이 바뀌면 기존 routineDate는 의미가 달라(WEEKLY=요일 비트마스크 ↔ MONTHLY=일자)
+    // 반복 유형이 바뀌면 기존 routineDate는 의미가 달라(WEEKLY=요일 비트마스크 ↔ MONTHLY=일자 비트마스크)
     // 재사용하지 않고, 새 유형에 맞는 routineDate를 op가 명시하도록 강제한다(없으면 아래 검증에서 400).
     // 유형이 그대로면 생략된 routineDate를 기존 값으로 보완한다.
     boolean typeChanged = op.routineType() != null && effectiveType != routine.getRoutineType();
@@ -571,8 +571,8 @@ public class ReplanService {
         && (routineDate == null || routineDate < 1 || routineDate > 127)) {
       throw new CustomException(ReplanErrorCode.REPLAN_INVALID_OPERATION);
     }
-    if (type == RoutineType.MONTHLY
-        && (routineDate == null || routineDate < 1 || routineDate > 31)) {
+    // MONTHLY도 일자 비트마스크(일자 d → 비트 d-1). 양의 정수면 유효(1~31일이 비트 0~30에 대응).
+    if (type == RoutineType.MONTHLY && (routineDate == null || routineDate < 1)) {
       throw new CustomException(ReplanErrorCode.REPLAN_INVALID_OPERATION);
     }
   }

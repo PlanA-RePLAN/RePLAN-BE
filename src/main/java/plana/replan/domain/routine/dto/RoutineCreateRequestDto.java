@@ -31,7 +31,7 @@ public record RoutineCreateRequestDto(
         RoutineType routineType,
     @Schema(
             description =
-                "반복 날짜. WEEKLY: 요일 bitmask (월=1, 화=2, 수=4, 목=8, 금=16, 토=32, 일=64). MONTHLY: 일자 (1~31). DAILY: 불필요.",
+                "반복 날짜. WEEKLY: 요일 bitmask (월=1, 화=2, 수=4, 목=8, 금=16, 토=32, 일=64). MONTHLY: 일자 bitmask (1일=1, 2일=2, 3일=4 … 여러 날 합산). DAILY: 불필요.",
             example = "21")
         Integer routineDate,
     @Schema(description = "태그 ID", example = "1") Long tagId,

@@ -24,7 +24,9 @@ public class TodoUpdateRequestDto {
   @Schema(description = "반복 유형 (DAILY/WEEKLY/MONTHLY). null이면 반복 없음")
   private RoutineType routineType;
 
-  @Schema(description = "반복 날짜 (WEEKLY: 1-127 비트마스크, MONTHLY: 1-31). DAILY는 null", example = "5")
+  @Schema(
+      description = "반복 날짜 (WEEKLY: 1-127 비트마스크, MONTHLY: 일자 비트마스크). DAILY는 null",
+      example = "5")
   private Integer routineDate;
 
   @Schema(description = "반복 시각 (HH:mm:ss). 반복되는 날의 마감 시각. 생략 시 23:59:59로 처리", example = "09:00:00")

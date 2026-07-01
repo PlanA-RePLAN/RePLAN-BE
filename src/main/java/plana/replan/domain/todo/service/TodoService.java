@@ -313,7 +313,7 @@ public class TodoService {
         throw new CustomException(RoutineErrorCode.ROUTINE_INVALID_DATE);
       }
     } else if (routineType == RoutineType.MONTHLY) {
-      if (routineDate == null || routineDate < 1 || routineDate > 31) {
+      if (routineDate == null || routineDate < 1) {
         throw new CustomException(RoutineErrorCode.ROUTINE_INVALID_DATE);
       }
     }

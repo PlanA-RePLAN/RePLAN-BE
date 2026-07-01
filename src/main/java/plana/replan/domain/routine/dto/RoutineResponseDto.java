@@ -33,7 +33,7 @@ public class RoutineResponseDto {
   @Schema(description = "반복 유형", example = "DAILY")
   private RoutineType routineType;
 
-  @Schema(description = "반복 날짜 설정값. DAILY=null, WEEKLY=요일 비트마스크, MONTHLY=일자", example = "21")
+  @Schema(description = "반복 날짜 설정값. DAILY=null, WEEKLY=요일 비트마스크, MONTHLY=일자 비트마스크", example = "21")
   private Integer routineDate;
 
   @Schema(description = "태그 ID (override 적용값). 없으면 null", example = "3")
