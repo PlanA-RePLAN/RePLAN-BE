@@ -41,7 +41,7 @@ public class TodoDetailResponseDto {
   private String routineType;
 
   @Schema(
-      description = "반복 날짜 (WEEKLY: 1-127 비트마스크, MONTHLY: 1-31 일자, DAILY 또는 반복 없으면 null)",
+      description = "반복 날짜 (WEEKLY: 1-127 비트마스크, MONTHLY: 일자 비트마스크, DAILY 또는 반복 없으면 null)",
       example = "5")
   private Integer routineDate;
 

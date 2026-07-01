@@ -487,12 +487,13 @@ class RoutineServiceTest {
 
   @Test
   void 루틴_생성_MONTHLY_오늘_날짜_일치_Todo_생성됨() {
-    // TEST_DATE = 15일. routineDate=15 → 일치
+    // TEST_DATE = 15일. routineDate=15일 비트(1<<14=16384) → 일치
     given(userRepository.findById(1L)).willReturn(Optional.of(testUser()));
     given(routineRepository.save(any(Routine.class))).willAnswer(inv -> inv.getArgument(0));
 
     routineService.createRoutine(
-        1L, new RoutineCreateRequestDto("루틴", null, null, RoutineType.MONTHLY, 15, null, null));
+        1L,
+        new RoutineCreateRequestDto("루틴", null, null, RoutineType.MONTHLY, 1 << 14, null, null));
 
     verify(todoRepository).saveAndFlush(any(Todo.class));
   }

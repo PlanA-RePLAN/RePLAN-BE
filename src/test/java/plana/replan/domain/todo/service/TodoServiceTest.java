@@ -1580,6 +1580,22 @@ class TodoServiceTest {
   }
 
   @Test
+  @DisplayName("updateTodo - MONTHLY + 여러 날짜 비트마스크(524292): 루틴 생성 성공")
+  void updateTodo_monthlyBitmask_success() {
+    User user = testUser();
+    given(todoRepository.findById(1L)).willReturn(Optional.of(testTodo(1L, user)));
+    given(routineRepository.save(any(Routine.class))).willAnswer(inv -> inv.getArgument(0));
+
+    // 3일·20일 = (1<<2)|(1<<19) = 524292 → 31 초과지만 유효한 비트마스크
+    todoService.updateTodo(
+        1L, 1L, updateTodoRequest("제목", null, null, RoutineType.MONTHLY, 524292));
+
+    ArgumentCaptor<Routine> captor = ArgumentCaptor.forClass(Routine.class);
+    verify(routineRepository).save(captor.capture());
+    assertThat(captor.getValue().getRoutineDate()).isEqualTo(524292);
+  }
+
+  @Test
   @DisplayName("updateTodo - WEEKLY + routineDate null: ROUTINE_INVALID_DATE 예외")
   void updateTodo_weeklyNullDate_throws() {
     User user = testUser();

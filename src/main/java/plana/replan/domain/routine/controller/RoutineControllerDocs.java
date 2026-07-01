@@ -35,7 +35,7 @@ public interface RoutineControllerDocs {
 
           - `DAILY` 루틴: 기간 내 모든 날짜에 포함
           - `WEEKLY` 루틴: 해당 날짜의 요일이 `routineDate` 비트마스크에 포함된 날짜에만 포함
-          - `MONTHLY` 루틴: 해당 날짜의 일(day)이 `routineDate`와 일치하는 날짜에만 포함
+          - `MONTHLY` 루틴: 해당 날짜의 일(day) 비트가 `routineDate` 비트마스크에 포함된 날짜에만 포함
 
           각 루틴에 해당 날짜의 Todo가 이미 생성되어 있으면 `todoId`가 포함되고, 아직 없으면 `null`입니다.
 
@@ -453,14 +453,14 @@ public interface RoutineControllerDocs {
                                 }
                                 """),
                         @ExampleObject(
-                            name = "MONTHLY — 매월 15일",
+                            name = "MONTHLY — 매월 15일 (15일=1<<14=16384)",
                             value =
                                 """
                                 {
                                   "title": "월간 회고",
                                   "dueDate": "2025-12-31T00:00:00",
                                   "routineType": "MONTHLY",
-                                  "routineDate": 15
+                                  "routineDate": 16384
                                 }
                                 """)
                       }))
