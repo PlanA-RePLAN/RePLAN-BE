@@ -5,20 +5,39 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.util.List;
 import org.junit.jupiter.api.Test;
+import org.springframework.test.util.ReflectionTestUtils;
 import plana.replan.domain.goal.dto.explore.GoalExploreRequest;
 import plana.replan.domain.goal.dto.explore.GoalExploreResponse;
 import plana.replan.domain.goal.dto.recommend.SolutionInput;
 import plana.replan.domain.goal.dto.recommend.TodoRecommendationRequest;
+import plana.replan.domain.goal.dto.recommend.TodoRecommendationResponse;
 import plana.replan.domain.goal.dto.refine.GoalRefinementRequest;
 import plana.replan.domain.goal.dto.refine.GoalRefinementResponse;
 import plana.replan.domain.goal.dto.refine.QuestionAnswer;
 import plana.replan.domain.goal.dto.refine.RefinedNoteItem;
 import plana.replan.domain.goal.exception.GoalErrorCode;
+import plana.replan.domain.tag.entity.Tag;
+import plana.replan.domain.user.entity.Provider;
+import plana.replan.domain.user.entity.Role;
+import plana.replan.domain.user.entity.User;
 import plana.replan.global.exception.CustomException;
 
 class GoalAiServiceTest {
 
-  private final GoalAiService service = new GoalAiService(null);
+  private final GoalAiService service = new GoalAiService(null, null);
+
+  private Tag tag(long id, String title) {
+    User user =
+        User.builder()
+            .email("a@a.com")
+            .nickname("n")
+            .role(Role.ROLE_USER)
+            .provider(Provider.LOCAL)
+            .build();
+    Tag t = Tag.builder().title(title).user(user).build();
+    ReflectionTestUtils.setField(t, "id", id);
+    return t;
+  }
 
   private TodoRecommendationRequest req(Integer refreshCount) {
     return new TodoRecommendationRequest(
@@ -70,7 +89,7 @@ class GoalAiServiceTest {
 
   @Test
   void 새로고침_횟수가_3을_넘으면_추천_실패() {
-    assertThatThrownBy(() -> service.recommendTodos(req(4)))
+    assertThatThrownBy(() -> service.recommendTodos(1L, req(4)))
         .isInstanceOfSatisfying(
             CustomException.class,
             e -> assertThat(e.getErrorCode()).isEqualTo(GoalErrorCode.INVALID_REFRESH_COUNT));
@@ -78,7 +97,7 @@ class GoalAiServiceTest {
 
   @Test
   void 새로고침_횟수가_음수면_추천_실패() {
-    assertThatThrownBy(() -> service.recommendTodos(req(-1)))
+    assertThatThrownBy(() -> service.recommendTodos(1L, req(-1)))
         .isInstanceOfSatisfying(
             CustomException.class,
             e -> assertThat(e.getErrorCode()).isEqualTo(GoalErrorCode.INVALID_REFRESH_COUNT));
@@ -86,19 +105,19 @@ class GoalAiServiceTest {
 
   @Test
   void 새로고침_0회차면_스타일_블록이_없다() {
-    String prompt = service.buildRecommendPrompt(req(0));
+    String prompt = service.buildRecommendPrompt(req(0), "없음");
     assertThat(prompt).doesNotContain("[이번 새로고침 스타일]");
   }
 
   @Test
   void 새로고침_생략_null이면_0회차처럼_스타일_블록이_없다() {
-    String prompt = service.buildRecommendPrompt(req(null));
+    String prompt = service.buildRecommendPrompt(req(null), "없음");
     assertThat(prompt).doesNotContain("[이번 새로고침 스타일]");
   }
 
   @Test
   void 새로고침_2회차면_벼락치기_스타일_블록이_붙는다() {
-    String prompt = service.buildRecommendPrompt(req(2));
+    String prompt = service.buildRecommendPrompt(req(2), "없음");
     assertThat(prompt).contains("[이번 새로고침 스타일]");
     assertThat(prompt).contains("벼락치기");
     assertThat(prompt).contains("todos"); // 기존 JSON 포맷 규칙 유지
@@ -106,9 +125,63 @@ class GoalAiServiceTest {
 
   @Test
   void 추천_프롬프트에_솔루션이_들어간다() {
-    String prompt = service.buildRecommendPrompt(req(0));
+    String prompt = service.buildRecommendPrompt(req(0), "없음");
     assertThat(prompt).contains("[현재 수준]");
     assertThat(prompt).contains("실력: 토익 600점");
+  }
+
+  @Test
+  void 추천_프롬프트에_태그_목록이_들어간다() {
+    String prompt =
+        service.buildRecommendPrompt(req(0), "- id=1, name=Study\n- id=2, name=Health\n");
+    assertThat(prompt).contains("[사용 가능한 태그 목록]");
+    assertThat(prompt).contains("id=1, name=Study");
+    assertThat(prompt).contains("id=2, name=Health");
+    assertThat(prompt).contains("tagId"); // 출력 JSON 스키마에 tagId 포함
+  }
+
+  @Test
+  void 태그정보_문자열_생성_태그가_없으면_없음() {
+    assertThat(service.buildTagInfo(List.of())).isEqualTo("없음");
+  }
+
+  @Test
+  void 태그정보_문자열_생성_id와_이름이_들어간다() {
+    String info = service.buildTagInfo(List.of(tag(1L, "Study"), tag(2L, "Health")));
+    assertThat(info).contains("id=1, name=Study");
+    assertThat(info).contains("id=2, name=Health");
+  }
+
+  @Test
+  void 추천파싱_AI가_준_tagId가_유저태그면_tagId와_이름을_채운다() {
+    String raw =
+        "{\"overallReason\":\"r\",\"todos\":[{\"type\":\"ONE_TIME\",\"title\":\"단어 암기\","
+            + "\"dueDate\":null,\"dueTime\":null,\"routineType\":null,\"routineDate\":null,\"tagId\":1}]}";
+    TodoRecommendationResponse res =
+        service.parseRecommendResponse(raw, List.of(tag(1L, "Study"), tag(2L, "Health")));
+    assertThat(res.todos()).hasSize(1);
+    assertThat(res.todos().get(0).tagId()).isEqualTo(1L);
+    assertThat(res.todos().get(0).tagName()).isEqualTo("Study");
+  }
+
+  @Test
+  void 추천파싱_AI가_지어낸_tagId면_태그없음으로_처리한다() {
+    String raw =
+        "{\"overallReason\":\"r\",\"todos\":[{\"type\":\"ONE_TIME\",\"title\":\"단어 암기\","
+            + "\"dueDate\":null,\"dueTime\":null,\"routineType\":null,\"routineDate\":null,\"tagId\":999}]}";
+    TodoRecommendationResponse res = service.parseRecommendResponse(raw, List.of(tag(1L, "Study")));
+    assertThat(res.todos().get(0).tagId()).isNull();
+    assertThat(res.todos().get(0).tagName()).isNull();
+  }
+
+  @Test
+  void 추천파싱_tagId가_null이면_태그없음() {
+    String raw =
+        "{\"overallReason\":\"r\",\"todos\":[{\"type\":\"ONE_TIME\",\"title\":\"단어 암기\","
+            + "\"dueDate\":null,\"dueTime\":null,\"routineType\":null,\"routineDate\":null,\"tagId\":null}]}";
+    TodoRecommendationResponse res = service.parseRecommendResponse(raw, List.of(tag(1L, "Study")));
+    assertThat(res.todos().get(0).tagId()).isNull();
+    assertThat(res.todos().get(0).tagName()).isNull();
   }
 
   private GoalRefinementRequest refineReq() {

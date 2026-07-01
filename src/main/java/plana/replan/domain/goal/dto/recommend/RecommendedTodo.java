@@ -28,4 +28,11 @@ public record RecommendedTodo(
                 "반복 날짜 (RECURRING만 사용). WEEKLY: 요일 bitmask (월=1,화=2,수=4,목=8,금=16,토=32,일=64). MONTHLY: 일자(1~31). DAILY: null.",
             example = "62",
             nullable = true)
-        Integer routineDate) {}
+        Integer routineDate,
+    @Schema(
+            description = "AI가 이 투두에 배정한 태그 ID. 유저의 실제 태그 중에서 선택되며, 마땅한 태그가 없으면 null",
+            example = "1",
+            nullable = true)
+        Long tagId,
+    @Schema(description = "배정된 태그 이름. tagId가 null이면 함께 null", example = "Study", nullable = true)
+        String tagName) {}
