@@ -1668,7 +1668,7 @@ public interface TodoControllerDocs {
 
           삭제된 일반 투두를 복원합니다. 하위 투두도 함께 복원됩니다.
 
-          - 루틴 투두는 이 API로 복원할 수 없습니다. 루틴 투두는 `PATCH /api/routines/{routineId}/overrides/{date}/unskip` 을 사용하세요.
+          - 루틴 투두는 이 API로 복원할 수 없습니다. 루틴 투두는 `PATCH /api/routines/{routineId}/overrides/{date}/undo` 를 사용하세요.
 
           **Request Headers**
 
@@ -1763,7 +1763,7 @@ public interface TodoControllerDocs {
                           """)
                 }))
   })
-  ResponseEntity<ApiResult<Void>> restoreTodo(
+  ResponseEntity<ApiResult<Void>> undoTodo(
       @AuthenticationPrincipal Long userId,
       @Parameter(description = "복원할 투두 ID", example = "1") @PathVariable Long todoId);
 }

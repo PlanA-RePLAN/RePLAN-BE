@@ -92,12 +92,12 @@ public class RoutineOverrideController implements RoutineOverrideControllerDocs 
   }
 
   @Override
-  @PatchMapping("/{routineId}/overrides/{date}/unskip")
-  public ResponseEntity<ApiResult<Void>> unskip(
+  @PatchMapping("/{routineId}/overrides/{date}/undo")
+  public ResponseEntity<ApiResult<Void>> undo(
       @AuthenticationPrincipal Long userId,
       @PathVariable Long routineId,
       @PathVariable LocalDate date) {
-    routineOverrideService.unskip(userId, routineId, date);
+    routineOverrideService.undo(userId, routineId, date);
     return ResponseEntity.ok(ApiResult.ok(null));
   }
 }

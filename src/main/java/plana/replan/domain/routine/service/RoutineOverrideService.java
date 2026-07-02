@@ -153,7 +153,7 @@ public class RoutineOverrideService {
   }
 
   @Transactional
-  public void unskip(Long userId, Long routineId, LocalDate date) {
+  public void undo(Long userId, Long routineId, LocalDate date) {
     Routine routine = findOwnedMotherRoutine(userId, routineId);
 
     // skip된 override가 없으면 no-op (ghost override row 생성 방지)
