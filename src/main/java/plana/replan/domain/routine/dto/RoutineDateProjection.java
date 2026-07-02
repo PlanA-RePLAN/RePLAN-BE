@@ -1,5 +1,6 @@
 package plana.replan.domain.routine.dto;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 
@@ -9,6 +10,8 @@ public interface RoutineDateProjection {
   String getTitle();
 
   LocalDateTime getDueDate();
+
+  LocalDateTime getRepeatEndDate();
 
   LocalTime getRoutineTime();
 
@@ -26,15 +29,15 @@ public interface RoutineDateProjection {
 
   Long getTodoId();
 
-  Double getOverrideSortOrder();
-
-  Double getDefaultSortOrder();
-
-  Boolean getIsSkipped();
+  Double getSortOrder();
 
   Boolean getIsPinned();
 
   Boolean getIsCompleted();
 
+  Boolean getIsOverdue();
+
   Boolean getHasOverride();
+
+  LocalDate getOverrideDate();
 }

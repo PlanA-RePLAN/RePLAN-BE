@@ -331,7 +331,7 @@ public interface RoutineOverrideControllerDocs {
 
           - 이미 배치로 Todo가 생성된 날짜라면 해당 Todo를 soft delete 한다.
           - 이미 완료된 Todo가 있는 날짜는 건너뜀 처리할 수 없다 (400).
-          - 건너뜀을 취소하려면 `PATCH /api/routines/{routineId}/overrides/{date}/unskip`을 호출한다.
+          - 건너뜀을 취소하려면 `PATCH /api/routines/{routineId}/overrides/{date}/undo`을 호출한다.
 
           ### Path Variables
 
@@ -373,13 +373,13 @@ public interface RoutineOverrideControllerDocs {
           LocalDate date);
 
   @Operation(
-      summary = "루틴 인스턴스 건너뜀 취소",
+      summary = "루틴 인스턴스 건너뜀 실행 취소 (undo)",
       description =
           """
           건너뜀 처리된 날짜를 다시 활성화한다.
 
           - override의 `isSkipped`를 `false`로 되돌린다.
-          - 이미 soft-delete된 Todo는 복구되지 않는다. 새 배치 실행 시 해당 날짜가 발생일이면 재생성된다.
+          - soft-delete된 Todo가 있으면 함께 복구한다.
           - 건너뜀 상태가 아닌 날짜에 호출해도 에러 없이 idempotent하게 처리된다.
 
           ### Path Variables
@@ -395,7 +395,7 @@ public interface RoutineOverrideControllerDocs {
     @ApiResponse(responseCode = "401", description = "인증 실패"),
     @ApiResponse(responseCode = "404", description = "루틴을 찾을 수 없음")
   })
-  ResponseEntity<ApiResult<Void>> unskip(
+  ResponseEntity<ApiResult<Void>> undo(
       @AuthenticationPrincipal Long userId,
       @Parameter(description = "루틴 ID", example = "1") @PathVariable Long routineId,
       @Parameter(description = "건너뜀을 취소할 날짜 (yyyy-MM-dd)", example = "2026-07-01") @PathVariable

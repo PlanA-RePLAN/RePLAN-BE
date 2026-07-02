@@ -28,6 +28,133 @@ import plana.replan.global.common.ApiResult;
 public interface RoutineControllerDocs {
 
   @Operation(
+      summary = "핀된 루틴 인스턴스 조회",
+      description =
+          """
+          핀(pin) 처리된 모든 루틴 인스턴스를 날짜별로 묶어 반환합니다.
+
+          - override의 `isPinned = true`인 인스턴스를 날짜 오름차순으로 반환합니다.
+          - 건너뜀(`isSkipped = true`) 처리된 인스턴스는 포함되지 않습니다.
+          - 과거·현재·미래 날짜 모두 포함됩니다.
+          - 응답 구조는 `GET /api/routines`와 동일하게 날짜(yyyy-MM-dd) → 루틴 배열 형태입니다.
+
+          ---
+
+          ### Request Headers
+
+          | 헤더명 | 필수 여부 | 타입 | 설명 |
+          |--------|-----------|------|------|
+          | Authorization | ✅ 필수 | string | `Bearer {accessToken}` 형식의 JWT 액세스 토큰 |
+
+          ---
+
+          ### Response Elements
+
+          응답 `data`는 날짜(yyyy-MM-dd)를 키로 하는 객체이며, 값은 해당 날짜의 핀된 루틴 배열입니다.
+          각 항목의 필드는 `GET /api/routines` 응답과 동일합니다.
+          """,
+      security = @SecurityRequirement(name = "Bearer Authentication"))
+  @ApiResponses({
+    @ApiResponse(
+        responseCode = "200",
+        description = "조회 성공",
+        content =
+            @Content(
+                examples =
+                    @ExampleObject(
+                        value =
+                            """
+                            {
+                              "status": 200,
+                              "success": true,
+                              "data": {
+                                "2025-06-20": [
+                                  {
+                                    "routineId": 1,
+                                    "title": "아침 스트레칭",
+                                    "dueDate": "2025-06-20T08:00:00",
+                                    "repeatEndDate": null,
+                                    "routineTime": "08:00:00",
+                                    "routineType": "DAILY",
+                                    "routineDays": null,
+                                    "tagId": null,
+                                    "tagTitle": null,
+                                    "tagColor": null,
+                                    "goalId": null,
+                                    "todoId": 42,
+                                    "sortOrder": 10000.0,
+                                    "isPinned": true,
+                                    "isCompleted": false,
+                                    "isOverdue": true,
+                                    "hasOverride": true
+                                  }
+                                ]
+                              },
+                              "error": null
+                            }
+                            """))),
+    @ApiResponse(
+        responseCode = "401",
+        description = "인증 실패 — 토큰 없음 또는 만료",
+        content =
+            @Content(
+                examples = {
+                  @ExampleObject(
+                      name = "토큰 없음",
+                      value =
+                          """
+                          {
+                            "status": 401,
+                            "success": false,
+                            "data": null,
+                            "error": {
+                              "code": "EMPTY_TOKEN",
+                              "message": "토큰이 없습니다.",
+                              "detail": null
+                            }
+                          }
+                          """),
+                  @ExampleObject(
+                      name = "만료된 토큰",
+                      value =
+                          """
+                          {
+                            "status": 401,
+                            "success": false,
+                            "data": null,
+                            "error": {
+                              "code": "EXPIRED_TOKEN",
+                              "message": "만료된 토큰입니다.",
+                              "detail": null
+                            }
+                          }
+                          """)
+                })),
+    @ApiResponse(
+        responseCode = "404",
+        description = "유저를 찾을 수 없음",
+        content =
+            @Content(
+                examples =
+                    @ExampleObject(
+                        value =
+                            """
+                            {
+                              "status": 404,
+                              "success": false,
+                              "data": null,
+                              "error": {
+                                "code": "USER_NOT_FOUND",
+                                "message": "유저를 찾을 수 없습니다.",
+                                "detail": null
+                              }
+                            }
+                            """)))
+  })
+  ResponseEntity<ApiResult<Map<String, List<RoutineResponseDto>>>> getPinnedRoutines(
+      @AuthenticationPrincipal Long userId);
+
+  @Operation(
       summary = "루틴 조회 (날짜 / 주간 / 월간)",
       description =
           """
@@ -70,16 +197,22 @@ public interface RoutineControllerDocs {
           | 필드명 | 타입 | 설명 |
           |--------|------|------|
           | routineId | integer | 루틴 ID |
-          | title | string | 루틴 제목 |
-          | dueDate | string | 반복 종료 마감일 (ISO 8601 형식). 없으면 null |
+          | title | string | 루틴 제목 (override 적용값) |
+          | dueDate | string | 해당 날짜 인스턴스 마감 일시 (ISO 8601 형식). instanceDate + routineTime (없으면 23:59:59) |
+          | repeatEndDate | string | 반복 종료 마감일 (ISO 8601 형식). 없으면 null |
           | routineTime | string | 마감 시각 (HH:mm:ss 형식). 없으면 null |
           | routineType | string | 반복 유형 (`DAILY` / `WEEKLY` / `MONTHLY`) |
-          | routineDays | integer | 반복 날짜 배열. DAILY는 null, WEEKLY는 요일 인덱스(월0…일6), MONTHLY는 일자(1~31) |
-          | tagId | integer | 태그 ID. 없으면 null |
+          | routineDays | array | 반복 날짜 배열. DAILY는 null, WEEKLY는 요일 인덱스(월0…일6), MONTHLY는 일자(1~31) |
+          | tagId | integer | 태그 ID (override 적용값). 없으면 null |
           | tagTitle | string | 태그 제목. 없으면 null |
           | tagColor | string | 태그 색상. 없으면 null |
           | goalId | integer | 목표 ID. 없으면 null |
           | todoId | integer | 해당 날짜에 생성된 Todo ID. 아직 생성 안 됐으면 null |
+          | sortOrder | number | 해당 날짜 인스턴스의 정렬 순서 |
+          | isPinned | boolean | 해당 날짜 핀 여부 |
+          | isCompleted | boolean | 해당 날짜 완료 여부 |
+          | isOverdue | boolean | 마감 시각이 지났고 미완료인 경우 true |
+          | hasOverride | boolean | override 존재 여부 |
           """,
       security = @SecurityRequirement(name = "Bearer Authentication"))
   @ApiResponses({
@@ -100,7 +233,8 @@ public interface RoutineControllerDocs {
                                   {
                                     "routineId": 1,
                                     "title": "아침 스트레칭",
-                                    "dueDate": null,
+                                    "dueDate": "2025-06-20T08:00:00",
+                                    "repeatEndDate": null,
                                     "routineTime": "08:00:00",
                                     "routineType": "DAILY",
                                     "routineDays": null,
@@ -108,14 +242,20 @@ public interface RoutineControllerDocs {
                                     "tagTitle": null,
                                     "tagColor": null,
                                     "goalId": null,
-                                    "todoId": 42
+                                    "todoId": 42,
+                                    "sortOrder": 10000.0,
+                                    "isPinned": false,
+                                    "isCompleted": false,
+                                    "isOverdue": false,
+                                    "hasOverride": false
                                   }
                                 ],
                                 "2025-06-21": [
                                   {
                                     "routineId": 1,
                                     "title": "아침 스트레칭",
-                                    "dueDate": null,
+                                    "dueDate": "2025-06-21T08:00:00",
+                                    "repeatEndDate": null,
                                     "routineTime": "08:00:00",
                                     "routineType": "DAILY",
                                     "routineDays": null,
@@ -123,12 +263,18 @@ public interface RoutineControllerDocs {
                                     "tagTitle": null,
                                     "tagColor": null,
                                     "goalId": null,
-                                    "todoId": null
+                                    "todoId": null,
+                                    "sortOrder": 10000.0,
+                                    "isPinned": false,
+                                    "isCompleted": false,
+                                    "isOverdue": false,
+                                    "hasOverride": false
                                   },
                                   {
                                     "routineId": 2,
                                     "title": "영어 단어 외우기",
-                                    "dueDate": "2025-12-31T00:00:00",
+                                    "dueDate": "2025-06-21T09:00:00",
+                                    "repeatEndDate": "2025-12-31T00:00:00",
                                     "routineTime": "09:00:00",
                                     "routineType": "WEEKLY",
                                     "routineDays": [0, 2, 4],
@@ -136,7 +282,12 @@ public interface RoutineControllerDocs {
                                     "tagTitle": "영어",
                                     "tagColor": "BLUE",
                                     "goalId": 2,
-                                    "todoId": 43
+                                    "todoId": 43,
+                                    "sortOrder": 20000.0,
+                                    "isPinned": false,
+                                    "isCompleted": false,
+                                    "isOverdue": false,
+                                    "hasOverride": false
                                   }
                                 ]
                               },
