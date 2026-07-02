@@ -62,7 +62,7 @@ public interface RoutineRepository extends JpaRepository<Routine, Long> {
                  ro.override_date                                      AS overrideDate,
                  (COALESCE(td.due_date,
                     CAST(CAST(:targetDate AS date) + COALESCE(r.routine_time, TIME '23:59:59') AS timestamp)
-                  ) < NOW()
+                  ) < NOW() AT TIME ZONE 'Asia/Seoul'
                   AND CASE WHEN td.id IS NOT NULL THEN td.is_completed
                            ELSE COALESCE(ro.is_completed, FALSE)
                       END = FALSE)                                     AS isOverdue
@@ -126,7 +126,7 @@ public interface RoutineRepository extends JpaRepository<Routine, Long> {
                  ro.override_date                                      AS overrideDate,
                  (COALESCE(td.due_date,
                     CAST(ro.override_date + COALESCE(r.routine_time, TIME '23:59:59') AS timestamp)
-                  ) < NOW()
+                  ) < NOW() AT TIME ZONE 'Asia/Seoul'
                   AND CASE WHEN td.id IS NOT NULL THEN td.is_completed
                            ELSE COALESCE(ro.is_completed, FALSE)
                       END = FALSE)                                     AS isOverdue
