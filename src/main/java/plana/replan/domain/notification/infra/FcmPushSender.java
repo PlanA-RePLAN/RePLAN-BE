@@ -5,11 +5,13 @@ import com.google.firebase.messaging.FirebaseMessagingException;
 import com.google.firebase.messaging.Message;
 import com.google.firebase.messaging.MessagingErrorCode;
 import com.google.firebase.messaging.Notification;
+import java.util.HashMap;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
+import plana.replan.domain.notification.entity.Platform;
 
 @Slf4j
 @Component
@@ -24,13 +26,28 @@ public class FcmPushSender implements PushSender {
   private final FirebaseMessaging firebaseMessaging;
 
   @Override
-  public PushResult send(String token, String title, String body, Map<String, String> data) {
-    Message message =
-        Message.builder()
-            .setToken(token)
-            .setNotification(Notification.builder().setTitle(title).setBody(body).build())
-            .putAllData(data == null ? java.util.Map.of() : data)
-            .build();
+  public PushResult send(
+      String token, String title, String body, Map<String, String> data, Platform platform) {
+    Message.Builder builder = Message.builder().setToken(token);
+
+    if (platform == Platform.WEB) {
+      // 웹은 notification 블록을 넣으면 브라우저 자동표시(1) + 서비스워커 표시(1)로 알림이 2개 뜬다.
+      // 그래서 제목·본문을 data에 담아 data-only로 보내고, 서비스워커가 data를 읽어 단독으로 표시한다.
+      Map<String, String> payload = new HashMap<>();
+      if (data != null) {
+        payload.putAll(data);
+      }
+      payload.put("title", title == null ? "" : title);
+      payload.put("body", body == null ? "" : body);
+      builder.putAllData(payload);
+    } else {
+      // 네이티브(IOS/ANDROID)는 OS 트레이 자동표시를 위해 notification 블록을 담는다(기존 동작 유지).
+      builder
+          .setNotification(Notification.builder().setTitle(title).setBody(body).build())
+          .putAllData(data == null ? Map.of() : data);
+    }
+
+    Message message = builder.build();
     try {
       firebaseMessaging.send(message);
       return PushResult.SUCCESS;

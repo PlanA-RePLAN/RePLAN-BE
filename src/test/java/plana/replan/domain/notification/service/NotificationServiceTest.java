@@ -63,7 +63,7 @@ class NotificationServiceTest {
         userWithReportOff(), NotificationType.REPORT_READY, "t", "b", TargetType.REPORT, 1L);
 
     verify(notificationRepository, never()).save(any());
-    verify(pushSender, never()).send(any(), any(), any(), anyMap());
+    verify(pushSender, never()).send(any(), any(), any(), anyMap(), any());
   }
 
   @Test
@@ -73,14 +73,15 @@ class NotificationServiceTest {
     DeviceToken t1 = DeviceToken.builder().user(u).token("a").platform(Platform.WEB).build();
     DeviceToken t2 = DeviceToken.builder().user(u).token("b").platform(Platform.ANDROID).build();
     given(deviceTokenRepository.findAllByUser(u)).willReturn(List.of(t1, t2));
-    given(pushSender.send(any(), any(), any(), anyMap())).willReturn(PushResult.SUCCESS);
+    given(pushSender.send(any(), any(), any(), anyMap(), any())).willReturn(PushResult.SUCCESS);
 
     notificationService.send(
         u, NotificationType.TODO_DUE_SOON, "title", "body", TargetType.TODO, 9L);
 
     verify(notificationRepository).save(any(Notification.class));
-    verify(pushSender).send(eq("a"), eq("title"), eq("body"), anyMap());
-    verify(pushSender).send(eq("b"), eq("title"), eq("body"), anyMap());
+    // 토큰의 플랫폼이 그대로 전달돼야 한다(웹/네이티브 분기의 근거).
+    verify(pushSender).send(eq("a"), eq("title"), eq("body"), anyMap(), eq(Platform.WEB));
+    verify(pushSender).send(eq("b"), eq("title"), eq("body"), anyMap(), eq(Platform.ANDROID));
   }
 
   @Test
@@ -89,7 +90,7 @@ class NotificationServiceTest {
     User u = userAllOn();
     DeviceToken dead = DeviceToken.builder().user(u).token("dead").platform(Platform.WEB).build();
     given(deviceTokenRepository.findAllByUser(u)).willReturn(List.of(dead));
-    given(pushSender.send(any(), any(), any(), anyMap())).willReturn(PushResult.DEAD_TOKEN);
+    given(pushSender.send(any(), any(), any(), anyMap(), any())).willReturn(PushResult.DEAD_TOKEN);
 
     notificationService.send(
         u, NotificationType.TODO_DUE_SOON, "title", "body", TargetType.TODO, 9L);
