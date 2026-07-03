@@ -986,7 +986,7 @@ class TodoServiceTest {
     List<TodoListResponseDto> result = todoService.getPinnedTodos(1L);
 
     assertThat(result).hasSize(2);
-    assertThat(result).extracting("isPinned").containsOnly(true);
+    assertThat(result).extracting("pinned").containsOnly(true);
   }
 
   @Test
