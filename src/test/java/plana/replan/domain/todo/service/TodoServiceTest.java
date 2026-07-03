@@ -627,16 +627,30 @@ class TodoServiceTest {
   void getTodos_day_activeTodosBeforeCompleted() {
     User user = testUser();
     given(userRepository.findById(1L)).willReturn(Optional.of(user));
-    given(todoRepository.findActiveTodosByDueDateRange(any(), any(), any()))
-        .willReturn(List.of(activeTodo(1L, user)));
-    given(todoRepository.findCompletedTodosByCompletedTimeRange(any(), any(), any()))
-        .willReturn(List.of(completedTodo(2L, user)));
+    given(todoRepository.findAllTodosByDueDateRange(any(), any(), any()))
+        .willReturn(List.of(activeTodo(1L, user), completedTodo(2L, user)));
 
     List<TodoListResponseDto> result = todoService.getTodos(1L, "day", "priority", null);
 
     assertThat(result).hasSize(2);
     assertThat(result.get(0).isCompleted()).isFalse();
     assertThat(result.get(1).isCompleted()).isTrue();
+  }
+
+  @Test
+  @DisplayName("getTodos - day 필터: 완료 시각이 아닌 마감기한(dueDate) 기준으로만 조회")
+  void getTodos_day_filtersByDueDateOnly() {
+    User user = testUser();
+    given(userRepository.findById(1L)).willReturn(Optional.of(user));
+    given(todoRepository.findAllTodosByDueDateRange(any(), any(), any())).willReturn(List.of());
+
+    todoService.getTodos(1L, "day", "priority", LocalDate.of(2026, 7, 1));
+
+    ArgumentCaptor<LocalDateTime> start = ArgumentCaptor.forClass(LocalDateTime.class);
+    ArgumentCaptor<LocalDateTime> end = ArgumentCaptor.forClass(LocalDateTime.class);
+    verify(todoRepository).findAllTodosByDueDateRange(any(), start.capture(), end.capture());
+    assertThat(start.getValue()).isEqualTo(LocalDate.of(2026, 7, 1).atStartOfDay());
+    assertThat(end.getValue()).isEqualTo(LocalDate.of(2026, 7, 1).atTime(23, 59, 59, 999999999));
   }
 
   @Test
@@ -654,8 +668,6 @@ class TodoServiceTest {
     verify(todoRepository).findAllTodosByDueDateRange(any(), start.capture(), end.capture());
     assertThat(start.getValue()).isEqualTo(LocalDate.of(2026, 6, 18).atStartOfDay());
     assertThat(end.getValue()).isEqualTo(LocalDate.of(2026, 6, 24).atTime(23, 59, 59, 999999999));
-    verify(todoRepository, never()).findActiveTodosByDueDateRange(any(), any(), any());
-    verify(todoRepository, never()).findCompletedTodosByCompletedTimeRange(any(), any(), any());
   }
 
   @Test
@@ -673,8 +685,6 @@ class TodoServiceTest {
     verify(todoRepository).findAllTodosByDueDateRange(any(), start.capture(), end.capture());
     assertThat(start.getValue()).isEqualTo(LocalDate.of(2026, 6, 18).atStartOfDay());
     assertThat(end.getValue()).isEqualTo(LocalDate.of(2026, 7, 17).atTime(23, 59, 59, 999999999));
-    verify(todoRepository, never()).findActiveTodosByDueDateRange(any(), any(), any());
-    verify(todoRepository, never()).findCompletedTodosByCompletedTimeRange(any(), any(), any());
   }
 
   @Test
@@ -806,8 +816,7 @@ class TodoServiceTest {
     ReflectionTestUtils.setField(completed, "dueDate", LocalDateTime.of(2020, 1, 1, 0, 0));
 
     given(userRepository.findById(1L)).willReturn(Optional.of(user));
-    given(todoRepository.findActiveTodosByDueDateRange(any(), any(), any())).willReturn(List.of());
-    given(todoRepository.findCompletedTodosByCompletedTimeRange(any(), any(), any()))
+    given(todoRepository.findAllTodosByDueDateRange(any(), any(), any()))
         .willReturn(List.of(completed));
 
     List<TodoListResponseDto> result = todoService.getTodos(1L, "day", "priority", null);
