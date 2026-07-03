@@ -27,7 +27,7 @@ public class TodoDetailResponseDto {
 
   @JsonProperty("isCompleted")
   @Schema(description = "완료 여부", example = "false")
-  private boolean isCompleted;
+  private boolean completed;
 
   @Schema(description = "태그 ID (없으면 null)", example = "3")
   private Long tagId;
@@ -62,7 +62,7 @@ public class TodoDetailResponseDto {
 
     @JsonProperty("isCompleted")
     @Schema(description = "완료 여부", example = "false")
-    private boolean isCompleted;
+    private boolean completed;
 
     public static SubTodoDto from(Todo todo) {
       return new SubTodoDto(todo.getId(), todo.getTitle(), todo.isCompleted());
