@@ -160,6 +160,53 @@ class ReplanServiceTest {
   }
 
   @Test
+  void 추천_ADD와_MODIFY_TODO는_마감일이_없으면_앵커_마감일로_채워진다() {
+    Todo anchor = ownedTodo(42L, 1L);
+    given(anchor.getId()).willReturn(42L);
+    given(anchor.getDueDate()).willReturn(LocalDateTime.of(2026, 6, 20, 10, 0));
+    given(todoRepository.findById(42L)).willReturn(Optional.of(anchor));
+    given(tagRepository.findAllByUserId(1L)).willReturn(List.of());
+
+    // AI가 dueDate를 null로 준 ADD/MODIFY_TODO도 응답에는 마감일이 채워져야 한다.
+    ReplanOperation add =
+        new ReplanOperation(
+            ReplanAction.ADD, null, "새 투두", null, null, null, null, null, null, List.of());
+    ReplanOperation modify =
+        new ReplanOperation(
+            ReplanAction.MODIFY_TODO, 42L, "수정", null, null, null, null, null, null, List.of());
+    given(aiService.generateRecommend(any())).willReturn(List.of(add, modify));
+
+    ReplanRecommendResponse res =
+        replanService.recommend(
+            1L, new ReplanRecommendRequest(42L, List.of("INTERRUPT_SUDDEN"), null, null));
+
+    assertThat(res.operations()).allSatisfy(op -> assertThat(op.dueDate()).isNotNull());
+    // 앵커 마감일(2026-06-20)이 있으므로 그 날짜로 채워진다.
+    assertThat(res.operations().get(0).dueDate()).isEqualTo("2026-06-20");
+    assertThat(res.operations().get(1).dueDate()).isEqualTo("2026-06-20");
+  }
+
+  @Test
+  void 추천_AI가_준_마감일이_있으면_그대로_둔다() {
+    Todo anchor = ownedTodo(42L, 1L);
+    given(anchor.getId()).willReturn(42L);
+    given(anchor.getDueDate()).willReturn(LocalDateTime.of(2026, 6, 20, 10, 0));
+    given(todoRepository.findById(42L)).willReturn(Optional.of(anchor));
+    given(tagRepository.findAllByUserId(1L)).willReturn(List.of());
+
+    ReplanOperation add =
+        new ReplanOperation(
+            ReplanAction.ADD, null, "새 투두", "2026-06-25", null, null, null, null, null, List.of());
+    given(aiService.generateRecommend(any())).willReturn(List.of(add));
+
+    ReplanRecommendResponse res =
+        replanService.recommend(
+            1L, new ReplanRecommendRequest(42L, List.of("INTERRUPT_SUDDEN"), null, null));
+
+    assertThat(res.operations().get(0).dueDate()).isEqualTo("2026-06-25");
+  }
+
+  @Test
   void 필요한_질문중_일부만_답하면_남은_질문을_다시_묻는다() {
     Todo todo = ownedTodo(42L, 1L);
     given(todo.getId()).willReturn(42L);

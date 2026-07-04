@@ -91,40 +91,60 @@ public class ReplanService {
 
     RecommendInput input = buildInput(anchor, req.reasonCodes(), null, req.answers(), refreshCount);
     List<ReplanOperation> operations =
-        applyModifyTagPolicy(aiService.generateRecommend(input), anchor);
+        normalizeRecommendedOperations(aiService.generateRecommend(input), anchor);
     return ReplanRecommendResponse.recommendation(operations, reasonLabels);
   }
 
   /**
-   * 수정(MODIFY_TODO/MODIFY_ROUTINE) 작업의 태그를 AI가 고른 값 대신 대상의 기존 태그로 고정한다. 리플랜은 투두를 쪼개거나 미루는 것이지
-   * 카테고리(태그)를 바꾸는 게 아니므로 태그는 그대로 유지한다. 신규 추가(ADD/CREATE_ROUTINE)는 AI가 배정한 태그를 그대로 둔다.
+   * AI가 만든 추천 작업을 응답용으로 보정한다.
    *
-   * <p>미리보기에 넣는 태그는 실제 저장될 태그와 일치해야 한다.
-   *
-   * <ul>
-   *   <li>MODIFY_ROUTINE: 저장 시 회차 오버라이드 태그가 아니라 엄마 루틴 태그(routine.getTag())를 유지하므로 미리보기도 루틴 태그를 쓴다.
-   *   <li>MODIFY_TODO: 저장 시 대상 투두(target.getTag())를 유지한다. 대상이 앵커가 아닌 다른 투두일 수도 있으므로(우선순위 재정렬 등)
-   *       targetTodoId로 조회해 그 투두의 태그를 쓴다.
-   * </ul>
+   * <ol>
+   *   <li><b>태그</b>: 수정(MODIFY) 작업의 태그를 AI 값 대신 실제 저장될 태그로 고정한다. 리플랜은 투두를 쪼개거나 미루는 것이지 카테고리(태그)를
+   *       바꾸는 게 아니다. MODIFY_ROUTINE(대상=앵커)은 엄마 루틴 태그를, MODIFY_TODO는 대상 투두의 기존 태그를 쓴다(저장 경로와 동일). 신규
+   *       추가(ADD/CREATE_ROUTINE)는 AI가 배정한 태그를 그대로 둔다.
+   *   <li><b>마감일</b>: 새 투두(ADD)·기존 투두 수정(MODIFY_TODO)에 dueDate가 없으면 채워, 추천 결과의 모든 투두에 마감기한이 있게 한다.
+   *       MODIFY_TODO는 대상 투두의 기존 마감일을, 없으면 앵커/오늘 날짜를 쓴다. ADD는 앵커/오늘 날짜를 쓴다. (CREATE_ROUTINE의
+   *       dueDate는 '반복 종료일'이라 무기한이면 null이 정상이므로 건드리지 않는다.)
+   * </ol>
    */
-  private List<ReplanOperation> applyModifyTagPolicy(
+  private List<ReplanOperation> normalizeRecommendedOperations(
       List<ReplanOperation> operations, Todo anchor) {
     List<ReplanOperation> result = new ArrayList<>();
     for (ReplanOperation op : operations) {
-      Tag tag;
-      if (op.action() == ReplanAction.MODIFY_ROUTINE && isAnchorTarget(op, anchor)) {
-        // 저장 경로(applyModifyRoutine)는 targetTodoId가 앵커일 때만 유효하고 엄마 루틴 태그를 유지한다.
-        // 미리보기도 같은 조건일 때만 엄마 루틴 태그를 붙여 저장될 값과 일치시킨다.
-        tag = anchor.getRoutine() != null ? anchor.getRoutine().getTag() : null;
-      } else if (op.action() == ReplanAction.MODIFY_TODO
-          || op.action() == ReplanAction.MODIFY_ROUTINE) {
-        // MODIFY_TODO, 그리고 대상이 앵커가 아닌(저장 시 거부될) MODIFY_ROUTINE은 대상 투두의 기존 태그를 쓴다.
-        tag = existingTagForModify(op.targetTodoId(), anchor);
-      } else {
-        result.add(op); // ADD/CREATE_ROUTINE: AI가 배정한 태그 그대로 둔다.
-        continue;
+      ReplanOperation normalized = op;
+      switch (op.action()) {
+        case MODIFY_ROUTINE -> {
+          // 대상이 앵커일 때만 엄마 루틴 태그(저장 경로와 동일), 아니면 대상 투두의 기존 태그.
+          Tag tag =
+              isAnchorTarget(op, anchor)
+                  ? (anchor.getRoutine() != null ? anchor.getRoutine().getTag() : null)
+                  : tagOf(ownedTargetTodo(op.targetTodoId(), anchor));
+          normalized = normalized.withTag(idOf(tag), titleOf(tag));
+        }
+        case MODIFY_TODO -> {
+          Todo target = ownedTargetTodo(op.targetTodoId(), anchor);
+          Tag tag = tagOf(target);
+          normalized = normalized.withTag(idOf(tag), titleOf(tag));
+          if (op.dueDate() == null) {
+            LocalDate due =
+                target != null && target.getDueDate() != null
+                    ? target.getDueDate().toLocalDate()
+                    : anchorDueDateOrToday(anchor);
+            normalized = normalized.withDueDate(due.format(DateTimeFormatter.ISO_LOCAL_DATE));
+          }
+        }
+        case ADD -> {
+          if (op.dueDate() == null) {
+            normalized =
+                normalized.withDueDate(
+                    anchorDueDateOrToday(anchor).format(DateTimeFormatter.ISO_LOCAL_DATE));
+          }
+        }
+        case CREATE_ROUTINE -> {
+          // 루틴 종료일(dueDate)은 무기한이면 null이 정상 — 태그·마감일 모두 그대로 둔다.
+        }
       }
-      result.add(op.withTag(tag == null ? null : tag.getId(), tag == null ? null : tag.getTitle()));
+      result.add(normalized);
     }
     return result;
   }
@@ -134,19 +154,35 @@ public class ReplanService {
     return op.targetTodoId() != null && op.targetTodoId().equals(anchor.getId());
   }
 
-  /** 수정 대상 투두의 기존 태그를 찾는다. 앵커면 앵커 태그, 아니면 소유한 투두를 조회해 그 태그(없으면 null). */
-  private Tag existingTagForModify(Long targetTodoId, Todo anchor) {
+  /** 수정 대상 투두를 찾는다. 앵커면 앵커, 아니면 소유한 투두를 조회(없거나 남의 것이면 null). */
+  private Todo ownedTargetTodo(Long targetTodoId, Todo anchor) {
     if (targetTodoId == null) {
       return null;
     }
     if (targetTodoId.equals(anchor.getId())) {
-      return anchor.getTag();
+      return anchor;
     }
     return todoRepository
         .findById(targetTodoId)
         .filter(t -> t.getUser().getId().equals(anchor.getUser().getId()))
-        .map(Todo::getTag)
         .orElse(null);
+  }
+
+  /** 앵커 투두의 마감 날짜(시간 제외). 없으면 오늘 날짜. 마감일이 없는 투두의 기본 마감일로 쓴다. */
+  private LocalDate anchorDueDateOrToday(Todo anchor) {
+    return anchor.getDueDate() != null ? anchor.getDueDate().toLocalDate() : LocalDate.now(clock);
+  }
+
+  private Tag tagOf(Todo todo) {
+    return todo != null ? todo.getTag() : null;
+  }
+
+  private Long idOf(Tag tag) {
+    return tag != null ? tag.getId() : null;
+  }
+
+  private String titleOf(Tag tag) {
+    return tag != null ? tag.getTitle() : null;
   }
 
   /**

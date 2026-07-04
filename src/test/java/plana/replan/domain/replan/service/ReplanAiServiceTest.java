@@ -137,6 +137,29 @@ class ReplanAiServiceTest {
   }
 
   @Test
+  void 추천_프롬프트에_마감일_필수_규칙이_포함된다() {
+    RecommendInput input =
+        new RecommendInput(
+            7L,
+            "데이터 분석 공부하기",
+            "2026-06-07",
+            null,
+            false,
+            null,
+            List.of("목표 개선 필요"),
+            List.of(),
+            "2026-06-18",
+            0,
+            List.of());
+
+    String prompt = service.buildRecommendPrompt(input);
+
+    // ADD/MODIFY_TODO는 dueDate를 반드시 채우도록 지시해야 한다.
+    assertThat(prompt).contains("dueDate");
+    assertThat(prompt).contains("절대 null로 두지 않는다");
+  }
+
+  @Test
   void 추천_프롬프트에_대상_투두ID와_규칙이_포함된다() {
     RecommendInput input =
         new RecommendInput(

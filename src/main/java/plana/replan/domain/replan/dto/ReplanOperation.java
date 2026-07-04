@@ -41,4 +41,19 @@ public record ReplanOperation(
         routineDays,
         changedFields);
   }
+
+  /** 마감 날짜(dueDate)만 바꾼 복사본을 만든다. 추천 결과에 마감기한이 비지 않도록 채울 때 쓴다. */
+  public ReplanOperation withDueDate(String dueDate) {
+    return new ReplanOperation(
+        action,
+        targetTodoId,
+        title,
+        dueDate,
+        dueTime,
+        tagId,
+        tagName,
+        routineType,
+        routineDays,
+        changedFields);
+  }
 }
