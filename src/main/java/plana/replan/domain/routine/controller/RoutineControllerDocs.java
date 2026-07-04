@@ -464,7 +464,9 @@ public interface RoutineControllerDocs {
           @RequestParam(defaultValue = "day")
           String filter,
       @Parameter(
-              description = "기준 시작 날짜 (yyyy-MM-dd). filter=day/week/month에서는 필수, filter=all에서는 무시됨",
+              description =
+                  "기준 시작 날짜 (yyyy-MM-dd). filter=day/week/month에서는 필수(생략 시 400), filter=all에서는"
+                      + " 생략 가능(주더라도 무시됨). 단, 값 자체가 yyyy-MM-dd 형식이 아니면 filter 값과 무관하게 400 발생",
               example = "2025-06-20")
           @RequestParam(required = false)
           LocalDate date);

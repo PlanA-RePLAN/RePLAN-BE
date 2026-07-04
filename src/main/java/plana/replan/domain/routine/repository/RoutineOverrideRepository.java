@@ -20,6 +20,9 @@ public interface RoutineOverrideRepository extends JpaRepository<RoutineOverride
 
   void deleteByRoutineAndOverrideDateGreaterThanEqual(Routine routine, LocalDate date);
 
+  @Query("SELECT o FROM RoutineOverride o LEFT JOIN FETCH o.tag WHERE o.routine IN :routines")
+  List<RoutineOverride> findByRoutineIn(@Param("routines") List<Routine> routines);
+
   @Modifying
   @Query("UPDATE RoutineOverride o SET o.tag = null WHERE o.tag = :tag")
   void clearTagFromOverrides(@Param("tag") Tag tag);

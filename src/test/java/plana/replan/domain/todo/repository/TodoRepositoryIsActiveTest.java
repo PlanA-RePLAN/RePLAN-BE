@@ -115,7 +115,7 @@ class TodoRepositoryIsActiveTest {
     retiredCompleted.deactivate();
     todoRepository.saveAndFlush(retiredCompleted);
 
-    List<Todo> result = todoRepository.findCompletedMotherTodosByRoutine(routine);
+    List<Todo> result = todoRepository.findCompletedMotherTodosByRoutines(List.of(routine));
 
     assertThat(result).extracting(Todo::getTitle).containsExactly("활성 완료");
   }
@@ -145,7 +145,7 @@ class TodoRepositoryIsActiveTest {
     retiredIncomplete.deactivate();
     todoRepository.saveAndFlush(retiredIncomplete);
 
-    var result = todoRepository.findLatestIncompleteMotherTodoByRoutine(routine);
+    List<Todo> result = todoRepository.findIncompleteMotherTodosByRoutines(List.of(routine));
 
     assertThat(result).isEmpty();
   }

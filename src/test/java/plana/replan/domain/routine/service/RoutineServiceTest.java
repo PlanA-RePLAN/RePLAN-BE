@@ -3,7 +3,6 @@ package plana.replan.domain.routine.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
@@ -916,17 +915,35 @@ class RoutineServiceTest {
 
   // ========== getRoutinesByFilter ==========
 
+  private Todo routineTodo(Routine routine, String title, LocalDateTime dueDate) {
+    return Todo.builder()
+        .title(title)
+        .dueDate(dueDate)
+        .user(testUser())
+        .isPinned(false)
+        .routine(routine)
+        .build();
+  }
+
+  private void givenAllFilterData(
+      Routine routine,
+      List<Todo> completed,
+      List<Todo> incomplete,
+      List<RoutineOverride> overrides) {
+    given(routineRepository.findAllActiveMotherRoutinesByUser(1L)).willReturn(List.of(routine));
+    given(todoRepository.findCompletedMotherTodosByRoutines(List.of(routine)))
+        .willReturn(completed);
+    given(todoRepository.findIncompleteMotherTodosByRoutines(List.of(routine)))
+        .willReturn(incomplete);
+    given(routineOverrideRepository.findByRoutineIn(List.of(routine))).willReturn(overrides);
+  }
+
   @Test
   void getRoutinesByFilter_all_완료된Todo도_미완료Todo도_없으면_루틴_기본값_1건() {
     given(userRepository.findById(1L)).willReturn(Optional.of(testUser()));
     Routine routine = buildRoutine(RoutineType.DAILY, null);
     ReflectionTestUtils.setField(routine, "id", 10L);
-    given(routineRepository.findAllActiveMotherRoutinesByUser(1L)).willReturn(List.of(routine));
-    given(todoRepository.findCompletedMotherTodosByRoutine(routine)).willReturn(List.of());
-    given(todoRepository.findLatestIncompleteMotherTodoByRoutine(routine))
-        .willReturn(Optional.empty());
-    given(routineOverrideRepository.findByRoutineAndOverrideDate(eq(routine), any()))
-        .willReturn(Optional.empty());
+    givenAllFilterData(routine, List.of(), List.of(), List.of());
 
     Map<String, List<RoutineResponseDto>> result =
         routineService.getRoutinesByFilter(1L, "all", null);
@@ -941,11 +958,24 @@ class RoutineServiceTest {
   }
 
   @Test
+  void getRoutinesByFilter_all_라우틴이_없으면_배치조회_없이_빈리스트() {
+    given(userRepository.findById(1L)).willReturn(Optional.of(testUser()));
+    given(routineRepository.findAllActiveMotherRoutinesByUser(1L)).willReturn(List.of());
+
+    Map<String, List<RoutineResponseDto>> result =
+        routineService.getRoutinesByFilter(1L, "all", null);
+
+    assertThat(result.get("all")).isEmpty();
+    verify(todoRepository, never()).findCompletedMotherTodosByRoutines(any());
+    verify(todoRepository, never()).findIncompleteMotherTodosByRoutines(any());
+    verify(routineOverrideRepository, never()).findByRoutineIn(any());
+  }
+
+  @Test
   void getRoutinesByFilter_all_완료된_Todo는_기간제한없이_전부_반환() {
     given(userRepository.findById(1L)).willReturn(Optional.of(testUser()));
     Routine routine = buildRoutine(RoutineType.DAILY, null);
     ReflectionTestUtils.setField(routine, "id", 10L);
-    given(routineRepository.findAllActiveMotherRoutinesByUser(1L)).willReturn(List.of(routine));
 
     Todo oldCompleted = routineTodo(routine, "예전 스트레칭", TEST_DATE.minusDays(30).atTime(8, 0));
     ReflectionTestUtils.setField(oldCompleted, "id", 100L);
@@ -954,12 +984,7 @@ class RoutineServiceTest {
     ReflectionTestUtils.setField(todayCompleted, "id", 200L);
     todayCompleted.updateCompleted(true, TEST_DATE.atStartOfDay());
 
-    given(todoRepository.findCompletedMotherTodosByRoutine(routine))
-        .willReturn(List.of(todayCompleted, oldCompleted));
-    given(todoRepository.findLatestIncompleteMotherTodoByRoutine(routine))
-        .willReturn(Optional.empty());
-    given(routineOverrideRepository.findByRoutineAndOverrideDate(eq(routine), any()))
-        .willReturn(Optional.empty());
+    givenAllFilterData(routine, List.of(todayCompleted, oldCompleted), List.of(), List.of());
 
     Map<String, List<RoutineResponseDto>> result =
         routineService.getRoutinesByFilter(1L, "all", null);
@@ -976,14 +1001,12 @@ class RoutineServiceTest {
     given(userRepository.findById(1L)).willReturn(Optional.of(testUser()));
     Routine routine = buildRoutine(RoutineType.DAILY, null);
     ReflectionTestUtils.setField(routine, "id", 10L);
-    given(routineRepository.findAllActiveMotherRoutinesByUser(1L)).willReturn(List.of(routine));
-    given(todoRepository.findCompletedMotherTodosByRoutine(routine)).willReturn(List.of());
 
     Todo overdueIncomplete =
         routineTodo(routine, "어제 못한 스트레칭", TEST_DATE.minusDays(1).atTime(8, 0));
     ReflectionTestUtils.setField(overdueIncomplete, "id", 300L);
-    given(todoRepository.findLatestIncompleteMotherTodoByRoutine(routine))
-        .willReturn(Optional.of(overdueIncomplete));
+
+    givenAllFilterData(routine, List.of(), List.of(overdueIncomplete), List.of());
 
     Map<String, List<RoutineResponseDto>> result =
         routineService.getRoutinesByFilter(1L, "all", null);
@@ -1000,34 +1023,45 @@ class RoutineServiceTest {
     given(userRepository.findById(1L)).willReturn(Optional.of(testUser()));
     Routine routine = buildRoutine(RoutineType.DAILY, null);
     ReflectionTestUtils.setField(routine, "id", 10L);
-    given(routineRepository.findAllActiveMotherRoutinesByUser(1L)).willReturn(List.of(routine));
-    given(todoRepository.findCompletedMotherTodosByRoutine(routine)).willReturn(List.of());
-    given(todoRepository.findLatestIncompleteMotherTodoByRoutine(routine))
-        .willReturn(Optional.empty());
 
     RoutineOverride override =
         RoutineOverride.builder().routine(routine).overrideDate(TEST_DATE).build();
     override.updateContent("오버라이드 제목", null);
-    given(routineOverrideRepository.findByRoutineAndOverrideDate(routine, TEST_DATE))
-        .willReturn(Optional.of(override));
+
+    givenAllFilterData(routine, List.of(), List.of(), List.of(override));
 
     Map<String, List<RoutineResponseDto>> result =
         routineService.getRoutinesByFilter(1L, "all", null);
 
+    assertThat(result.get("all")).hasSize(1);
     RoutineResponseDto dto = result.get("all").get(0);
     assertThat(dto.getTodoId()).isNull();
     assertThat(dto.getTitle()).isEqualTo("오버라이드 제목");
     assertThat(dto.isHasOverride()).isTrue();
   }
 
-  private Todo routineTodo(Routine routine, String title, LocalDateTime dueDate) {
-    return Todo.builder()
-        .title(title)
-        .dueDate(dueDate)
-        .user(testUser())
-        .isPinned(false)
-        .routine(routine)
-        .build();
+  @Test
+  void getRoutinesByFilter_all_Todo없이_override로만_완료처리된_날짜도_완료이력에_포함된다() {
+    given(userRepository.findById(1L)).willReturn(Optional.of(testUser()));
+    Routine routine = buildRoutine(RoutineType.DAILY, null);
+    ReflectionTestUtils.setField(routine, "id", 10L);
+
+    // Todo가 아직 생성 안 된 미래 날짜에 override로만 완료 처리 (예: 미리 당겨서 완료 체크)
+    RoutineOverride completedOverride =
+        RoutineOverride.builder().routine(routine).overrideDate(TEST_DATE.plusDays(1)).build();
+    completedOverride.updateComplete(true, TEST_DATE.atStartOfDay());
+
+    givenAllFilterData(routine, List.of(), List.of(), List.of(completedOverride));
+
+    Map<String, List<RoutineResponseDto>> result =
+        routineService.getRoutinesByFilter(1L, "all", null);
+
+    // override 기반 완료 이력 1건 + 다음 할 일(오늘, 루틴 기본값) 1건
+    assertThat(result.get("all")).hasSize(2);
+    assertThat(result.get("all"))
+        .extracting(RoutineResponseDto::isCompleted)
+        .containsExactly(true, false);
+    assertThat(result.get("all").get(0).isHasOverride()).isTrue();
   }
 
   @Test
@@ -1035,18 +1069,12 @@ class RoutineServiceTest {
     given(userRepository.findById(1L)).willReturn(Optional.of(testUser()));
     Routine routine = buildRoutine(RoutineType.DAILY, null);
     ReflectionTestUtils.setField(routine, "id", 10L);
-    given(routineRepository.findAllActiveMotherRoutinesByUser(1L)).willReturn(List.of(routine));
 
     Todo completedNoDueDate = routineTodo(routine, "일반 투두였다가 루틴이 붙음", null);
     ReflectionTestUtils.setField(completedNoDueDate, "id", 400L);
     completedNoDueDate.updateCompleted(true, TEST_DATE.atStartOfDay());
 
-    given(todoRepository.findCompletedMotherTodosByRoutine(routine))
-        .willReturn(List.of(completedNoDueDate));
-    given(todoRepository.findLatestIncompleteMotherTodoByRoutine(routine))
-        .willReturn(Optional.empty());
-    given(routineOverrideRepository.findByRoutineAndOverrideDate(eq(routine), any()))
-        .willReturn(Optional.empty());
+    givenAllFilterData(routine, List.of(completedNoDueDate), List.of(), List.of());
 
     Map<String, List<RoutineResponseDto>> result =
         routineService.getRoutinesByFilter(1L, "all", null);
@@ -1068,10 +1096,7 @@ class RoutineServiceTest {
             .user(testUser())
             .build();
     ReflectionTestUtils.setField(routine, "id", 11L);
-    given(routineRepository.findAllActiveMotherRoutinesByUser(1L)).willReturn(List.of(routine));
-    given(todoRepository.findCompletedMotherTodosByRoutine(routine)).willReturn(List.of());
-    given(todoRepository.findLatestIncompleteMotherTodoByRoutine(routine))
-        .willReturn(Optional.empty());
+    givenAllFilterData(routine, List.of(), List.of(), List.of());
 
     Map<String, List<RoutineResponseDto>> result =
         routineService.getRoutinesByFilter(1L, "all", null);
@@ -1081,7 +1106,6 @@ class RoutineServiceTest {
     assertThat(dto.getTodoId()).isNull();
     assertThat(dto.getDueDate()).isNull();
     assertThat(dto.isHasOverride()).isFalse();
-    verify(routineOverrideRepository, never()).findByRoutineAndOverrideDate(any(), any());
   }
 
   @Test
