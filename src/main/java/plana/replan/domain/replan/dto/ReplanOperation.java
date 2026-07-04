@@ -14,6 +14,7 @@ public record ReplanOperation(
     @Schema(description = "마감 시간 HH:mm. 없으면 null", nullable = true, example = "23:59")
         String dueTime,
     @Schema(description = "태그 ID. 없으면 null", nullable = true, example = "5") Long tagId,
+    @Schema(description = "태그 이름. 없으면 null", nullable = true, example = "공부") String tagName,
     @Schema(
             description = "반복 유형 DAILY/WEEKLY/MONTHLY. 반복 아니면 null",
             nullable = true,
@@ -24,4 +25,20 @@ public record ReplanOperation(
             nullable = true,
             example = "[0, 2, 4]")
         List<Integer> routineDays,
-    @Schema(description = "바뀐 필드 목록") List<ChangedField> changedFields) {}
+    @Schema(description = "바뀐 필드 목록") List<ChangedField> changedFields) {
+
+  /** 태그(id·이름)만 바꾼 복사본을 만든다. 수정(MODIFY) 작업의 태그를 기존 투두 값으로 고정할 때 쓴다. */
+  public ReplanOperation withTag(Long tagId, String tagName) {
+    return new ReplanOperation(
+        action,
+        targetTodoId,
+        title,
+        dueDate,
+        dueTime,
+        tagId,
+        tagName,
+        routineType,
+        routineDays,
+        changedFields);
+  }
+}
