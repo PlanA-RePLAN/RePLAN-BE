@@ -96,21 +96,32 @@ public class ReplanService {
   }
 
   /**
-   * 수정(MODIFY_TODO/MODIFY_ROUTINE) 작업의 태그를 AI가 고른 값 대신 대상 투두의 기존 태그로 고정한다. 리플랜은 투두를 쪼개거나 미루는 것이지
-   * 카테고리(태그)를 바꾸는 게 아니므로 태그는 그대로 유지한다. 신규 추가(ADD/CREATE_ROUTINE)는 AI가 배정한 태그를 그대로 둔다. 대상이 앵커가 아닌 다른
-   * 투두일 수도 있으므로(우선순위 재정렬 등) targetTodoId로 조회해 그 투두의 태그를 쓴다.
+   * 수정(MODIFY_TODO/MODIFY_ROUTINE) 작업의 태그를 AI가 고른 값 대신 대상의 기존 태그로 고정한다. 리플랜은 투두를 쪼개거나 미루는 것이지
+   * 카테고리(태그)를 바꾸는 게 아니므로 태그는 그대로 유지한다. 신규 추가(ADD/CREATE_ROUTINE)는 AI가 배정한 태그를 그대로 둔다.
+   *
+   * <p>미리보기에 넣는 태그는 실제 저장될 태그와 일치해야 한다.
+   *
+   * <ul>
+   *   <li>MODIFY_ROUTINE: 저장 시 회차 오버라이드 태그가 아니라 엄마 루틴 태그(routine.getTag())를 유지하므로 미리보기도 루틴 태그를 쓴다.
+   *   <li>MODIFY_TODO: 저장 시 대상 투두(target.getTag())를 유지한다. 대상이 앵커가 아닌 다른 투두일 수도 있으므로(우선순위 재정렬 등)
+   *       targetTodoId로 조회해 그 투두의 태그를 쓴다.
+   * </ul>
    */
   private List<ReplanOperation> applyModifyTagPolicy(
       List<ReplanOperation> operations, Todo anchor) {
     List<ReplanOperation> result = new ArrayList<>();
     for (ReplanOperation op : operations) {
-      if (op.action() == ReplanAction.MODIFY_TODO || op.action() == ReplanAction.MODIFY_ROUTINE) {
-        Tag tag = existingTagForModify(op.targetTodoId(), anchor);
-        result.add(
-            op.withTag(tag == null ? null : tag.getId(), tag == null ? null : tag.getTitle()));
+      Tag tag;
+      if (op.action() == ReplanAction.MODIFY_ROUTINE) {
+        // MODIFY_ROUTINE은 항상 앵커(=루틴 회차)를 대상으로 하며, 저장 때 엄마 루틴 태그를 유지한다.
+        tag = anchor.getRoutine() != null ? anchor.getRoutine().getTag() : null;
+      } else if (op.action() == ReplanAction.MODIFY_TODO) {
+        tag = existingTagForModify(op.targetTodoId(), anchor);
       } else {
-        result.add(op);
+        result.add(op); // ADD/CREATE_ROUTINE: AI가 배정한 태그 그대로 둔다.
+        continue;
       }
+      result.add(op.withTag(tag == null ? null : tag.getId(), tag == null ? null : tag.getTitle()));
     }
     return result;
   }
