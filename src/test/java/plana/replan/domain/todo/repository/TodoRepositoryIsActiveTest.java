@@ -9,6 +9,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.transaction.annotation.Transactional;
+import plana.replan.domain.routine.entity.Routine;
+import plana.replan.domain.routine.entity.RoutineType;
+import plana.replan.domain.routine.repository.RoutineRepository;
 import plana.replan.domain.todo.entity.Todo;
 import plana.replan.domain.user.entity.Provider;
 import plana.replan.domain.user.entity.Role;
@@ -25,6 +28,7 @@ class TodoRepositoryIsActiveTest {
 
   @Autowired private TodoRepository todoRepository;
   @Autowired private UserRepository userRepository;
+  @Autowired private RoutineRepository routineRepository;
 
   @Test
   void 전체조회는_비활성_투두를_제외한다() {
@@ -73,5 +77,76 @@ class TodoRepositoryIsActiveTest {
             user, LocalDateTime.of(2026, 6, 1, 0, 0), LocalDateTime.of(2026, 7, 1, 0, 0));
 
     assertThat(result).extracting(Todo::getTitle).contains("실패원본");
+  }
+
+  @Test
+  void 루틴_완료투두_조회는_비활성화된_투두를_제외한다() {
+    User user =
+        userRepository.save(
+            User.builder()
+                .email("isactive-routine-completed@test.com")
+                .nickname("o")
+                .role(Role.ROLE_USER)
+                .provider(Provider.LOCAL)
+                .build());
+    Routine routine =
+        routineRepository.save(
+            Routine.builder().title("루틴").routineType(RoutineType.DAILY).user(user).build());
+
+    Todo activeCompleted =
+        todoRepository.save(
+            Todo.builder()
+                .title("활성 완료")
+                .dueDate(LocalDateTime.of(2026, 6, 10, 10, 0))
+                .user(user)
+                .routine(routine)
+                .build());
+    activeCompleted.updateCompleted(true, LocalDateTime.of(2026, 6, 10, 10, 0));
+
+    Todo retiredCompleted =
+        todoRepository.save(
+            Todo.builder()
+                .title("비활성화된 완료")
+                .dueDate(LocalDateTime.of(2026, 6, 9, 10, 0))
+                .user(user)
+                .routine(routine)
+                .build());
+    retiredCompleted.updateCompleted(true, LocalDateTime.of(2026, 6, 9, 10, 0));
+    retiredCompleted.deactivate();
+    todoRepository.saveAndFlush(retiredCompleted);
+
+    List<Todo> result = todoRepository.findCompletedMotherTodosByRoutine(routine);
+
+    assertThat(result).extracting(Todo::getTitle).containsExactly("활성 완료");
+  }
+
+  @Test
+  void 루틴_미완료투두_조회는_비활성화된_투두를_제외한다() {
+    User user =
+        userRepository.save(
+            User.builder()
+                .email("isactive-routine-incomplete@test.com")
+                .nickname("p")
+                .role(Role.ROLE_USER)
+                .provider(Provider.LOCAL)
+                .build());
+    Routine routine =
+        routineRepository.save(
+            Routine.builder().title("루틴").routineType(RoutineType.DAILY).user(user).build());
+
+    Todo retiredIncomplete =
+        todoRepository.save(
+            Todo.builder()
+                .title("비활성화된 미완료")
+                .dueDate(LocalDateTime.of(2026, 6, 9, 10, 0))
+                .user(user)
+                .routine(routine)
+                .build());
+    retiredIncomplete.deactivate();
+    todoRepository.saveAndFlush(retiredIncomplete);
+
+    var result = todoRepository.findLatestIncompleteMotherTodoByRoutine(routine);
+
+    assertThat(result).isEmpty();
   }
 }

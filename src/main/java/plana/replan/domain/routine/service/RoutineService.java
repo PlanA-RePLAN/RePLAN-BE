@@ -7,8 +7,11 @@ import java.time.LocalTime;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
@@ -195,8 +198,22 @@ public class RoutineService {
         .findById(userId)
         .orElseThrow(() -> new CustomException(UserErrorCode.USER_NOT_FOUND));
 
+    String normalizedFilter = filter.toLowerCase();
+    if (normalizedFilter.equals("all")) {
+      LocalDate today = LocalDate.now(clock);
+      List<RoutineResponseDto> routines =
+          routineRepository.findAllActiveMotherRoutinesByUser(userId).stream()
+              .flatMap(routine -> buildAllFilterResponses(routine, today).stream())
+              .collect(Collectors.toList());
+      return Map.of("all", routines);
+    }
+
+    if (date == null) {
+      throw new CustomException(GlobalErrorCode.INVALID_INPUT);
+    }
+
     List<LocalDate> dates =
-        switch (filter.toLowerCase()) {
+        switch (normalizedFilter) {
           case "day" -> List.of(date);
           case "week" -> date.datesUntil(date.plusWeeks(1)).collect(Collectors.toList());
           case "month" -> date.datesUntil(date.plusMonths(1)).collect(Collectors.toList());
@@ -208,6 +225,124 @@ public class RoutineService {
       result.put(d.toString(), getRoutinesForDate(userId, d));
     }
     return result;
+  }
+
+  /**
+   * 루틴 1건에 대한 all 필터 응답: (1) 존재하는 완료 Todo 전부 + (2) 아직 해야 할 일 1건. (2)는 완료 안 된 Todo 중 가장 최근 것(과거 미완료
+   * 포함)이 있으면 그 상태로, 없으면 다음 발생일의 override 또는 루틴 기본값으로 구성한다.
+   */
+  private List<RoutineResponseDto> buildAllFilterResponses(Routine routine, LocalDate today) {
+    List<Todo> completedTodos = todoRepository.findCompletedMotherTodosByRoutine(routine);
+    Stream<RoutineResponseDto> completed =
+        completedTodos.stream().map(todo -> toRoutineResponseFromTodo(routine, todo));
+    return Stream.concat(
+            completed, Stream.of(toNextActionableRoutineResponse(routine, today, completedTodos)))
+        .collect(Collectors.toList());
+  }
+
+  /**
+   * 완료 안 된 Todo 중 가장 최근 것이 있으면 그 상태를 반환한다. 없으면 다음 발생일부터 하루씩 훑어, 이미 완료 Todo가 있거나(completedTodos)
+   * override로 완료/스킵 처리된 날짜는 건너뛰고, 아직 해결되지 않은 첫 날짜를 override(있으면) 또는 루틴 기본값으로 구성한다. (DAILY 루틴은 오늘
+   * 회차가 이미 끝났어도 nextOccurrence가 항상 오늘을 가리키므로, 이 건너뛰기 로직이 없으면 방금 완료 처리한 오늘 회차를 "다음 할 일"로 다시 보여주는 문제가
+   * 생긴다.)
+   */
+  private RoutineResponseDto toNextActionableRoutineResponse(
+      Routine routine, LocalDate today, List<Todo> completedTodos) {
+    Optional<Todo> latestIncomplete =
+        todoRepository.findLatestIncompleteMotherTodoByRoutine(routine);
+    if (latestIncomplete.isPresent()) {
+      return toRoutineResponseFromTodo(routine, latestIncomplete.get());
+    }
+
+    Set<LocalDate> completedDates =
+        completedTodos.stream()
+            .map(Todo::getDueDate)
+            .filter(Objects::nonNull)
+            .map(LocalDateTime::toLocalDate)
+            .collect(Collectors.toSet());
+
+    LocalDate repeatEndDate =
+        routine.getDueDate() != null ? routine.getDueDate().toLocalDate() : null;
+    LocalDate candidate = nextOccurrence(routine, today);
+    for (int i = 0; i < 366; i++) {
+      if (repeatEndDate != null && candidate.isAfter(repeatEndDate)) {
+        break;
+      }
+      if (completedDates.contains(candidate)) {
+        candidate = nextOccurrence(routine, candidate.plusDays(1));
+        continue;
+      }
+      RoutineOverride override =
+          routineOverrideRepository.findByRoutineAndOverrideDate(routine, candidate).orElse(null);
+      if (override != null
+          && (override.isSkipped() || Boolean.TRUE.equals(override.getIsCompleted()))) {
+        candidate = nextOccurrence(routine, candidate.plusDays(1));
+        continue;
+      }
+      return toRoutineResponseFromOverrideOrDefault(routine, candidate, override);
+    }
+    return RoutineResponseDto.from(routine);
+  }
+
+  private RoutineResponseDto toRoutineResponseFromTodo(Routine routine, Todo todo) {
+    Tag tag = todo.getTag();
+    boolean overdue =
+        !todo.isCompleted()
+            && todo.getDueDate() != null
+            && todo.getDueDate().isBefore(LocalDateTime.now(clock));
+
+    return new RoutineResponseDto(
+        routine.getId(),
+        todo.getTitle(),
+        todo.getDueDate(),
+        routine.getDueDate(),
+        routine.getRoutineTime(),
+        routine.getRoutineType(),
+        RoutineDays.toDays(routine.getRoutineType(), routine.getRoutineDate()),
+        tag != null ? tag.getId() : null,
+        tag != null ? tag.getTitle() : null,
+        tag != null ? tag.getColor() : null,
+        routine.getGoal() != null ? routine.getGoal().getId() : null,
+        todo.getId(),
+        todo.getSortOrder(),
+        todo.isPinned(),
+        todo.isCompleted(),
+        overdue,
+        false);
+  }
+
+  private RoutineResponseDto toRoutineResponseFromOverrideOrDefault(
+      Routine routine, LocalDate nextDate, RoutineOverride override) {
+    if (override == null) {
+      return RoutineResponseDto.from(routine);
+    }
+
+    LocalTime time =
+        routine.getRoutineTime() != null ? routine.getRoutineTime() : LocalTime.of(23, 59, 59);
+    LocalDateTime dueDate = nextDate.atTime(time);
+    Tag tag = override.getTag() != null ? override.getTag() : routine.getTag();
+    boolean isCompleted = Boolean.TRUE.equals(override.getIsCompleted());
+    boolean isPinned = Boolean.TRUE.equals(override.getIsPinned());
+    boolean overdue = !isCompleted && dueDate.isBefore(LocalDateTime.now(clock));
+
+    return new RoutineResponseDto(
+        routine.getId(),
+        override.getTitle() != null ? override.getTitle() : routine.getTitle(),
+        dueDate,
+        routine.getDueDate(),
+        routine.getRoutineTime(),
+        routine.getRoutineType(),
+        RoutineDays.toDays(routine.getRoutineType(), routine.getRoutineDate()),
+        tag != null ? tag.getId() : null,
+        tag != null ? tag.getTitle() : null,
+        tag != null ? tag.getColor() : null,
+        routine.getGoal() != null ? routine.getGoal().getId() : null,
+        null,
+        override.getSortOrder() != null ? override.getSortOrder() : routine.getDefaultSortOrder(),
+        isPinned,
+        isCompleted,
+        overdue,
+        true);
   }
 
   private List<RoutineResponseDto> getRoutinesForDate(Long userId, LocalDate date) {

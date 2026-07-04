@@ -54,6 +54,23 @@ public interface TodoRepository extends JpaRepository<Todo, Long> {
   }
 
   @Query(
+      "SELECT t FROM Todo t WHERE t.routine = :routine AND t.parent IS NULL"
+          + " AND t.isCompleted = true AND t.isActive = true ORDER BY t.dueDate DESC")
+  List<Todo> findCompletedMotherTodosByRoutine(@Param("routine") Routine routine);
+
+  @Query(
+      "SELECT t FROM Todo t WHERE t.routine = :routine AND t.parent IS NULL"
+          + " AND t.isCompleted = false AND t.isActive = true ORDER BY t.dueDate DESC")
+  List<Todo> findIncompleteMotherTodosByRoutineOrderByDueDateDesc(
+      @Param("routine") Routine routine, Pageable pageable);
+
+  default Optional<Todo> findLatestIncompleteMotherTodoByRoutine(Routine routine) {
+    return findIncompleteMotherTodosByRoutineOrderByDueDateDesc(routine, PageRequest.of(0, 1))
+        .stream()
+        .findFirst();
+  }
+
+  @Query(
       "SELECT t FROM Todo t WHERE t.user = :user AND t.parent IS NULL AND t.isCompleted = false"
           + " AND t.isActive = true AND t.routine IS NULL")
   List<Todo> findActiveTodosForUser(@Param("user") User user);

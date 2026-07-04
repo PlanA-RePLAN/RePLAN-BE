@@ -16,6 +16,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
+import plana.replan.domain.routine.repository.RoutineOverrideRepository;
 import plana.replan.domain.routine.repository.RoutineRepository;
 import plana.replan.domain.tag.dto.TagCreateRequestDto;
 import plana.replan.domain.tag.dto.TagResponseDto;
@@ -39,6 +40,7 @@ class TagServiceTest {
   @Mock private UserRepository userRepository;
   @Mock private TodoRepository todoRepository;
   @Mock private RoutineRepository routineRepository;
+  @Mock private RoutineOverrideRepository routineOverrideRepository;
 
   @InjectMocks private TagService tagService;
 
@@ -319,7 +321,7 @@ class TagServiceTest {
   }
 
   @Test
-  @DisplayName("deleteTag - 성공: 연관 todo·루틴 tag null 처리 후 soft delete")
+  @DisplayName("deleteTag - 성공: 연관 todo·루틴·루틴 오버라이드 tag null 처리 후 soft delete")
   void deleteTag_success() {
     User user = testUser();
     Tag tag = testTag(1L, user);
@@ -329,6 +331,7 @@ class TagServiceTest {
 
     verify(todoRepository).clearTagFromTodos(tag);
     verify(routineRepository).clearTagFromRoutines(tag);
+    verify(routineOverrideRepository).clearTagFromOverrides(tag);
     assertThat(ReflectionTestUtils.getField(tag, "deletedAt")).isNotNull();
   }
 }
