@@ -5,6 +5,7 @@ import java.util.regex.Pattern;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import plana.replan.domain.routine.repository.RoutineOverrideRepository;
 import plana.replan.domain.routine.repository.RoutineRepository;
 import plana.replan.domain.tag.dto.TagCreateRequestDto;
 import plana.replan.domain.tag.dto.TagResponseDto;
@@ -38,6 +39,7 @@ public class TagService {
   private final UserRepository userRepository;
   private final TodoRepository todoRepository;
   private final RoutineRepository routineRepository;
+  private final RoutineOverrideRepository routineOverrideRepository;
 
   @Transactional(readOnly = true)
   public List<TagResponseDto> getTags(Long userId) {
@@ -134,6 +136,7 @@ public class TagService {
 
     todoRepository.clearTagFromTodos(tag);
     routineRepository.clearTagFromRoutines(tag);
+    routineOverrideRepository.clearTagFromOverrides(tag);
     tag.softDelete();
   }
 }

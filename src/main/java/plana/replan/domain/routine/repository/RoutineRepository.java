@@ -31,6 +31,11 @@ public interface RoutineRepository extends JpaRepository<Routine, Long> {
   List<Routine> findAllActiveMotherRoutines();
 
   @Query(
+      "SELECT r FROM Routine r WHERE r.user.id = :userId AND r.parent IS NULL"
+          + " AND r.isActive = true ORDER BY r.defaultSortOrder ASC")
+  List<Routine> findAllActiveMotherRoutinesByUser(@Param("userId") Long userId);
+
+  @Query(
       nativeQuery = true,
       value =
           """
