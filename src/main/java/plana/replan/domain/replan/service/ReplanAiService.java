@@ -3,6 +3,7 @@ package plana.replan.domain.replan.service;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -40,7 +41,7 @@ public class ReplanAiService {
 
   /** 카테고리별 로직에 따른 추천 작업 목록을 생성한다. */
   public List<ReplanOperation> generateRecommend(RecommendInput input) {
-    return parseRecommend(callGemini(buildRecommendPrompt(input)));
+    return parseRecommend(callGemini(buildRecommendPrompt(input)), input.tags());
   }
 
   public String buildRecommendPrompt(RecommendInput input) {
@@ -64,6 +65,13 @@ public class ReplanAiService {
         실패 이유: %s
         추가 질문 답변:
         %s
+
+        [사용 가능한 태그 목록]
+        %s
+        새로 추가하는 투두(ADD/CREATE_ROUTINE)에는 위 목록에서 가장 적절한 태그 하나를 골라 그 태그의 id를 tagId에 넣으세요.
+        - tagId는 반드시 위 목록에 있는 id 중 하나(숫자)여야 합니다. 목록에 없는 id나 태그 '이름'을 넣지 마세요.
+        - 마땅한 태그가 없거나 목록이 "없음"이면 tagId는 null로 두세요.
+        - 기존 투두/루틴 수정(MODIFY_TODO/MODIFY_ROUTINE)은 태그를 바꾸지 않으니 tagId는 신경 쓰지 마세요(서버가 기존 태그를 유지합니다).
 
         [카테고리별 개선 로직 — 실패 이유와 답변에 맞는 것을 적용]
         ▷ 심리적 저항
@@ -103,7 +111,8 @@ public class ReplanAiService {
            - MODIFY_TODO의 targetTodoId에는 위 '대상 투두 ID'를, 다른 기존 투두 수정(우선순위 등)은 아래 '선택 투두' 목록의 실제 ID만 사용. ID를 임의로 만들지 않는다.
         5. changedFields: 수정(MODIFY_TODO/MODIFY_ROUTINE)에서 바뀐 필드만 {field, before, after}로 채운다. field는 title/dueDate/dueTime/tag/routineType/routineDays.
            새로 만드는 ADD·CREATE_ROUTINE은 changedFields를 빈 배열([])로 둔다.
-        6. dueDate는 yyyy-MM-dd 또는 null, dueTime은 HH:mm 또는 null. routineType은 DAILY/WEEKLY/MONTHLY 또는 null. routineDays는 정수 배열 또는 null (DAILY는 null / WEEKLY는 요일 인덱스 배열: 월=0·화=1·수=2·목=3·금=4·토=5·일=6, 예 월·수·금=[0,2,4] / MONTHLY는 일자 배열 1~31, 예 3일·20일=[3,20]).
+        6. 새로 추가하거나(ADD) 기존 투두를 수정하는(MODIFY_TODO) 경우 dueDate(yyyy-MM-dd)를 반드시 오늘 이후의 구체적 날짜로 정한다. 절대 null로 두지 않는다(모든 투두는 마감기한이 있어야 한다). dueTime은 HH:mm 또는 null.
+           routineType은 DAILY/WEEKLY/MONTHLY 또는 null. routineDays는 정수 배열 또는 null (DAILY는 null / WEEKLY는 요일 인덱스 배열: 월=0·화=1·수=2·목=3·금=4·토=5·일=6, 예 월·수·금=[0,2,4] / MONTHLY는 일자 배열 1~31, 예 3일·20일=[3,20]).
            - CREATE_ROUTINE의 dueDate는 '반복을 끝낼 종료일'을 뜻한다(이 날짜 이후로는 회차를 만들지 않음). 무기한 반복이면 null로 둔다. 새 루틴의 반복 시각은 dueTime으로 지정한다.
 
         반드시 아래 JSON만 출력 (다른 설명 없이):
@@ -117,8 +126,21 @@ public class ReplanAiService {
                 input.anchorDueDate() != null ? input.anchorDueDate() : "없음",
                 input.anchorTagName() != null ? input.anchorTagName() : "없음",
                 String.join(", ", input.reasonLabels()),
-                answers);
+                answers,
+                buildTagInfo(input.tags()));
     return prompt + refreshStyleBlock(input.refreshCount());
+  }
+
+  /** 유저 태그 목록을 프롬프트용 문자열로 만든다. 태그가 없으면 "없음". */
+  private String buildTagInfo(List<RecommendInput.TagOption> tags) {
+    if (tags == null || tags.isEmpty()) {
+      return "없음";
+    }
+    StringBuilder sb = new StringBuilder();
+    for (RecommendInput.TagOption tag : tags) {
+      sb.append("- id=").append(tag.id()).append(", name=").append(tag.name()).append("\n");
+    }
+    return sb.toString();
   }
 
   /** 새로고침 회차(1~3)에 맞는 스타일 안내 블록. 0/그 외는 빈 문자열(0회차는 프롬프트 변경 없음). */
@@ -180,7 +202,14 @@ public class ReplanAiService {
     }
   }
 
-  public List<ReplanOperation> parseRecommend(String raw) {
+  public List<ReplanOperation> parseRecommend(String raw, List<RecommendInput.TagOption> tags) {
+    // 유저의 실제 태그만 담은 (id -> 이름) 맵. AI가 준 tagId 검증·태그명 확정에 쓴다.
+    Map<Long, String> validTags = new LinkedHashMap<>();
+    if (tags != null) {
+      for (RecommendInput.TagOption tag : tags) {
+        validTags.put(tag.id(), tag.name());
+      }
+    }
     try {
       JsonNode root = objectMapper.readTree(extractJson(raw));
       List<ReplanOperation> operations = new ArrayList<>();
@@ -197,6 +226,27 @@ public class ReplanAiService {
                     textOrNull(cf.path("after"))));
           }
         }
+        // AI가 준 tagId를 유저의 실제 태그로 검증한다. 숫자로 못 바꾸거나(예: 태그 이름을 넣음)
+        // 목록에 없는 값이면 예외로 터뜨리지 않고 태그 없이(null) 처리한다. 이름은 DB 기준으로 확정한다.
+        Long tagId = null;
+        String tagName = null;
+        JsonNode tagIdNode = op.path("tagId");
+        if (!tagIdNode.isNull() && !tagIdNode.isMissingNode()) {
+          Long candidate = null;
+          if (tagIdNode.canConvertToLong()) {
+            candidate = tagIdNode.asLong();
+          } else if (tagIdNode.isTextual()) {
+            try {
+              candidate = Long.valueOf(tagIdNode.asText().trim());
+            } catch (NumberFormatException ignored) {
+              candidate = null;
+            }
+          }
+          if (candidate != null && validTags.containsKey(candidate)) {
+            tagId = candidate;
+            tagName = validTags.get(candidate);
+          }
+        }
         operations.add(
             new ReplanOperation(
                 action,
@@ -204,7 +254,8 @@ public class ReplanAiService {
                 textOrNull(op.path("title")),
                 textOrNull(op.path("dueDate")),
                 textOrNull(op.path("dueTime")),
-                longOrNull(op.path("tagId")),
+                tagId,
+                tagName,
                 textOrNull(op.path("routineType")),
                 intListOrNull(op.path("routineDays")),
                 changed));
@@ -221,7 +272,7 @@ public class ReplanAiService {
     return node.isNull() || node.isMissingNode() ? null : node.asText(null);
   }
 
-  // 숫자 필드는 숫자/숫자문자열만 허용한다. 그 외 값은 0으로 묵시 변환하지 않고 파싱 실패로 처리한다.
+  // targetTodoId는 숫자/숫자문자열만 허용한다. 그 외 값은 0으로 묵시 변환하지 않고 파싱 실패로 처리한다.
   private Long longOrNull(JsonNode node) {
     if (node.isNull() || node.isMissingNode()) {
       return null;
@@ -232,7 +283,7 @@ public class ReplanAiService {
     if (node.isTextual()) {
       return Long.parseLong(node.asText().trim());
     }
-    throw new IllegalArgumentException("숫자 필드(targetTodoId/tagId)가 숫자가 아닙니다: " + node);
+    throw new IllegalArgumentException("숫자 필드(targetTodoId)가 숫자가 아닙니다: " + node);
   }
 
   /** routineDays: 정수 배열. 없으면 null. 각 원소는 숫자/숫자문자열만 허용. */
