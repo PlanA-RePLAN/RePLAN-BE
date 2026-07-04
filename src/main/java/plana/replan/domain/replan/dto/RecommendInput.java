@@ -13,8 +13,14 @@ public record RecommendInput(
     List<String> reasonLabels,
     List<AnswerInput> answers,
     String today,
-    int refreshCount) {
+    int refreshCount,
+    // 유저가 가진 태그 목록(id+이름). AI가 신규 투두에 배정할 태그를 이 안에서 고르게 하고,
+    // 응답 파싱 시 AI가 준 tagId가 실제 내 태그인지 검증하는 데 쓴다.
+    List<TagOption> tags) {
 
   public record AnswerInput(
       String key, String text, List<Long> selectedTodoIds, List<String> selectedTodoLabels) {}
+
+  /** 프롬프트/검증에 쓰는 태그 한 건(엔티티 대신 값만). */
+  public record TagOption(Long id, String name) {}
 }

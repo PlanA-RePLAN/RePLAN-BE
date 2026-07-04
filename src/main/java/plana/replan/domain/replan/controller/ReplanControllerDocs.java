@@ -77,12 +77,25 @@ public interface ReplanControllerDocs {
                                   "title": "데이터 분석 공부하기",
                                   "dueDate": "2026-06-26",
                                   "dueTime": "23:59",
-                                  "tagId": null,
+                                  "tagId": 3,
+                                  "tagName": "Study",
                                   "routineType": null,
                                   "routineDays": null,
                                   "changedFields": [
                                     {"field": "dueDate", "before": "2026-06-25", "after": "2026-06-26"}
                                   ]
+                                },
+                                {
+                                  "action": "ADD",
+                                  "targetTodoId": null,
+                                  "title": "데이터 분석 3~4강 수강",
+                                  "dueDate": "2026-06-27",
+                                  "dueTime": null,
+                                  "tagId": 3,
+                                  "tagName": "Study",
+                                  "routineType": null,
+                                  "routineDays": null,
+                                  "changedFields": []
                                 }
                               ]
                             },
