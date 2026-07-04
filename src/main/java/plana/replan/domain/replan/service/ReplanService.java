@@ -112,10 +112,13 @@ public class ReplanService {
     List<ReplanOperation> result = new ArrayList<>();
     for (ReplanOperation op : operations) {
       Tag tag;
-      if (op.action() == ReplanAction.MODIFY_ROUTINE) {
-        // MODIFY_ROUTINE은 항상 앵커(=루틴 회차)를 대상으로 하며, 저장 때 엄마 루틴 태그를 유지한다.
+      if (op.action() == ReplanAction.MODIFY_ROUTINE && isAnchorTarget(op, anchor)) {
+        // 저장 경로(applyModifyRoutine)는 targetTodoId가 앵커일 때만 유효하고 엄마 루틴 태그를 유지한다.
+        // 미리보기도 같은 조건일 때만 엄마 루틴 태그를 붙여 저장될 값과 일치시킨다.
         tag = anchor.getRoutine() != null ? anchor.getRoutine().getTag() : null;
-      } else if (op.action() == ReplanAction.MODIFY_TODO) {
+      } else if (op.action() == ReplanAction.MODIFY_TODO
+          || op.action() == ReplanAction.MODIFY_ROUTINE) {
+        // MODIFY_TODO, 그리고 대상이 앵커가 아닌(저장 시 거부될) MODIFY_ROUTINE은 대상 투두의 기존 태그를 쓴다.
         tag = existingTagForModify(op.targetTodoId(), anchor);
       } else {
         result.add(op); // ADD/CREATE_ROUTINE: AI가 배정한 태그 그대로 둔다.
@@ -124,6 +127,11 @@ public class ReplanService {
       result.add(op.withTag(tag == null ? null : tag.getId(), tag == null ? null : tag.getTitle()));
     }
     return result;
+  }
+
+  /** op의 대상이 앵커 투두인지 확인한다. */
+  private boolean isAnchorTarget(ReplanOperation op, Todo anchor) {
+    return op.targetTodoId() != null && op.targetTodoId().equals(anchor.getId());
   }
 
   /** 수정 대상 투두의 기존 태그를 찾는다. 앵커면 앵커 태그, 아니면 소유한 투두를 조회해 그 태그(없으면 null). */
