@@ -5,6 +5,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.willThrow;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -491,5 +492,27 @@ class RoutineControllerTest {
                     """))
         .andExpect(status().isNotFound())
         .andExpect(jsonPath("$.error.code").value("ROUTINE_NOT_FOUND"));
+  }
+
+  // ========== getRoutinesByFilter: date 파라미터 형식 오류 ==========
+
+  @Test
+  @DisplayName("filter=day, date 형식 오류: status=400, error.code=INVALID_INPUT (500 아님)")
+  void getRoutinesByFilter_day_malformedDate_returns400NotInternalServerError() throws Exception {
+    mockMvc
+        .perform(get("/api/routines?filter=day&date=notadate").with(authentication(authToken(1L))))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.success").value(false))
+        .andExpect(jsonPath("$.error.code").value("INVALID_INPUT"));
+  }
+
+  @Test
+  @DisplayName("filter=all, date 형식 오류: status=400, error.code=INVALID_INPUT (500 아님)")
+  void getRoutinesByFilter_all_malformedDate_returns400NotInternalServerError() throws Exception {
+    mockMvc
+        .perform(get("/api/routines?filter=all&date=notadate").with(authentication(authToken(1L))))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.success").value(false))
+        .andExpect(jsonPath("$.error.code").value("INVALID_INPUT"));
   }
 }
