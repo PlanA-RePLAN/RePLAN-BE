@@ -54,6 +54,16 @@ public interface TodoRepository extends JpaRepository<Todo, Long> {
   }
 
   @Query(
+      "SELECT t FROM Todo t LEFT JOIN FETCH t.tag WHERE t.routine IN :routines AND t.parent IS NULL"
+          + " AND t.isCompleted = true AND t.isActive = true ORDER BY t.dueDate DESC")
+  List<Todo> findCompletedMotherTodosByRoutines(@Param("routines") List<Routine> routines);
+
+  @Query(
+      "SELECT t FROM Todo t LEFT JOIN FETCH t.tag WHERE t.routine IN :routines AND t.parent IS NULL"
+          + " AND t.isCompleted = false AND t.isActive = true ORDER BY t.dueDate DESC")
+  List<Todo> findIncompleteMotherTodosByRoutines(@Param("routines") List<Routine> routines);
+
+  @Query(
       "SELECT t FROM Todo t WHERE t.user = :user AND t.parent IS NULL AND t.isCompleted = false"
           + " AND t.isActive = true AND t.routine IS NULL")
   List<Todo> findActiveTodosForUser(@Param("user") User user);
@@ -69,26 +79,9 @@ public interface TodoRepository extends JpaRepository<Todo, Long> {
   List<Todo> findPinnedActiveTodosForUser(@Param("user") User user);
 
   @Query(
-      "SELECT t FROM Todo t WHERE t.user = :user AND t.parent IS NULL AND t.isCompleted = false"
-          + " AND t.dueDate BETWEEN :start AND :end AND t.isActive = true AND t.routine IS NULL")
-  List<Todo> findActiveTodosByDueDateRange(
-      @Param("user") User user,
-      @Param("start") LocalDateTime start,
-      @Param("end") LocalDateTime end);
-
-  @Query(
       "SELECT t FROM Todo t WHERE t.user = :user AND t.parent IS NULL"
           + " AND t.dueDate BETWEEN :start AND :end AND t.isActive = true AND t.routine IS NULL")
   List<Todo> findAllTodosByDueDateRange(
-      @Param("user") User user,
-      @Param("start") LocalDateTime start,
-      @Param("end") LocalDateTime end);
-
-  @Query(
-      "SELECT t FROM Todo t WHERE t.user = :user AND t.parent IS NULL AND t.isCompleted = true"
-          + " AND t.completedTime BETWEEN :start AND :end AND t.isActive = true"
-          + " AND t.routine IS NULL")
-  List<Todo> findCompletedTodosByCompletedTimeRange(
       @Param("user") User user,
       @Param("start") LocalDateTime start,
       @Param("end") LocalDateTime end);

@@ -199,12 +199,8 @@ public class TodoService {
         todos.sort(Comparator.comparing(Todo::isCompleted).thenComparing(sortComparator));
       }
       case "day" -> {
-        List<Todo> active =
-            todoRepository.findActiveTodosByDueDateRange(user, startOfDay, endOfDay);
-        List<Todo> completed =
-            todoRepository.findCompletedTodosByCompletedTimeRange(user, startOfDay, endOfDay);
-        todos = new ArrayList<>(active);
-        todos.addAll(completed);
+        todos =
+            new ArrayList<>(todoRepository.findAllTodosByDueDateRange(user, startOfDay, endOfDay));
         todos.sort(Comparator.comparing(Todo::isCompleted).thenComparing(sortComparator));
       }
       case "week" -> {

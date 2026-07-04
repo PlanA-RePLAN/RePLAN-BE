@@ -68,7 +68,7 @@ public class NotificationService {
     for (DeviceToken token : tokens) {
       PushResult result;
       try {
-        result = pushSender.send(token.getToken(), title, body, data);
+        result = pushSender.send(token.getToken(), title, body, data, token.getPlatform());
       } catch (Exception e) {
         // 푸시 실패가 알림함 저장/다음 처리를 막으면 안 된다.
         log.warn("푸시 발송 중 예외 - tokenId={}", token.getId(), e);

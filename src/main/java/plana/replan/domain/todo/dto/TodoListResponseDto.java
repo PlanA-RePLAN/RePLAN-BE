@@ -26,14 +26,14 @@ public class TodoListResponseDto {
 
   @JsonProperty("isPinned")
   @Schema(description = "핀 여부", example = "false")
-  private boolean isPinned;
+  private boolean pinned;
 
   @Schema(description = "정렬 순서", example = "10000.0")
   private double sortOrder;
 
   @JsonProperty("isCompleted")
   @Schema(description = "완료 여부", example = "false")
-  private boolean isCompleted;
+  private boolean completed;
 
   @Schema(description = "태그 ID (없으면 null)", example = "3")
   private Long tagId;
@@ -49,7 +49,7 @@ public class TodoListResponseDto {
 
   @JsonProperty("isOverdue")
   @Schema(description = "기한 초과 여부 (미완료이고 dueDate가 현재 시각 이전인 경우 true)", example = "false")
-  private boolean isOverdue;
+  private boolean overdue;
 
   public static TodoListResponseDto from(Todo todo, Clock clock) {
     Tag tag = todo.getTag();

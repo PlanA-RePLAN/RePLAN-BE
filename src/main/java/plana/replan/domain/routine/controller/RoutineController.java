@@ -46,7 +46,7 @@ public class RoutineController implements RoutineControllerDocs {
   public ResponseEntity<ApiResult<Map<String, List<RoutineResponseDto>>>> getRoutinesByFilter(
       @AuthenticationPrincipal Long userId,
       @RequestParam(defaultValue = "day") String filter,
-      @RequestParam LocalDate date) {
+      @RequestParam(required = false) LocalDate date) {
     return ResponseEntity.ok(
         ApiResult.ok(routineService.getRoutinesByFilter(userId, filter, date)));
   }

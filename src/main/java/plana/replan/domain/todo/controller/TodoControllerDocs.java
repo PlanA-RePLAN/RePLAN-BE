@@ -1067,9 +1067,9 @@ public interface TodoControllerDocs {
           | filter | 조회 대상 |
           |--------|----------|
           | `all` | 완료되지 않은 모든 투두 (마감일 무관, date 무시) |
-          | `day` | 기준 날짜에 마감인 미완료 투두 + 기준 날짜에 완료된 투두 |
-          | `week` | 기준 날짜부터 7일 이내 마감인 미완료 투두 |
-          | `month` | 기준 날짜부터 한 달 이내 마감인 미완료 투두 |
+          | `day` | 기준 날짜에 마감인 미완료 투두 + 기준 날짜에 마감인 완료 투두 |
+          | `week` | 기준 날짜부터 7일 이내 마감인 미완료 투두 + 완료 투두 |
+          | `month` | 기준 날짜부터 한 달 이내 마감인 미완료 투두 + 완료 투두 |
 
           **sort 값별 정렬 기준**
 
@@ -1078,7 +1078,7 @@ public interface TodoControllerDocs {
           | `priority` | sortOrder ASC |
           | `dueDate` | dueDate ASC (null 마지막) |
 
-          **day 필터의 추가 정렬 규칙**
+          **공통 추가 정렬 규칙 (모든 filter 값 공통)**
           - 미완료 투두 먼저, 완료 투두 나중 → 각 그룹 내에서 선택한 sort 기준 적용
 
           **반환 필드**

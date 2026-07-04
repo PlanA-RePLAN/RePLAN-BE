@@ -7,8 +7,10 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import plana.replan.global.common.ApiResult;
 import tools.jackson.core.JacksonException;
 import tools.jackson.core.exc.StreamReadException;
@@ -48,6 +50,23 @@ public class GlobalExceptionHandler {
             .map(v -> v.getPropertyPath() + ": " + v.getMessage())
             .orElse(e.getMessage());
     log.error("ConstraintViolationException: {}", detail);
+    return ResponseEntity.badRequest()
+        .body(ApiResult.error(400, ErrorDetail.of(GlobalErrorCode.INVALID_INPUT, detail)));
+  }
+
+  @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+  public ResponseEntity<ApiResult<?>> handleTypeMismatch(MethodArgumentTypeMismatchException e) {
+    String detail = e.getName() + ": 값 형식이 올바르지 않습니다";
+    log.error("MethodArgumentTypeMismatchException: {}", detail);
+    return ResponseEntity.badRequest()
+        .body(ApiResult.error(400, ErrorDetail.of(GlobalErrorCode.INVALID_INPUT, detail)));
+  }
+
+  @ExceptionHandler(MissingServletRequestParameterException.class)
+  public ResponseEntity<ApiResult<?>> handleMissingParameter(
+      MissingServletRequestParameterException e) {
+    String detail = e.getParameterName() + ": 필수 파라미터입니다";
+    log.error("MissingServletRequestParameterException: {}", detail);
     return ResponseEntity.badRequest()
         .body(ApiResult.error(400, ErrorDetail.of(GlobalErrorCode.INVALID_INPUT, detail)));
   }

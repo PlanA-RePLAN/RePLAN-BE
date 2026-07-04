@@ -155,16 +155,26 @@ public interface RoutineControllerDocs {
       @AuthenticationPrincipal Long userId);
 
   @Operation(
-      summary = "루틴 조회 (날짜 / 주간 / 월간)",
+      summary = "루틴 조회 (전체 / 날짜 / 주간 / 월간)",
       description =
           """
-          `filter`와 `date`를 기준으로 해당 기간의 루틴 목록을 날짜별로 묶어 반환합니다.
+          `filter`와 `date`를 기준으로 루틴 목록을 반환합니다.
 
-          - `DAILY` 루틴: 기간 내 모든 날짜에 포함
-          - `WEEKLY` 루틴: 해당 날짜의 요일 인덱스가 `routineDays` 배열에 포함된 날짜에만 포함
-          - `MONTHLY` 루틴: 해당 날짜의 일(day)이 `routineDays` 배열에 포함된 날짜에만 포함
+          - `filter=all`: 미래 날짜를 무한히 전개하는 대신(반복 종료일이 없는 루틴은 끝이 없어 전개 자체가 불가능),
+            활성 상태인 엄마 루틴마다 아래 두 종류의 항목을 반환합니다. `date` 생략 가능.
+            1. **완료 이력 전부** — 기간 제한 없이, (a) 그 루틴에 연결된 완료 Todo 전부와 (b) Todo가 아직 생성되지
+               않았더라도 override로 완료 처리된 날짜(둘 다 각각 하나의 항목)를 합쳐서 반환
+            2. **아직 해야 할 일 1건** — 완료되지 않은 Todo 중 가장 최근 것(과거에 놓친 회차 포함)이 있으면 그 상태를,
+               없으면 다음 발생일의 override가 있으면 그 값으로, override도 없으면 루틴 기본값으로 구성
+          - `filter=day` / `week` / `month`: 해당 기간의 루틴 목록을 날짜별로 묶어 반환합니다. `date` 필수.
+            - `DAILY` 루틴: 기간 내 모든 날짜에 포함
+            - `WEEKLY` 루틴: 해당 날짜의 요일 인덱스가 `routineDays` 배열에 포함된 날짜에만 포함
+            - `MONTHLY` 루틴: 해당 날짜의 일(day)이 `routineDays` 배열에 포함된 날짜에만 포함
 
-          각 루틴에 해당 날짜의 Todo가 이미 생성되어 있으면 `todoId`가 포함되고, 아직 없으면 `null`입니다.
+          각 루틴에 해당 날짜(또는 `all`의 "아직 해야 할 일" 항목)의 Todo가 이미 생성되어 있으면 `todoId`가
+          포함되고, 아직 없으면 `null`입니다. `filter=all`의 "아직 해야 할 일" 항목에서 Todo도 override도
+          없는 경우 `dueDate`는 `null`, `todoId`는 `null`, `isPinned`/`isCompleted`/`isOverdue`/`hasOverride`는
+          `false`로 고정됩니다.
 
           ---
 
@@ -180,10 +190,11 @@ public interface RoutineControllerDocs {
 
           | 파라미터명 | 필수 여부 | 타입 | 기본값 | 설명 | 예시 |
           |-----------|-----------|------|--------|------|------|
-          | filter | ❌ 선택 | string | `day` | 조회 범위 (`day` / `week` / `month`) | `week` |
-          | date | ✅ 필수 | string | 없음 | 기준 시작 날짜 (yyyy-MM-dd 형식) | `2025-06-20` |
+          | filter | ❌ 선택 | string | `day` | 조회 범위 (`all` / `day` / `week` / `month`) | `week` |
+          | date | ❌ 선택 | string | 없음 | 기준 시작 날짜 (yyyy-MM-dd 형식). `filter=day/week/month`에서는 필수이며 생략 시 400 | `2025-06-20` |
 
           **filter 범위 기준**
+          - `all`: date 무관, 활성 엄마 루틴마다 완료 이력 전부(Todo + override 기반) + 아직 해야 할 일 1건
           - `day`: date 당일 1일치
           - `week`: date 포함 7일 (date ~ date+6)
           - `month`: date부터 정확히 1개월 전날까지 (28~31일, 시작 월에 따라 다름)
@@ -192,13 +203,15 @@ public interface RoutineControllerDocs {
 
           ### Response Elements
 
-          응답 `data`는 날짜(yyyy-MM-dd)를 키로 하는 객체이며, 값은 해당 날짜의 루틴 배열입니다.
+          `filter=day/week/month`는 날짜(yyyy-MM-dd)를 키로 하는 객체를, `filter=all`은 `"all"` 하나를
+          키로 하는 객체를 반환합니다. 값은 각각 해당 범위의 루틴 배열이며, `filter=all`의 경우 루틴 하나당
+          완료 이력 개수(완료 Todo + Todo 없이 override로만 완료 처리된 날짜) + 1(아직 해야 할 일)건이 들어갑니다.
 
           | 필드명 | 타입 | 설명 |
           |--------|------|------|
           | routineId | integer | 루틴 ID |
-          | title | string | 루틴 제목 (override 적용값) |
-          | dueDate | string | 해당 날짜 인스턴스 마감 일시 (ISO 8601 형식). instanceDate + routineTime (없으면 23:59:59) |
+          | title | string | 루틴 제목 (override 적용값). Todo가 이미 생성됐으면 그 Todo의 제목 |
+          | dueDate | string | 마감 일시 (ISO 8601 형식). `filter=all`에서 Todo도 override도 없으면 null |
           | repeatEndDate | string | 반복 종료 마감일 (ISO 8601 형식). 없으면 null |
           | routineTime | string | 마감 시각 (HH:mm:ss 형식). 없으면 null |
           | routineType | string | 반복 유형 (`DAILY` / `WEEKLY` / `MONTHLY`) |
@@ -207,12 +220,12 @@ public interface RoutineControllerDocs {
           | tagTitle | string | 태그 제목. 없으면 null |
           | tagColor | string | 태그 색상. 없으면 null |
           | goalId | integer | 목표 ID. 없으면 null |
-          | todoId | integer | 해당 날짜에 생성된 Todo ID. 아직 생성 안 됐으면 null |
-          | sortOrder | number | 해당 날짜 인스턴스의 정렬 순서 |
-          | isPinned | boolean | 해당 날짜 핀 여부 |
-          | isCompleted | boolean | 해당 날짜 완료 여부 |
+          | todoId | integer | 생성된 Todo ID. `filter=all`에서 아직 생성 안 된 "해야 할 일" 항목은 null |
+          | sortOrder | number | 정렬 순서. `filter=all`에서 Todo/override가 없으면 루틴의 기본 정렬 순서 |
+          | isPinned | boolean | 핀 여부. `filter=all`에서 Todo/override가 없으면 false |
+          | isCompleted | boolean | 완료 여부. `filter=all`의 완료 Todo 항목은 항상 true |
           | isOverdue | boolean | 마감 시각이 지났고 미완료인 경우 true |
-          | hasOverride | boolean | override 존재 여부 |
+          | hasOverride | boolean | override 존재 여부. `filter=all`에서 Todo 기반 항목은 항상 false로 고정(개별 override 반영 여부를 조회하지 않음) |
           """,
       security = @SecurityRequirement(name = "Bearer Authentication"))
   @ApiResponses({
@@ -221,79 +234,153 @@ public interface RoutineControllerDocs {
         description = "조회 성공",
         content =
             @Content(
-                examples =
-                    @ExampleObject(
-                        value =
-                            """
-                            {
-                              "status": 200,
-                              "success": true,
-                              "data": {
-                                "2025-06-20": [
-                                  {
-                                    "routineId": 1,
-                                    "title": "아침 스트레칭",
-                                    "dueDate": "2025-06-20T08:00:00",
-                                    "repeatEndDate": null,
-                                    "routineTime": "08:00:00",
-                                    "routineType": "DAILY",
-                                    "routineDays": null,
-                                    "tagId": null,
-                                    "tagTitle": null,
-                                    "tagColor": null,
-                                    "goalId": null,
-                                    "todoId": 42,
-                                    "sortOrder": 10000.0,
-                                    "isPinned": false,
-                                    "isCompleted": false,
-                                    "isOverdue": false,
-                                    "hasOverride": false
-                                  }
-                                ],
-                                "2025-06-21": [
-                                  {
-                                    "routineId": 1,
-                                    "title": "아침 스트레칭",
-                                    "dueDate": "2025-06-21T08:00:00",
-                                    "repeatEndDate": null,
-                                    "routineTime": "08:00:00",
-                                    "routineType": "DAILY",
-                                    "routineDays": null,
-                                    "tagId": null,
-                                    "tagTitle": null,
-                                    "tagColor": null,
-                                    "goalId": null,
-                                    "todoId": null,
-                                    "sortOrder": 10000.0,
-                                    "isPinned": false,
-                                    "isCompleted": false,
-                                    "isOverdue": false,
-                                    "hasOverride": false
-                                  },
-                                  {
-                                    "routineId": 2,
-                                    "title": "영어 단어 외우기",
-                                    "dueDate": "2025-06-21T09:00:00",
-                                    "repeatEndDate": "2025-12-31T00:00:00",
-                                    "routineTime": "09:00:00",
-                                    "routineType": "WEEKLY",
-                                    "routineDays": [0, 2, 4],
-                                    "tagId": 3,
-                                    "tagTitle": "영어",
-                                    "tagColor": "BLUE",
-                                    "goalId": 2,
-                                    "todoId": 43,
-                                    "sortOrder": 20000.0,
-                                    "isPinned": false,
-                                    "isCompleted": false,
-                                    "isOverdue": false,
-                                    "hasOverride": false
-                                  }
-                                ]
-                              },
-                              "error": null
-                            }
-                            """))),
+                examples = {
+                  @ExampleObject(
+                      name = "filter=day/week/month",
+                      value =
+                          """
+                          {
+                            "status": 200,
+                            "success": true,
+                            "data": {
+                              "2025-06-20": [
+                                {
+                                  "routineId": 1,
+                                  "title": "아침 스트레칭",
+                                  "dueDate": "2025-06-20T08:00:00",
+                                  "repeatEndDate": null,
+                                  "routineTime": "08:00:00",
+                                  "routineType": "DAILY",
+                                  "routineDays": null,
+                                  "tagId": null,
+                                  "tagTitle": null,
+                                  "tagColor": null,
+                                  "goalId": null,
+                                  "todoId": 42,
+                                  "sortOrder": 10000.0,
+                                  "isPinned": false,
+                                  "isCompleted": false,
+                                  "isOverdue": false,
+                                  "hasOverride": false
+                                }
+                              ],
+                              "2025-06-21": [
+                                {
+                                  "routineId": 1,
+                                  "title": "아침 스트레칭",
+                                  "dueDate": "2025-06-21T08:00:00",
+                                  "repeatEndDate": null,
+                                  "routineTime": "08:00:00",
+                                  "routineType": "DAILY",
+                                  "routineDays": null,
+                                  "tagId": null,
+                                  "tagTitle": null,
+                                  "tagColor": null,
+                                  "goalId": null,
+                                  "todoId": null,
+                                  "sortOrder": 10000.0,
+                                  "isPinned": false,
+                                  "isCompleted": false,
+                                  "isOverdue": false,
+                                  "hasOverride": false
+                                },
+                                {
+                                  "routineId": 2,
+                                  "title": "영어 단어 외우기",
+                                  "dueDate": "2025-06-21T09:00:00",
+                                  "repeatEndDate": "2025-12-31T00:00:00",
+                                  "routineTime": "09:00:00",
+                                  "routineType": "WEEKLY",
+                                  "routineDays": [0, 2, 4],
+                                  "tagId": 3,
+                                  "tagTitle": "영어",
+                                  "tagColor": "BLUE",
+                                  "goalId": 2,
+                                  "todoId": 43,
+                                  "sortOrder": 20000.0,
+                                  "isPinned": false,
+                                  "isCompleted": false,
+                                  "isOverdue": false,
+                                  "hasOverride": false
+                                }
+                              ]
+                            },
+                            "error": null
+                          }
+                          """),
+                  @ExampleObject(
+                      name = "filter=all",
+                      summary = "루틴 1(완료 이력 없음, 해야 할 일만 1건) + 루틴 2(완료 1건 + 오늘 해야 할 일 1건)",
+                      value =
+                          """
+                          {
+                            "status": 200,
+                            "success": true,
+                            "data": {
+                              "all": [
+                                {
+                                  "routineId": 1,
+                                  "title": "아침 스트레칭",
+                                  "dueDate": null,
+                                  "repeatEndDate": null,
+                                  "routineTime": "08:00:00",
+                                  "routineType": "DAILY",
+                                  "routineDays": null,
+                                  "tagId": null,
+                                  "tagTitle": null,
+                                  "tagColor": null,
+                                  "goalId": null,
+                                  "todoId": null,
+                                  "sortOrder": 10000.0,
+                                  "isPinned": false,
+                                  "isCompleted": false,
+                                  "isOverdue": false,
+                                  "hasOverride": false
+                                },
+                                {
+                                  "routineId": 2,
+                                  "title": "영어 단어 외우기",
+                                  "dueDate": "2025-06-19T09:00:00",
+                                  "repeatEndDate": "2025-12-31T00:00:00",
+                                  "routineTime": "09:00:00",
+                                  "routineType": "WEEKLY",
+                                  "routineDays": [0, 2, 4],
+                                  "tagId": 3,
+                                  "tagTitle": "영어",
+                                  "tagColor": "BLUE",
+                                  "goalId": 2,
+                                  "todoId": 40,
+                                  "sortOrder": 20000.0,
+                                  "isPinned": false,
+                                  "isCompleted": true,
+                                  "isOverdue": false,
+                                  "hasOverride": false
+                                },
+                                {
+                                  "routineId": 2,
+                                  "title": "영어 단어 외우기",
+                                  "dueDate": "2025-06-20T09:00:00",
+                                  "repeatEndDate": "2025-12-31T00:00:00",
+                                  "routineTime": "09:00:00",
+                                  "routineType": "WEEKLY",
+                                  "routineDays": [0, 2, 4],
+                                  "tagId": 3,
+                                  "tagTitle": "영어",
+                                  "tagColor": "BLUE",
+                                  "goalId": 2,
+                                  "todoId": 43,
+                                  "sortOrder": 20000.0,
+                                  "isPinned": true,
+                                  "isCompleted": false,
+                                  "isOverdue": false,
+                                  "hasOverride": false
+                                }
+                              ]
+                            },
+                            "error": null
+                          }
+                          """)
+                })),
     @ApiResponse(
         responseCode = "400",
         description = "date 파라미터 누락·형식 오류 또는 filter 값 오류",
@@ -374,10 +461,15 @@ public interface RoutineControllerDocs {
   })
   ResponseEntity<ApiResult<Map<String, List<RoutineResponseDto>>>> getRoutinesByFilter(
       @AuthenticationPrincipal Long userId,
-      @Parameter(description = "조회 범위 (day / week / month)", example = "week")
+      @Parameter(description = "조회 범위 (all / day / week / month)", example = "week")
           @RequestParam(defaultValue = "day")
           String filter,
-      @Parameter(description = "기준 시작 날짜 (yyyy-MM-dd)", example = "2025-06-20") @RequestParam
+      @Parameter(
+              description =
+                  "기준 시작 날짜 (yyyy-MM-dd). filter=day/week/month에서는 필수(생략 시 400), filter=all에서는"
+                      + " 생략 가능(주더라도 무시됨). 단, 값 자체가 yyyy-MM-dd 형식이 아니면 filter 값과 무관하게 400 발생",
+              example = "2025-06-20")
+          @RequestParam(required = false)
           LocalDate date);
 
   @Operation(
