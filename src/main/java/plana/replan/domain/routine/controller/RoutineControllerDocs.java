@@ -162,7 +162,8 @@ public interface RoutineControllerDocs {
 
           - `filter=all`: 미래 날짜를 무한히 전개하는 대신(반복 종료일이 없는 루틴은 끝이 없어 전개 자체가 불가능),
             활성 상태인 엄마 루틴마다 아래 두 종류의 항목을 반환합니다. `date` 생략 가능.
-            1. **완료된 Todo 전부** — 기간 제한 없이, 그 루틴에 연결된 완료 Todo를 모두 각각 하나의 항목으로 반환
+            1. **완료 이력 전부** — 기간 제한 없이, (a) 그 루틴에 연결된 완료 Todo 전부와 (b) Todo가 아직 생성되지
+               않았더라도 override로 완료 처리된 날짜(둘 다 각각 하나의 항목)를 합쳐서 반환
             2. **아직 해야 할 일 1건** — 완료되지 않은 Todo 중 가장 최근 것(과거에 놓친 회차 포함)이 있으면 그 상태를,
                없으면 다음 발생일의 override가 있으면 그 값으로, override도 없으면 루틴 기본값으로 구성
           - `filter=day` / `week` / `month`: 해당 기간의 루틴 목록을 날짜별로 묶어 반환합니다. `date` 필수.
@@ -193,7 +194,7 @@ public interface RoutineControllerDocs {
           | date | ❌ 선택 | string | 없음 | 기준 시작 날짜 (yyyy-MM-dd 형식). `filter=day/week/month`에서는 필수이며 생략 시 400 | `2025-06-20` |
 
           **filter 범위 기준**
-          - `all`: date 무관, 활성 엄마 루틴마다 완료 Todo 전부 + 아직 해야 할 일 1건
+          - `all`: date 무관, 활성 엄마 루틴마다 완료 이력 전부(Todo + override 기반) + 아직 해야 할 일 1건
           - `day`: date 당일 1일치
           - `week`: date 포함 7일 (date ~ date+6)
           - `month`: date부터 정확히 1개월 전날까지 (28~31일, 시작 월에 따라 다름)
@@ -204,7 +205,7 @@ public interface RoutineControllerDocs {
 
           `filter=day/week/month`는 날짜(yyyy-MM-dd)를 키로 하는 객체를, `filter=all`은 `"all"` 하나를
           키로 하는 객체를 반환합니다. 값은 각각 해당 범위의 루틴 배열이며, `filter=all`의 경우 루틴 하나당
-          완료 Todo 개수 + 1(아직 해야 할 일)건이 들어갑니다.
+          완료 이력 개수(완료 Todo + Todo 없이 override로만 완료 처리된 날짜) + 1(아직 해야 할 일)건이 들어갑니다.
 
           | 필드명 | 타입 | 설명 |
           |--------|------|------|
