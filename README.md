@@ -10,9 +10,6 @@
 
 목표를 세우고 매일의 할 일과 반복 루틴을 관리하며, 계획이 어긋났을 때 **AI(Gemini)가 원인을 분석해 재계획(Re-Plan)을 추천**하는 서비스의 백엔드입니다.
 
-- **운영 서버**: http://54.180.141.175
-- **API 문서 (Swagger)**: http://54.180.141.175/swagger-ui/index.html
-
 ---
 
 ## ✨ 주요 기능
@@ -80,22 +77,8 @@ JWT 인증 필터 · 전역 예외 핸들러(@RestControllerAdvice) · Redis · 
 
 ## ☁️ 인프라 & 배포 (AWS `ap-northeast-2`)
 
-```
-                 Internet
-                    │  (HTTPS / Let's Encrypt)
-        ┌───────────┴──────────────── VPC ──────────────────────┐
-        │  Public Subnet                Private Subnet          │
-        │  ├ Internet Gateway           ┌──────── EC2 ────────┐ │
-        │  ├ Route53 (DNS)              │ Docker              │ │
-        │  └ NAT Instance ─────outbound─│  Nginx(reverse／SSL)│ │
-        │                               │  Spring Boot App    │ │
-        │                               │  Redis(cache)       │ │
-        │                               └─────────┬───────────┘ │
-        │                                    RDS (PostgreSQL)    │
-        └───────────────────────────────────────────────────────┘
-   S3 + CloudFront (이미지)   ECR (이미지 레지스트리)
-   SSM Parameter Store (시크릿)   CloudWatch (로그·메트릭)
-```
+<img width="4452" height="2940" alt="시스템 아키텍처" src="https://github.com/user-attachments/assets/27c502dc-23af-4332-bbdf-e951776cb516" />
+
 
 | 영역 | 구성 |
 |------|------|
@@ -110,31 +93,6 @@ JWT 인증 필터 · 전역 예외 핸들러(@RestControllerAdvice) · Redis · 
 - **CI** — PR마다 JDK 17로 `./gradlew build` (테스트 + Spotless 포맷 검사)
 - **CD** — `main` 병합 시 ① **OIDC로 AWS 임시 자격증명 발급**(장기 액세스 키 불필요) → ② Docker 이미지 빌드 후 **ECR push** → ③ **EC2에 SSH 접속** → SSM 시크릿을 `.env`로 주입 → `docker compose pull && up -d`로 새 이미지 교체
 - **Release** — `develop → main` 병합 시 버전 태그·릴리즈 자동 생성
-
-**Dockerfile** — 멀티 스테이지 빌드(JDK 빌드 → JRE 실행)로 이미지 경량화, **비root 유저** 실행, `/actuator/health` 헬스체크
-
-## 🚀 로컬 실행
-
-**요구 사항**: JDK 17, Docker
-
-```bash
-# 1. 설정 파일 준비 (gitignore 처리된 파일들)
-cp docker-compose.yml.example docker-compose.yml
-cp src/main/resources/application-local.yaml.example src/main/resources/application-local.yaml
-#   → 두 파일의 DB 정보를 동일하게 맞춥니다.
-
-# 2. PostgreSQL(5432) · Redis(6379) 컨테이너 실행
-docker compose up -d
-
-# 3. 애플리케이션 실행 (local 프로파일)
-./gradlew bootRun --args='--spring.profiles.active=local'
-
-# 4. 헬스 체크
-curl http://localhost:8080/actuator/health
-```
-
-> 로컬도 운영과 동일하게 `ddl-auto: none` + Flyway로 스키마를 관리합니다.
-> 실행 후 API 문서는 http://localhost:8080/swagger-ui/index.html 에서 볼 수 있습니다.
 
 ## ✅ 빌드 · 포맷 검사
 
