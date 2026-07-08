@@ -10,6 +10,7 @@ import io.jsonwebtoken.security.PublicJwk;
 import java.security.Key;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClient;
@@ -17,6 +18,7 @@ import plana.replan.domain.user.exception.UserErrorCode;
 import plana.replan.global.config.AppleProperties;
 import plana.replan.global.exception.CustomException;
 
+@Slf4j
 @Component
 @RequiredArgsConstructor
 public class AppleTokenVerifier {
@@ -53,6 +55,16 @@ public class AppleTokenVerifier {
               .parseSignedClaims(identityToken);
 
       Claims claims = jws.getPayload();
+
+      // ── 임시 디버그 (확인 후 반드시 삭제): 원인 판별용.
+      //    개인정보(이메일 값·sub)는 남기지 않고, "이메일이 왔는지 여부"와 aud만 남긴다.
+      log.warn(
+          "[APPLE-DEBUG] aud={}, hasEmail={}, emailVerified={}, isPrivateEmail={}",
+          claims.getAudience(),
+          claims.get("email") != null,
+          claims.get("email_verified"),
+          claims.get("is_private_email"));
+
       Set<String> audiences = claims.getAudience();
       String matchedAud =
           properties.getClientIds().stream()
