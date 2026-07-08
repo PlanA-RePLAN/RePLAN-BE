@@ -132,6 +132,9 @@ public interface TodoRepository extends JpaRepository<Todo, Long> {
       @Param("start") LocalDateTime start,
       @Param("end") LocalDateTime end);
 
+  // 아래 마감 임박/실패 조회는 due_date 범위로 거른다.
+  // 공통 조건(parent IS NULL, isCompleted=false, isActive=true)에 맞춘 부분 인덱스
+  // idx_todo_due_active(V21)로 순차 스캔 대신 인덱스 스캔되도록 지원한다.
   @Query(
       "SELECT t FROM Todo t JOIN FETCH t.user WHERE t.parent IS NULL AND t.isCompleted = false"
           + " AND t.isPinned = true AND t.isActive = true"
