@@ -60,18 +60,24 @@ public class AppleTokenVerifier {
               .findFirst()
               .orElseThrow(() -> new CustomException(UserErrorCode.APPLE_TOKEN_INVALID));
 
+      // sub(고유 식별번호)는 애플이 로그인마다 항상 주는 값이라, 이걸 사용자 식별 기준으로 삼는다.
+      String sub = claims.getSubject();
+      if (sub == null) {
+        throw new CustomException(UserErrorCode.APPLE_TOKEN_INVALID);
+      }
+
+      // 이메일은 애플이 최초 인증 때만 준다(네이티브 재로그인 시엔 없음).
+      // 이메일이 있을 때만 이메일 인증 여부를 확인하고, 없으면 sub로만 식별한다.
+      // (email_verified는 boolean 또는 "true" 문자열로 옴)
       String email = claims.get("email", String.class);
-      if (email == null) {
-        throw new CustomException(UserErrorCode.APPLE_TOKEN_INVALID);
+      if (email != null) {
+        Object emailVerified = claims.get("email_verified");
+        if (!"true".equals(String.valueOf(emailVerified))) {
+          throw new CustomException(UserErrorCode.APPLE_TOKEN_INVALID);
+        }
       }
 
-      // 애플이 이메일 인증을 완료한 계정인지 확인 (email_verified는 boolean 또는 "true" 문자열로 옴)
-      Object emailVerified = claims.get("email_verified");
-      if (!"true".equals(String.valueOf(emailVerified))) {
-        throw new CustomException(UserErrorCode.APPLE_TOKEN_INVALID);
-      }
-
-      return new AppleIdTokenPayload(email, matchedAud, claims.getSubject());
+      return new AppleIdTokenPayload(email, matchedAud, sub);
     } catch (CustomException e) {
       throw e;
     } catch (ResourceAccessException e) {

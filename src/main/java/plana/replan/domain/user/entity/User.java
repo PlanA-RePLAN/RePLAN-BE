@@ -48,6 +48,11 @@ public class User extends BaseTimeEntity {
   @Column(name = "notify_report", nullable = false)
   private boolean notifyReport = true;
 
+  // 애플 고유 식별번호(sub). 애플 회원만 값이 있고, 재로그인 시 이메일 대신 이 값으로 사용자를 찾는다.
+  // 값이 있는 경우 유일해야 하며, 그 제약은 마이그레이션(V22 ux_users_apple_sub)에서 관리한다.
+  @Column(name = "apple_sub")
+  private String appleSub;
+
   @Builder
   public User(
       String email,
@@ -55,13 +60,20 @@ public class User extends BaseTimeEntity {
       String nickname,
       Role role,
       Provider provider,
-      String profileImage) {
+      String profileImage,
+      String appleSub) {
     this.email = Objects.requireNonNull(email, "이메일은 필수입니다.");
     this.nickname = Objects.requireNonNull(nickname, "닉네임은 필수입니다.");
     this.role = Objects.requireNonNull(role, "역할은 필수입니다.");
     this.provider = Objects.requireNonNull(provider, "제공자는 필수입니다.");
     this.password = password;
     this.profileImage = profileImage;
+    this.appleSub = appleSub;
+  }
+
+  /** 애플 재로그인 식별용 고유번호(sub)를 연결한다. 최초 저장·기존 회원 이관에 사용. */
+  public void linkAppleSub(String appleSub) {
+    this.appleSub = appleSub;
   }
 
   public void updateNickname(String nickname) {
@@ -93,6 +105,8 @@ public class User extends BaseTimeEntity {
     this.nickname = "deleted_" + this.id;
     this.password = null;
     this.profileImage = null;
+    // 애플 sub를 비워, 같은 애플 계정으로 재가입할 때 중복 인덱스(ux_users_apple_sub)와 충돌하지 않게 한다.
+    this.appleSub = null;
     softDelete();
   }
 }
