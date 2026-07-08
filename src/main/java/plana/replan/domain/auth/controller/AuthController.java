@@ -824,11 +824,13 @@ public class AuthController {
           **호출 주체**: 비인증 사용자
 
           **비즈니스 로직**
-          1. 프론트가 보낸 identityToken(JWT)을 애플 공개키로 검증 → 이메일 추출
-          2. authorizationCode를 애플 토큰 엔드포인트에서 refresh token으로 교환(탈퇴 시 철회용)
-          3. 같은 이메일이 다른 provider로 가입돼 있으면 409
-          4. 기존유저: accessToken/refreshToken 발급 (isNewUser: false)
-          5. 신규유저: tempToken(5분) 발급 (isNewUser: true) → 온보딩 후 `/api/auth/oauth/register` 호출 필요
+          1. 프론트가 보낸 identityToken(JWT)을 애플 공개키로 검증 → 애플 고유번호(sub)와 이메일 추출
+             (애플은 네이티브 재로그인 시 이메일을 주지 않으므로, sub를 사용자 식별 기준으로 사용)
+          2. sub로 사용자 조회 → 없으면 이메일로 조회(있을 때)해 기존 애플 회원이면 sub를 채워 넣어 이관
+          3. authorizationCode를 애플 토큰 엔드포인트에서 refresh token으로 교환(탈퇴 시 철회용)
+          4. 같은 이메일이 다른 provider로 가입돼 있으면 409
+          5. 기존유저: accessToken/refreshToken 발급 (isNewUser: false)
+          6. 신규유저: tempToken(5분) 발급 (isNewUser: true) → 온보딩 후 `/api/auth/oauth/register` 호출 필요
           """)
   @ApiResponses({
     @ApiResponse(
