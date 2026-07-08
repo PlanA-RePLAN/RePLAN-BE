@@ -6,6 +6,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
 import java.util.Optional;
@@ -58,6 +59,7 @@ class AuthServiceAppleLoginTest {
     given(jwtUtil.generateAccessToken(anyString(), anyString(), any())).willReturn("access-token");
     given(jwtUtil.generateRefreshToken(anyString())).willReturn("refresh-token");
     given(jwtUtil.getRefreshExpiration()).willReturn(604800000L);
+    // 기본: 이메일이 포함된 토큰(최초 인증 또는 웹). 재로그인 케이스는 각 테스트에서 재정의한다.
     given(appleTokenVerifier.verify(anyString()))
         .willReturn(new AppleIdTokenPayload(EMAIL, AUD, SUB));
     given(appleAuthClient.exchangeRefreshToken(eq(AUD), anyString()))
@@ -68,20 +70,24 @@ class AuthServiceAppleLoginTest {
     return new AppleLoginRequestDto("id-token", "auth-code");
   }
 
-  @Test
-  @DisplayName("기존 애플 유저면 토큰쌍을 발급하고 refresh token을 userId 키에 저장한다")
-  void existingUser() {
+  private User appleUser(String email) {
     User user =
         User.builder()
-            .email(EMAIL)
+            .email(email)
             .nickname("apple")
             .role(Role.ROLE_USER)
             .provider(Provider.APPLE)
             .build();
     ReflectionTestUtils.setField(user, "id", 1L);
-    given(userRepository.findByEmail(EMAIL)).willReturn(Optional.of(user));
-    given(userRepository.findByEmailAndProvider(EMAIL, Provider.APPLE))
-        .willReturn(Optional.of(user));
+    return user;
+  }
+
+  @Test
+  @DisplayName("sub로 찾은 기존 애플 유저면 토큰쌍을 발급하고 refresh token을 userId 키에 저장한다")
+  void existingUserBySub() {
+    User user = appleUser(EMAIL);
+    ReflectionTestUtils.setField(user, "appleSub", SUB);
+    given(userRepository.findByAppleSub(SUB)).willReturn(Optional.of(user));
 
     OAuthLoginResponseDto res = authService.appleLogin(request());
 
@@ -91,21 +97,60 @@ class AuthServiceAppleLoginTest {
   }
 
   @Test
-  @DisplayName("신규 유저면 tempToken을 발급하고 refresh token을 email 임시 키에 저장한다")
+  @DisplayName("재로그인이라 이메일이 없어도 sub로 사용자를 찾아 로그인된다")
+  void reloginWithoutEmail() {
+    given(appleTokenVerifier.verify(anyString()))
+        .willReturn(new AppleIdTokenPayload(null, AUD, SUB));
+    User user = appleUser(EMAIL);
+    ReflectionTestUtils.setField(user, "appleSub", SUB);
+    given(userRepository.findByAppleSub(SUB)).willReturn(Optional.of(user));
+
+    OAuthLoginResponseDto res = authService.appleLogin(request());
+
+    assertThat(res.getAccessToken()).isEqualTo("access-token");
+  }
+
+  @Test
+  @DisplayName("sub 저장 전 가입한 기존 애플 유저는 이메일로 찾아 sub를 채워 넣고(이관) 로그인된다")
+  void backfillSubForExistingUser() {
+    User user = appleUser(EMAIL); // appleSub 아직 없음
+    given(userRepository.findByAppleSub(SUB)).willReturn(Optional.empty());
+    given(userRepository.findByEmail(EMAIL)).willReturn(Optional.of(user));
+
+    OAuthLoginResponseDto res = authService.appleLogin(request());
+
+    assertThat(res.getAccessToken()).isEqualTo("access-token");
+    assertThat(user.getAppleSub()).isEqualTo(SUB);
+    verify(valueOperations)
+        .set(eq("apple:refresh:" + user.getId()), eq(AUD + "|apple-refresh-token"));
+  }
+
+  @Test
+  @DisplayName("신규 유저면 tempToken을 발급하고 refresh token과 sub를 email 임시 키에 저장한다")
   void newUser() {
+    given(userRepository.findByAppleSub(SUB)).willReturn(Optional.empty());
     given(userRepository.findByEmail(EMAIL)).willReturn(Optional.empty());
-    given(userRepository.findByEmailAndProvider(EMAIL, Provider.APPLE))
-        .willReturn(Optional.empty());
 
     OAuthLoginResponseDto res = authService.appleLogin(request());
 
     assertThat(res.getTempToken()).isNotBlank();
     verify(valueOperations)
-        .set(
-            eq("apple-refresh-temp:" + EMAIL),
-            eq(AUD + "|apple-refresh-token"),
-            org.mockito.ArgumentMatchers.eq(300L),
-            any());
+        .set(eq("apple-refresh-temp:" + EMAIL), eq(AUD + "|apple-refresh-token"), eq(300L), any());
+    verify(valueOperations).set(eq("apple-sub-temp:" + EMAIL), eq(SUB), eq(300L), any());
+  }
+
+  @Test
+  @DisplayName("우리 DB에 없는데 이메일도 없는 예외 상태면 가입을 막고 토큰 무효 예외")
+  void newUserWithoutEmailFails() {
+    given(appleTokenVerifier.verify(anyString()))
+        .willReturn(new AppleIdTokenPayload(null, AUD, SUB));
+    given(userRepository.findByAppleSub(SUB)).willReturn(Optional.empty());
+
+    assertThatThrownBy(() -> authService.appleLogin(request()))
+        .isInstanceOf(CustomException.class)
+        .hasFieldOrPropertyWithValue("errorCode", UserErrorCode.APPLE_TOKEN_INVALID);
+    // 고아 refresh token 방지: 거부는 토큰 교환 전에 이뤄져야 한다.
+    verify(appleAuthClient, never()).exchangeRefreshToken(anyString(), anyString());
   }
 
   @Test
@@ -118,6 +163,7 @@ class AuthServiceAppleLoginTest {
             .role(Role.ROLE_USER)
             .provider(Provider.GOOGLE)
             .build();
+    given(userRepository.findByAppleSub(SUB)).willReturn(Optional.empty());
     given(userRepository.findByEmail(EMAIL)).willReturn(Optional.of(google));
 
     assertThatThrownBy(() -> authService.appleLogin(request()))
@@ -128,6 +174,7 @@ class AuthServiceAppleLoginTest {
   @Test
   @DisplayName("신분증과 인가코드의 sub가 다르면(다른 사용자) 토큰 무효 예외")
   void subMismatch() {
+    given(userRepository.findByAppleSub(SUB)).willReturn(Optional.empty());
     given(userRepository.findByEmail(EMAIL)).willReturn(Optional.empty());
     given(appleAuthClient.exchangeRefreshToken(eq(AUD), anyString()))
         .willReturn(new AppleTokenResponse("apple-refresh-token", "different-sub"));
@@ -140,6 +187,7 @@ class AuthServiceAppleLoginTest {
   @Test
   @DisplayName("교환 응답에 sub가 없으면(검증 불가) 토큰 무효 예외")
   void subMissing() {
+    given(userRepository.findByAppleSub(SUB)).willReturn(Optional.empty());
     given(userRepository.findByEmail(EMAIL)).willReturn(Optional.empty());
     given(appleAuthClient.exchangeRefreshToken(eq(AUD), anyString()))
         .willReturn(new AppleTokenResponse("apple-refresh-token", null));
