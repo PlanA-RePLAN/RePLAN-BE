@@ -6,6 +6,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
 import java.util.Optional;
@@ -148,6 +149,8 @@ class AuthServiceAppleLoginTest {
     assertThatThrownBy(() -> authService.appleLogin(request()))
         .isInstanceOf(CustomException.class)
         .hasFieldOrPropertyWithValue("errorCode", UserErrorCode.APPLE_TOKEN_INVALID);
+    // 고아 refresh token 방지: 거부는 토큰 교환 전에 이뤄져야 한다.
+    verify(appleAuthClient, never()).exchangeRefreshToken(anyString(), anyString());
   }
 
   @Test
