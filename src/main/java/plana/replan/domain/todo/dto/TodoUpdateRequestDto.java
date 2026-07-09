@@ -4,6 +4,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.List;
+import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import plana.replan.domain.routine.entity.RoutineType;
@@ -11,6 +12,7 @@ import plana.replan.domain.routine.entity.RoutineType;
 @Schema(description = "투두 수정 요청")
 @Getter
 @NoArgsConstructor
+@AllArgsConstructor
 public class TodoUpdateRequestDto {
 
   @Schema(description = "투두 제목. null이면 변경하지 않음. 빈 문자열은 허용하지 않음", example = "토익 단어 50개 외우기")
