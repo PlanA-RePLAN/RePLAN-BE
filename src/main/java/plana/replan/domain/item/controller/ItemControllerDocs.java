@@ -26,7 +26,7 @@ import plana.replan.domain.item.dto.ItemResponseDto;
 import plana.replan.global.common.ApiResult;
 
 @Tag(
-    name = "Item",
+    name = "Home (홈 통합)",
     description =
         """
         홈 화면용 통합 아이템 API. 일회성 투두와 반복 루틴의 날짜별 회차를 "아이템" 하나의 개념으로 다룬다.
