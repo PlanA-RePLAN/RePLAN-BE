@@ -455,20 +455,62 @@ public class RoutineService {
   }
 
   /**
-   * TodoService.handleRoutineUpdate처럼 권한 검증이 이미 끝난 cross-domain 호출용. children 일괄 softDelete + 자기
-   * softDelete 정책을 한 지점에 모으기 위한 헬퍼. 해당 루틴들을 참조하는 살아있는 Todo는 routine 참조를 null로 끊는다
-   * — @SQLRestriction이 걸려있어 deleted routine을 lazy-load할 때 EntityNotFoundException이 터지기 때문 (목록 조회
-   * 500 방지). 외부 public 진입점이므로 호출자 트랜잭션 유무와 무관하게 routine.getChildren() 지연 로딩이
-   * 안전하도록 @Transactional(propagation = REQUIRED)로 트랜잭션을 보장한다.
+   * 루틴 삭제의 단일 진입점 (children 일괄 + 자기 자신). 삭제 시 이 루틴이 찍어낸 투두를 다음 규칙으로 정리한다.
+   *
+   * <ul>
+   *   <li>완료된 회차 투두 트리 → 기록(통계·이력)을 위해 남긴다. 단 routine 참조는 끊는다 — @SQLRestriction이 걸린 삭제 루틴을
+   *       lazy-load하는 순간 EntityNotFoundException(500)이 나기 때문 (목록 조회·undo 공통).
+   *   <li>미완료 회차 투두 트리 → 하위 투두(직접 추가한 서브투두 포함)까지 함께 softDelete한다. 회차 하나 건너뛰기(skip)와 일관된 동작. 판단 단위는
+   *       투두 낱개가 아니라 엄마 투두 트리다 — 부모만 지워지고 자식이 살아남으면 삭제된 부모를 참조하는 고아가 생긴다.
+   *   <li>회차 예외(override) → 진짜 삭제. 루틴에 딸린 부속 메모라 어디서도 단독 참조하지 않으며, 루틴 전체 수정(updateMotherRoutine)도
+   *       같은 방식으로 버린다.
+   * </ul>
+   *
+   * 외부 public 진입점이므로 호출자 트랜잭션 유무와 무관하게 지연 로딩이 안전하도록 @Transactional을 보장한다.
    */
   @Transactional
   public void cascadeSoftDelete(Routine routine) {
+    if (routine.isMother()) {
+      routineOverrideRepository.deleteByRoutine(routine);
+
+      LocalDateTime now = LocalDateTime.now(clock);
+      todoRepository
+          .findAllByRoutine(routine)
+          .forEach(
+              motherTodo -> {
+                motherTodo.updateRoutine(null);
+                if (!motherTodo.isCompleted()) {
+                  motherTodo
+                      .getChildren()
+                      .forEach(
+                          child -> {
+                            child.updateRoutine(null);
+                            child.softDelete(now);
+                          });
+                  motherTodo.softDelete(now);
+                }
+              });
+    }
     routine.getChildren().forEach(this::detachAndSoftDelete);
     detachAndSoftDelete(routine);
   }
 
+  /**
+   * 남아있는 투두의 routine 참조를 끊고 루틴을 softDelete한다. 하위 루틴 단독 삭제 경로에서는 서브투두의 운명을 소속 엄마 투두 트리의 완료 여부로 결정한다
+   * (완료 회차의 기록은 보존, 미완료 회차 것은 함께 삭제).
+   */
   private void detachAndSoftDelete(Routine routine) {
-    todoRepository.findAllByRoutine(routine).forEach(t -> t.updateRoutine(null));
+    LocalDateTime now = LocalDateTime.now(clock);
+    todoRepository
+        .findAllByRoutine(routine)
+        .forEach(
+            todo -> {
+              todo.updateRoutine(null);
+              Todo root = todo.getParent() != null ? todo.getParent() : todo;
+              if (!root.isCompleted()) {
+                todo.softDelete(now);
+              }
+            });
     routine.softDelete();
   }
 
