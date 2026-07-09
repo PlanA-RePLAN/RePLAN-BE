@@ -3,6 +3,9 @@ package plana.replan.domain.goal.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneId;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -24,7 +27,11 @@ import plana.replan.global.exception.CustomException;
 
 class GoalAiServiceTest {
 
-  private final GoalAiService service = new GoalAiService(null, null);
+  // 한국시간 2026-07-09 18:00 고정
+  private static final Clock FIXED_CLOCK =
+      Clock.fixed(Instant.parse("2026-07-09T09:00:00Z"), ZoneId.of("Asia/Seoul"));
+
+  private final GoalAiService service = new GoalAiService(null, null, FIXED_CLOCK);
 
   private Tag tag(long id, String title) {
     User user =
@@ -63,6 +70,59 @@ class GoalAiServiceTest {
     GoalExploreRequest req = new GoalExploreRequest("토익 850점", null, null);
     String prompt = service.buildExplorePrompt(req, "2026-06-20");
     assertThat(prompt).containsPattern("미입력[\\s\\S]*미입력");
+  }
+
+  @Test
+  void 탐색_프롬프트에_날짜_비교_규칙이_없다() {
+    GoalExploreRequest req = new GoalExploreRequest("토익 850점", "2026-05-01", "23:59");
+    String prompt = service.buildExplorePrompt(req, "2026-06-20");
+    assertThat(prompt).doesNotContain("이미 지났어요");
+  }
+
+  @Test
+  void 탐색_종료일이_과거면_AI_호출_없이_안내_메시지를_반환한다() {
+    // geminiRestClient가 null이므로, 예외 없이 응답이 온다는 것 자체가 AI를 호출하지 않았다는 뜻
+    GoalExploreRequest req = new GoalExploreRequest("토익 850점", "2026-07-08", "23:59");
+    GoalExploreResponse res = service.exploreGoal(req);
+    assertThat(res.valid()).isFalse();
+    assertThat(res.message()).isEqualTo("종료 일정이 이미 지났어요. 미래 날짜로 다시 설정해주세요.");
+    assertThat(res.questions()).isEmpty();
+  }
+
+  @Test
+  void 기한검사_내일_날짜는_지나지_않은_것으로_본다() {
+    assertThat(service.isDeadlinePassed("2026-07-10", "23:59")).isFalse();
+  }
+
+  @Test
+  void 기한검사_어제_날짜는_지난_것으로_본다() {
+    assertThat(service.isDeadlinePassed("2026-07-08", null)).isTrue();
+  }
+
+  @Test
+  void 기한검사_오늘_날짜에_시간이_없으면_그날_끝까지_유효하다() {
+    assertThat(service.isDeadlinePassed("2026-07-09", null)).isFalse();
+  }
+
+  @Test
+  void 기한검사_오늘_날짜에_지난_시간이면_지난_것으로_본다() {
+    // 고정된 현재 시각은 18:00
+    assertThat(service.isDeadlinePassed("2026-07-09", "17:00")).isTrue();
+  }
+
+  @Test
+  void 기한검사_오늘_날짜에_남은_시간이면_지나지_않은_것으로_본다() {
+    assertThat(service.isDeadlinePassed("2026-07-09", "19:00")).isFalse();
+  }
+
+  @Test
+  void 기한검사_날짜가_없으면_검사하지_않는다() {
+    assertThat(service.isDeadlinePassed(null, "09:00")).isFalse();
+  }
+
+  @Test
+  void 기한검사_형식이_잘못된_날짜는_지나지_않은_것으로_본다() {
+    assertThat(service.isDeadlinePassed("내일까지", null)).isFalse();
   }
 
   @Test
