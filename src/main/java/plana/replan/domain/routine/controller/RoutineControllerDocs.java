@@ -1111,7 +1111,10 @@ public interface RoutineControllerDocs {
           """
           엄마 루틴을 삭제합니다 (soft delete). 매달려 있던 모든 하위 루틴도 함께 사라집니다.
 
-          - 이미 생성된 Todo는 함께 삭제되지 않습니다. 다만 삭제된 루틴을 참조하던 살아있는 Todo는 **`routine` 참조가 null로 끊겨** 일반 Todo처럼 남습니다. 그래서 조회 시 해당 Todo의 `routineType`이 `null`로 나옵니다. 다음 스케줄러 사이클부터는 새 Todo가 생성되지 않습니다.
+          - **미완료 회차 Todo는 하위 투두까지 함께 삭제**됩니다 (회차 하나 건너뛰기와 일관된 동작).
+          - **완료된 회차 Todo는 기록(통계·이력)으로 남습니다.** 다만 `routine` 참조가 null로 끊겨 일반 Todo처럼 남으므로 조회 시 `routineType`이 `null`로 나옵니다.
+          - 이 루틴의 회차 예외(override) 기록은 모두 삭제됩니다.
+          - 다음 스케줄러 사이클부터는 새 Todo가 생성되지 않습니다.
           - 하위 루틴 ID를 넘기면 400(ROUTINE_INVALID_TARGET) — 하위 루틴은 `/children/{id}`로 삭제하세요.
 
           ### Request Headers
@@ -1181,7 +1184,7 @@ public interface RoutineControllerDocs {
           """
           하위 루틴 하나를 삭제합니다 (soft delete). 엄마 루틴은 영향 없습니다.
 
-          - 이미 생성된 Todo는 함께 삭제되지 않습니다. 다만 삭제된 하위 루틴을 참조하던 살아있는 Todo는 **`routine` 참조가 null로 끊겨** 남으며, 조회 시 `routineType`이 `null`로 나옵니다. (엄마 Todo와의 `parent` 관계는 그대로 유지됩니다.)
+          - 이 하위 루틴이 만든 서브투두는 소속 회차(엄마 Todo)가 **미완료면 함께 삭제**되고, **완료된 회차의 것은 기록으로 남습니다** (남는 경우 `routine` 참조만 null로 끊기며, 엄마 Todo와의 `parent` 관계는 유지).
           - 엄마 루틴 ID를 넘기면 400(ROUTINE_INVALID_TARGET) — 엄마 루틴은 `/{id}`로 삭제하세요.
 
           ### Path Variable
