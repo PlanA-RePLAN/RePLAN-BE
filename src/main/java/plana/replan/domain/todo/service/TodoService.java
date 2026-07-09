@@ -372,6 +372,35 @@ public class TodoService {
     return TodoListResponseDto.from(todo, clock);
   }
 
+  /**
+   * 정렬 순서를 직접 지정한다. 통합 아이템 API(/api/items/order)용 — 합쳐진 목록에서는 이웃이 아직 투두로 생성되지 않은 루틴 회차(id 없음)일 수 있어
+   * 이웃 id 방식(reorderTodo)을 쓸 수 없다. 반복에 연결된 투두는 순서가 회차 예외(override)에 저장돼야 하므로 루틴 API를 쓰도록 거절한다.
+   */
+  @Transactional
+  public void updateSortOrder(Long userId, Long todoId, double sortOrder) {
+    if (userId == null) {
+      throw new CustomException(UserErrorCode.USER_NOT_FOUND);
+    }
+    Todo todo =
+        todoRepository
+            .findById(todoId)
+            .orElseThrow(() -> new CustomException(TodoErrorCode.TODO_NOT_FOUND));
+
+    if (!todo.getUser().getId().equals(userId)) {
+      throw new CustomException(TodoErrorCode.TODO_NOT_FOUND);
+    }
+
+    if (todo.getParent() != null) {
+      throw new CustomException(TodoErrorCode.TODO_NOT_FOUND);
+    }
+
+    if (todo.getRoutine() != null) {
+      throw new CustomException(TodoErrorCode.ROUTINE_TODO_USE_ROUTINE_API);
+    }
+
+    todo.updateSortOrder(sortOrder);
+  }
+
   @Transactional
   public TodoListResponseDto completeTodo(
       Long userId, Long todoId, TodoCompleteRequestDto request) {
