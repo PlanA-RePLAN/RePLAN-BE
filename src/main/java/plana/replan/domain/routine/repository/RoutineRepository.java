@@ -91,6 +91,9 @@ public interface RoutineRepository extends JpaRepository<Routine, Long> {
               OR (r.routine_type = 'WEEKLY'  AND (r.routine_date & :dayBit) != 0)
               OR (r.routine_type = 'MONTHLY' AND (r.routine_date & :monthDayBit) != 0)
             )
+            -- 반복 종료일이 지난 날짜의 회차는 목록에서 제외한다.
+            -- (종료일이 지난 회차는 완료/핀/수정 검증에서 거부되므로 애초에 보여주면 안 된다.)
+            AND (r.due_date IS NULL OR CAST(:targetDate AS date) <= CAST(r.due_date AS date))
             AND COALESCE(ro.is_skipped, FALSE) = FALSE
           """)
   List<RoutineDateProjection> findMotherRoutinesByDate(
