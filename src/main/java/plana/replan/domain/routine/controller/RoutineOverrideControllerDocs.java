@@ -89,6 +89,25 @@ public interface RoutineOverrideControllerDocs {
                             }
                             """))),
     @ApiResponse(
+        responseCode = "400",
+        description = "제목이 빈 문자열, 또는 루틴이 발생하지 않는 날짜(요일/일자 불일치, 반복 종료일 이후)",
+        content =
+            @Content(
+                examples = {
+                  @ExampleObject(
+                      name = "빈 제목",
+                      value =
+                          """
+                          {"status":400,"success":false,"data":null,"error":{"code":"INVALID_INPUT","message":"잘못된 입력입니다.","detail":null}}
+                          """),
+                  @ExampleObject(
+                      name = "발생하지 않는 날짜",
+                      value =
+                          """
+                          {"status":400,"success":false,"data":null,"error":{"code":"ROUTINE_INVALID_DATE","message":"유효하지 않은 반복 날짜입니다.","detail":null}}
+                          """)
+                })),
+    @ApiResponse(
         responseCode = "401",
         description = "인증 실패",
         content =
@@ -187,7 +206,10 @@ public interface RoutineOverrideControllerDocs {
                               "error": null
                             }
                             """))),
-    @ApiResponse(responseCode = "400", description = "sortOrder 누락"),
+    @ApiResponse(
+        responseCode = "400",
+        description =
+            "sortOrder 누락, 또는 루틴이 발생하지 않는 날짜(요일/일자 불일치, 반복 종료일 이후) — ROUTINE_INVALID_DATE"),
     @ApiResponse(responseCode = "401", description = "인증 실패"),
     @ApiResponse(responseCode = "404", description = "루틴을 찾을 수 없음")
   })
@@ -277,7 +299,10 @@ public interface RoutineOverrideControllerDocs {
                           }
                           """)
                 })),
-    @ApiResponse(responseCode = "400", description = "isCompleted 누락"),
+    @ApiResponse(
+        responseCode = "400",
+        description =
+            "isCompleted 누락, 또는 루틴이 발생하지 않는 날짜(요일/일자 불일치, 반복 종료일 이후) — ROUTINE_INVALID_DATE"),
     @ApiResponse(responseCode = "401", description = "인증 실패"),
     @ApiResponse(responseCode = "404", description = "루틴을 찾을 수 없음")
   })
@@ -312,7 +337,10 @@ public interface RoutineOverrideControllerDocs {
       security = @SecurityRequirement(name = "Bearer Authentication"))
   @ApiResponses({
     @ApiResponse(responseCode = "200", description = "핀/언핀 성공"),
-    @ApiResponse(responseCode = "400", description = "isPinned 누락"),
+    @ApiResponse(
+        responseCode = "400",
+        description =
+            "isPinned 누락, 또는 루틴이 발생하지 않는 날짜(요일/일자 불일치, 반복 종료일 이후) — ROUTINE_INVALID_DATE"),
     @ApiResponse(responseCode = "401", description = "인증 실패"),
     @ApiResponse(responseCode = "404", description = "루틴을 찾을 수 없음")
   })
@@ -345,24 +373,23 @@ public interface RoutineOverrideControllerDocs {
     @ApiResponse(responseCode = "200", description = "건너뜀 처리 성공"),
     @ApiResponse(
         responseCode = "400",
-        description = "이미 완료된 Todo가 있는 날짜",
+        description = "이미 완료된 Todo가 있는 날짜, 또는 루틴이 발생하지 않는 날짜(요일/일자 불일치, 반복 종료일 이후)",
         content =
             @Content(
-                examples =
-                    @ExampleObject(
-                        value =
-                            """
-                            {
-                              "status": 400,
-                              "success": false,
-                              "data": null,
-                              "error": {
-                                "code": "ROUTINE_OVERRIDE_CANNOT_SKIP_COMPLETED",
-                                "message": "이미 완료된 Todo가 있는 날짜는 건너뜀 처리할 수 없습니다.",
-                                "detail": null
-                              }
-                            }
-                            """))),
+                examples = {
+                  @ExampleObject(
+                      name = "완료된 날짜 건너뜀 시도",
+                      value =
+                          """
+                          {"status":400,"success":false,"data":null,"error":{"code":"ROUTINE_OVERRIDE_CANNOT_SKIP_COMPLETED","message":"이미 완료된 Todo가 있는 날짜는 건너뜀 처리할 수 없습니다.","detail":null}}
+                          """),
+                  @ExampleObject(
+                      name = "발생하지 않는 날짜",
+                      value =
+                          """
+                          {"status":400,"success":false,"data":null,"error":{"code":"ROUTINE_INVALID_DATE","message":"유효하지 않은 반복 날짜입니다.","detail":null}}
+                          """)
+                })),
     @ApiResponse(responseCode = "401", description = "인증 실패"),
     @ApiResponse(responseCode = "404", description = "루틴을 찾을 수 없음")
   })

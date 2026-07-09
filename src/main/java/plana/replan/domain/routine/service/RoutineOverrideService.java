@@ -18,6 +18,7 @@ import plana.replan.domain.routine.entity.RoutineOverride;
 import plana.replan.domain.routine.exception.RoutineErrorCode;
 import plana.replan.domain.routine.repository.RoutineOverrideRepository;
 import plana.replan.domain.routine.repository.RoutineRepository;
+import plana.replan.domain.routine.util.RoutineDays;
 import plana.replan.domain.tag.entity.Tag;
 import plana.replan.domain.tag.exception.TagErrorCode;
 import plana.replan.domain.tag.repository.TagRepository;
@@ -41,6 +42,7 @@ public class RoutineOverrideService {
   public RoutineOverrideResponseDto updateContent(
       Long userId, Long routineId, LocalDate date, RoutineOverrideContentRequestDto request) {
     Routine routine = findOwnedMotherRoutine(userId, routineId);
+    validateOccurrenceDate(routine, date);
 
     if (request.title() != null && request.title().isBlank()) {
       throw new CustomException(GlobalErrorCode.INVALID_INPUT);
@@ -80,6 +82,7 @@ public class RoutineOverrideService {
   public RoutineOverrideResponseDto updateOrder(
       Long userId, Long routineId, LocalDate date, RoutineOverrideOrderRequestDto request) {
     Routine routine = findOwnedMotherRoutine(userId, routineId);
+    validateOccurrenceDate(routine, date);
 
     RoutineOverride override = upsert(routine, date);
     override.updateOrder(request.sortOrder());
@@ -95,6 +98,7 @@ public class RoutineOverrideService {
   public RoutineOverrideResponseDto updateComplete(
       Long userId, Long routineId, LocalDate date, RoutineOverrideCompleteRequestDto request) {
     Routine routine = findOwnedMotherRoutine(userId, routineId);
+    validateOccurrenceDate(routine, date);
     LocalDateTime now = LocalDateTime.now(clock);
 
     RoutineOverride override = upsert(routine, date);
@@ -111,6 +115,7 @@ public class RoutineOverrideService {
   public RoutineOverrideResponseDto updatePin(
       Long userId, Long routineId, LocalDate date, RoutineOverridePinRequestDto request) {
     Routine routine = findOwnedMotherRoutine(userId, routineId);
+    validateOccurrenceDate(routine, date);
 
     RoutineOverride override = upsert(routine, date);
     override.updatePin(request.isPinned());
@@ -136,6 +141,7 @@ public class RoutineOverrideService {
   @Transactional
   public void skip(Long userId, Long routineId, LocalDate date) {
     Routine routine = findOwnedMotherRoutine(userId, routineId);
+    validateOccurrenceDate(routine, date);
 
     findExistingTodo(routine, date)
         .ifPresent(
@@ -176,6 +182,20 @@ public class RoutineOverrideService {
                         todo.restore();
                       });
             });
+  }
+
+  /**
+   * 그 날짜가 이 루틴의 실제 발생일인지 검증한다. 발생하지 않는 날짜(요일/일자 불일치 또는 반복 종료일 이후)에 회차 예외(override)를 만들면 존재하지 않는 회차의
+   * 완료/건너뜀 기록이 생겨 이력과 통계가 오염되므로 미리 거절한다.
+   */
+  private void validateOccurrenceDate(Routine routine, LocalDate date) {
+    boolean occurs =
+        RoutineDays.isOccurrence(routine.getRoutineType(), routine.getRoutineDate(), date);
+    boolean afterRepeatEnd =
+        routine.getDueDate() != null && date.isAfter(routine.getDueDate().toLocalDate());
+    if (!occurs || afterRepeatEnd) {
+      throw new CustomException(RoutineErrorCode.ROUTINE_INVALID_DATE);
+    }
   }
 
   private Routine findOwnedMotherRoutine(Long userId, Long routineId) {

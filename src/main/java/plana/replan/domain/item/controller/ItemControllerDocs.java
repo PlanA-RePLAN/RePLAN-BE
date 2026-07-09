@@ -338,7 +338,7 @@ public interface ItemControllerDocs {
     @ApiResponse(responseCode = "200", description = "처리 성공"),
     @ApiResponse(
         responseCode = "400",
-        description = "대상 정보 누락 / 반복에 연결된 투두를 TODO로 지목 / 하위 루틴 ID 지정",
+        description = "대상 정보 누락 / 반복에 연결된 투두를 TODO로 지목 / 하위 루틴 ID 지정 / 발생하지 않는 날짜",
         content =
             @Content(
                 examples = {
@@ -346,7 +346,10 @@ public interface ItemControllerDocs {
                   @ExampleObject(
                       name = "반복 연결 투두를 TODO로 지목",
                       value = ERR_ROUTINE_TODO_USE_ROUTINE_API),
-                  @ExampleObject(name = "하위 루틴 ID 지정", value = ERR_ROUTINE_INVALID_TARGET)
+                  @ExampleObject(name = "하위 루틴 ID 지정", value = ERR_ROUTINE_INVALID_TARGET),
+                  @ExampleObject(
+                      name = "발생하지 않는 날짜(요일/일자 불일치, 종료일 이후)",
+                      value = ERR_ROUTINE_INVALID_DATE)
                 })),
     @ApiResponse(
         responseCode = "404",
@@ -372,7 +375,7 @@ public interface ItemControllerDocs {
     @ApiResponse(responseCode = "200", description = "처리 성공"),
     @ApiResponse(
         responseCode = "400",
-        description = "대상 정보 누락 / 반복에 연결된 투두를 TODO로 지목 / 하위 루틴 ID 지정",
+        description = "대상 정보 누락 / 반복에 연결된 투두를 TODO로 지목 / 하위 루틴 ID 지정 / 발생하지 않는 날짜",
         content =
             @Content(
                 examples = {
@@ -380,7 +383,10 @@ public interface ItemControllerDocs {
                   @ExampleObject(
                       name = "반복 연결 투두를 TODO로 지목",
                       value = ERR_ROUTINE_TODO_USE_ROUTINE_API),
-                  @ExampleObject(name = "하위 루틴 ID 지정", value = ERR_ROUTINE_INVALID_TARGET)
+                  @ExampleObject(name = "하위 루틴 ID 지정", value = ERR_ROUTINE_INVALID_TARGET),
+                  @ExampleObject(
+                      name = "발생하지 않는 날짜(요일/일자 불일치, 종료일 이후)",
+                      value = ERR_ROUTINE_INVALID_DATE)
                 })),
     @ApiResponse(
         responseCode = "404",
@@ -410,7 +416,7 @@ public interface ItemControllerDocs {
     @ApiResponse(responseCode = "200", description = "처리 성공"),
     @ApiResponse(
         responseCode = "400",
-        description = "대상 정보 누락 / 반복에 연결된 투두를 TODO로 지목 / 하위 루틴 ID 지정",
+        description = "대상 정보 누락 / 반복에 연결된 투두를 TODO로 지목 / 하위 루틴 ID 지정 / 발생하지 않는 날짜",
         content =
             @Content(
                 examples = {
@@ -418,7 +424,10 @@ public interface ItemControllerDocs {
                   @ExampleObject(
                       name = "반복 연결 투두를 TODO로 지목",
                       value = ERR_ROUTINE_TODO_USE_ROUTINE_API),
-                  @ExampleObject(name = "하위 루틴 ID 지정", value = ERR_ROUTINE_INVALID_TARGET)
+                  @ExampleObject(name = "하위 루틴 ID 지정", value = ERR_ROUTINE_INVALID_TARGET),
+                  @ExampleObject(
+                      name = "발생하지 않는 날짜(요일/일자 불일치, 종료일 이후)",
+                      value = ERR_ROUTINE_INVALID_DATE)
                 })),
     @ApiResponse(
         responseCode = "404",
@@ -507,7 +516,10 @@ public interface ItemControllerDocs {
                   @ExampleObject(
                       name = "반복 연결 투두를 TODO로 지목",
                       value = ERR_ROUTINE_TODO_USE_ROUTINE_API),
-                  @ExampleObject(name = "하위 루틴 ID 지정", value = ERR_ROUTINE_INVALID_TARGET)
+                  @ExampleObject(name = "하위 루틴 ID 지정", value = ERR_ROUTINE_INVALID_TARGET),
+                  @ExampleObject(
+                      name = "발생하지 않는 날짜(요일/일자 불일치, 종료일 이후)",
+                      value = ERR_ROUTINE_INVALID_DATE)
                 })),
     @ApiResponse(
         responseCode = "404",

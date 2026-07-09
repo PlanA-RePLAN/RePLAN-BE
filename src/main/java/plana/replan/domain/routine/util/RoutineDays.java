@@ -1,5 +1,6 @@
 package plana.replan.domain.routine.util;
 
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import plana.replan.domain.routine.entity.RoutineType;
@@ -23,6 +24,21 @@ public final class RoutineDays {
   private static final int WEEKLY_MAX = 6;
   private static final int MONTHLY_MIN = 1;
   private static final int MONTHLY_MAX = 31;
+
+  /**
+   * 해당 날짜가 이 반복 규칙의 발생일인지 판정한다. DAILY는 항상 발생. type이 null(하위 루틴 등)이면 발생일이 아니다.
+   * RoutineService.isOccurrenceDay와 같은 규칙이며, 루틴 엔티티 없이도 쓸 수 있게 유틸로 둔다.
+   */
+  public static boolean isOccurrence(RoutineType type, Integer mask, LocalDate date) {
+    if (type == null) {
+      return false;
+    }
+    return switch (type) {
+      case DAILY -> true;
+      case WEEKLY -> mask != null && (mask & (1 << (date.getDayOfWeek().getValue() - 1))) != 0;
+      case MONTHLY -> mask != null && (mask & (1 << (date.getDayOfMonth() - 1))) != 0;
+    };
+  }
 
   /** WEEKLY/MONTHLY 배열 값이 유효 범위 안이고 비어있지 않은지 검사한다. DAILY는 null 또는 빈 배열만 허용한다. */
   public static boolean isValid(RoutineType type, List<Integer> days) {
