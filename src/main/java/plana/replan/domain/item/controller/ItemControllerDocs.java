@@ -38,6 +38,147 @@ import plana.replan.global.common.ApiResult;
         """)
 public interface ItemControllerDocs {
 
+  // ── 공통 에러 응답 예시 ──
+  String ERR_INVALID_FILTER =
+      """
+      {
+        "status": 400,
+        "success": false,
+        "data": null,
+        "error": {
+          "code": "INVALID_FILTER",
+          "message": "유효하지 않은 필터 값입니다. (all, day, week, month 중 하나)",
+          "detail": null
+        }
+      }
+      """;
+
+  String ERR_INVALID_SORT =
+      """
+      {
+        "status": 400,
+        "success": false,
+        "data": null,
+        "error": {
+          "code": "INVALID_SORT",
+          "message": "유효하지 않은 정렬 값입니다. (priority, dueDate 중 하나)",
+          "detail": null
+        }
+      }
+      """;
+
+  String ERR_INVALID_INPUT =
+      """
+      {
+        "status": 400,
+        "success": false,
+        "data": null,
+        "error": {
+          "code": "INVALID_INPUT",
+          "message": "잘못된 입력입니다.",
+          "detail": null
+        }
+      }
+      """;
+
+  String ERR_ROUTINE_TODO_USE_ROUTINE_API =
+      """
+      {
+        "status": 400,
+        "success": false,
+        "data": null,
+        "error": {
+          "code": "ROUTINE_TODO_USE_ROUTINE_API",
+          "message": "반복 todo는 루틴 API를 통해 수정해주세요.",
+          "detail": null
+        }
+      }
+      """;
+
+  String ERR_ROUTINE_INVALID_TARGET =
+      """
+      {
+        "status": 400,
+        "success": false,
+        "data": null,
+        "error": {
+          "code": "ROUTINE_INVALID_TARGET",
+          "message": "이 API는 해당 루틴 종류(엄마/하위)에만 사용할 수 있습니다.",
+          "detail": null
+        }
+      }
+      """;
+
+  String ERR_ROUTINE_INVALID_DATE =
+      """
+      {
+        "status": 400,
+        "success": false,
+        "data": null,
+        "error": {
+          "code": "ROUTINE_INVALID_DATE",
+          "message": "유효하지 않은 반복 날짜입니다.",
+          "detail": null
+        }
+      }
+      """;
+
+  String ERR_CANNOT_SKIP_COMPLETED =
+      """
+      {
+        "status": 400,
+        "success": false,
+        "data": null,
+        "error": {
+          "code": "ROUTINE_OVERRIDE_CANNOT_SKIP_COMPLETED",
+          "message": "이미 완료된 Todo가 있는 날짜는 건너뜀 처리할 수 없습니다.",
+          "detail": null
+        }
+      }
+      """;
+
+  String ERR_TODO_NOT_FOUND =
+      """
+      {
+        "status": 404,
+        "success": false,
+        "data": null,
+        "error": {
+          "code": "TODO_NOT_FOUND",
+          "message": "투두를 찾을 수 없습니다.",
+          "detail": null
+        }
+      }
+      """;
+
+  String ERR_ROUTINE_NOT_FOUND =
+      """
+      {
+        "status": 404,
+        "success": false,
+        "data": null,
+        "error": {
+          "code": "ROUTINE_NOT_FOUND",
+          "message": "루틴을 찾을 수 없습니다.",
+          "detail": null
+        }
+      }
+      """;
+
+  String ERR_TAG_NOT_FOUND =
+      """
+      {
+        "status": 404,
+        "success": false,
+        "data": null,
+        "error": {
+          "code": "TAG_NOT_FOUND",
+          "message": "태그를 찾을 수 없습니다.",
+          "detail": null
+        }
+      }
+      """;
+
   @Operation(
       summary = "통합 아이템 목록 조회 (투두 + 루틴 회차)",
       description =
@@ -57,6 +198,9 @@ public interface ItemControllerDocs {
           **응답 아이템 구분**: `kind`가 `TODO`면 `todoId`로, `ROUTINE`이면 `routineId`+`date`로 이후 조작.
           `ROUTINE`인데 `todoId`가 null이면 아직 그날 투두가 생성되지 않은 미래 회차이다(조작 방법은 동일).
           핀 아이템은 별도 API 없이 `isPinned`로 구분한다.
+
+          **주의**: `filter=all`에서는 루틴의 "다음 할 일" 회차에 `date`가 null일 수 있다(회차 날짜 미확정).
+          이 경우 해당 아이템은 THIS 범위 조작(완료/핀 등)의 주소를 만들 수 없으므로 day/week/month 뷰에서 조작한다.
           """,
       security = @SecurityRequirement(name = "Bearer Authentication"))
   @ApiResponses({
@@ -122,21 +266,10 @@ public interface ItemControllerDocs {
         description = "유효하지 않은 filter 또는 sort 값",
         content =
             @Content(
-                examples =
-                    @ExampleObject(
-                        value =
-                            """
-                            {
-                              "status": 400,
-                              "success": false,
-                              "data": null,
-                              "error": {
-                                "code": "INVALID_FILTER",
-                                "message": "유효하지 않은 필터 값입니다. (all, day, week, month 중 하나)",
-                                "detail": null
-                              }
-                            }
-                            """)))
+                examples = {
+                  @ExampleObject(name = "filter 오류", value = ERR_INVALID_FILTER),
+                  @ExampleObject(name = "sort 오류", value = ERR_INVALID_SORT)
+                }))
   })
   ResponseEntity<ApiResult<List<ItemResponseDto>>> getItems(
       @AuthenticationPrincipal Long userId,
@@ -167,44 +300,22 @@ public interface ItemControllerDocs {
     @ApiResponse(responseCode = "200", description = "조회 성공"),
     @ApiResponse(
         responseCode = "400",
-        description = "kind에 필요한 대상 정보 누락 (TODO인데 todoId 없음 / ROUTINE인데 routineId·date 없음)",
+        description = "kind에 필요한 대상 정보 누락, 또는 하위 루틴 ID를 지정한 경우",
         content =
             @Content(
-                examples =
-                    @ExampleObject(
-                        value =
-                            """
-                            {
-                              "status": 400,
-                              "success": false,
-                              "data": null,
-                              "error": {
-                                "code": "INVALID_INPUT",
-                                "message": "입력값이 올바르지 않습니다.",
-                                "detail": null
-                              }
-                            }
-                            """))),
+                examples = {
+                  @ExampleObject(name = "대상 정보 누락", value = ERR_INVALID_INPUT),
+                  @ExampleObject(name = "하위 루틴 ID 지정", value = ERR_ROUTINE_INVALID_TARGET)
+                })),
     @ApiResponse(
         responseCode = "404",
         description = "투두 또는 루틴을 찾을 수 없음 (존재하지 않거나 본인 소유가 아님)",
         content =
             @Content(
-                examples =
-                    @ExampleObject(
-                        value =
-                            """
-                            {
-                              "status": 404,
-                              "success": false,
-                              "data": null,
-                              "error": {
-                                "code": "TODO_NOT_FOUND",
-                                "message": "투두를 찾을 수 없습니다.",
-                                "detail": null
-                              }
-                            }
-                            """)))
+                examples = {
+                  @ExampleObject(name = "투두 없음", value = ERR_TODO_NOT_FOUND),
+                  @ExampleObject(name = "루틴 없음", value = ERR_ROUTINE_NOT_FOUND)
+                }))
   })
   ResponseEntity<ApiResult<ItemDetailResponseDto>> getItemDetail(
       @AuthenticationPrincipal Long userId,
@@ -227,25 +338,25 @@ public interface ItemControllerDocs {
     @ApiResponse(responseCode = "200", description = "처리 성공"),
     @ApiResponse(
         responseCode = "400",
-        description = "대상 정보 누락 또는 반복에 연결된 투두를 TODO로 지목한 경우",
+        description = "대상 정보 누락 / 반복에 연결된 투두를 TODO로 지목 / 하위 루틴 ID 지정",
         content =
             @Content(
-                examples =
-                    @ExampleObject(
-                        value =
-                            """
-                            {
-                              "status": 400,
-                              "success": false,
-                              "data": null,
-                              "error": {
-                                "code": "ROUTINE_TODO_USE_ROUTINE_API",
-                                "message": "반복 todo는 루틴 API를 통해 수정해주세요.",
-                                "detail": null
-                              }
-                            }
-                            """))),
-    @ApiResponse(responseCode = "404", description = "투두 또는 루틴을 찾을 수 없음")
+                examples = {
+                  @ExampleObject(name = "대상 정보 누락", value = ERR_INVALID_INPUT),
+                  @ExampleObject(
+                      name = "반복 연결 투두를 TODO로 지목",
+                      value = ERR_ROUTINE_TODO_USE_ROUTINE_API),
+                  @ExampleObject(name = "하위 루틴 ID 지정", value = ERR_ROUTINE_INVALID_TARGET)
+                })),
+    @ApiResponse(
+        responseCode = "404",
+        description = "투두 또는 루틴을 찾을 수 없음",
+        content =
+            @Content(
+                examples = {
+                  @ExampleObject(name = "투두 없음", value = ERR_TODO_NOT_FOUND),
+                  @ExampleObject(name = "루틴 없음", value = ERR_ROUTINE_NOT_FOUND)
+                }))
   })
   ResponseEntity<ApiResult<Void>> completeItem(
       @AuthenticationPrincipal Long userId, @Valid @RequestBody ItemCompleteRequestDto request);
@@ -259,8 +370,27 @@ public interface ItemControllerDocs {
       security = @SecurityRequirement(name = "Bearer Authentication"))
   @ApiResponses({
     @ApiResponse(responseCode = "200", description = "처리 성공"),
-    @ApiResponse(responseCode = "400", description = "대상 정보 누락 또는 반복 연결 투두를 TODO로 지목"),
-    @ApiResponse(responseCode = "404", description = "투두 또는 루틴을 찾을 수 없음")
+    @ApiResponse(
+        responseCode = "400",
+        description = "대상 정보 누락 / 반복에 연결된 투두를 TODO로 지목 / 하위 루틴 ID 지정",
+        content =
+            @Content(
+                examples = {
+                  @ExampleObject(name = "대상 정보 누락", value = ERR_INVALID_INPUT),
+                  @ExampleObject(
+                      name = "반복 연결 투두를 TODO로 지목",
+                      value = ERR_ROUTINE_TODO_USE_ROUTINE_API),
+                  @ExampleObject(name = "하위 루틴 ID 지정", value = ERR_ROUTINE_INVALID_TARGET)
+                })),
+    @ApiResponse(
+        responseCode = "404",
+        description = "투두 또는 루틴을 찾을 수 없음",
+        content =
+            @Content(
+                examples = {
+                  @ExampleObject(name = "투두 없음", value = ERR_TODO_NOT_FOUND),
+                  @ExampleObject(name = "루틴 없음", value = ERR_ROUTINE_NOT_FOUND)
+                }))
   })
   ResponseEntity<ApiResult<Void>> pinItem(
       @AuthenticationPrincipal Long userId, @Valid @RequestBody ItemPinRequestDto request);
@@ -278,8 +408,27 @@ public interface ItemControllerDocs {
       security = @SecurityRequirement(name = "Bearer Authentication"))
   @ApiResponses({
     @ApiResponse(responseCode = "200", description = "처리 성공"),
-    @ApiResponse(responseCode = "400", description = "대상 정보 누락 또는 반복 연결 투두를 TODO로 지목"),
-    @ApiResponse(responseCode = "404", description = "투두 또는 루틴을 찾을 수 없음")
+    @ApiResponse(
+        responseCode = "400",
+        description = "대상 정보 누락 / 반복에 연결된 투두를 TODO로 지목 / 하위 루틴 ID 지정",
+        content =
+            @Content(
+                examples = {
+                  @ExampleObject(name = "대상 정보 누락", value = ERR_INVALID_INPUT),
+                  @ExampleObject(
+                      name = "반복 연결 투두를 TODO로 지목",
+                      value = ERR_ROUTINE_TODO_USE_ROUTINE_API),
+                  @ExampleObject(name = "하위 루틴 ID 지정", value = ERR_ROUTINE_INVALID_TARGET)
+                })),
+    @ApiResponse(
+        responseCode = "404",
+        description = "투두 또는 루틴을 찾을 수 없음",
+        content =
+            @Content(
+                examples = {
+                  @ExampleObject(name = "투두 없음", value = ERR_TODO_NOT_FOUND),
+                  @ExampleObject(name = "루틴 없음", value = ERR_ROUTINE_NOT_FOUND)
+                }))
   })
   ResponseEntity<ApiResult<Void>> reorderItem(
       @AuthenticationPrincipal Long userId, @Valid @RequestBody ItemOrderRequestDto request);
@@ -302,8 +451,29 @@ public interface ItemControllerDocs {
     @ApiResponse(responseCode = "200", description = "수정 성공"),
     @ApiResponse(
         responseCode = "400",
-        description = "대상/scope 누락, ALL인데 title·routineType 없음, 반복 날짜 배열이 유형과 안 맞음 등"),
-    @ApiResponse(responseCode = "404", description = "투두/루틴/태그를 찾을 수 없음")
+        description =
+            "대상/scope 누락, ALL인데 title·routineType 없음, 제목이 빈 문자열, 반복 날짜 배열이 유형과 안 맞음,"
+                + " 반복에 연결된 투두를 TODO로 지목, 하위 루틴 ID 지정",
+        content =
+            @Content(
+                examples = {
+                  @ExampleObject(name = "대상/scope/필수값 누락 또는 빈 제목", value = ERR_INVALID_INPUT),
+                  @ExampleObject(name = "반복 날짜 배열이 유형과 안 맞음", value = ERR_ROUTINE_INVALID_DATE),
+                  @ExampleObject(
+                      name = "반복 연결 투두를 TODO로 지목",
+                      value = ERR_ROUTINE_TODO_USE_ROUTINE_API),
+                  @ExampleObject(name = "하위 루틴 ID 지정", value = ERR_ROUTINE_INVALID_TARGET)
+                })),
+    @ApiResponse(
+        responseCode = "404",
+        description = "투두/루틴/태그를 찾을 수 없음",
+        content =
+            @Content(
+                examples = {
+                  @ExampleObject(name = "투두 없음", value = ERR_TODO_NOT_FOUND),
+                  @ExampleObject(name = "루틴 없음", value = ERR_ROUTINE_NOT_FOUND),
+                  @ExampleObject(name = "태그 없음", value = ERR_TAG_NOT_FOUND)
+                }))
   })
   ResponseEntity<ApiResult<Void>> updateItemContent(
       @AuthenticationPrincipal Long userId, @Valid @RequestBody ItemContentRequestDto request);
@@ -319,31 +489,35 @@ public interface ItemControllerDocs {
 
           **kind=ROUTINE + scope=ALL** (routineId 필수): 반복 전체(엄마 루틴 + 하위 루틴) 삭제.
           기존 `DELETE /api/routines/{id}`와 동일.
+
+          **요청 본문 주의**: DELETE지만 본문(body)이 필수다. axios는 `axios.delete(url, { data: {...} })`처럼
+          설정 객체의 `data`로 본문을 전달해야 한다.
           """,
       security = @SecurityRequirement(name = "Bearer Authentication"))
   @ApiResponses({
     @ApiResponse(responseCode = "200", description = "삭제 성공"),
     @ApiResponse(
         responseCode = "400",
-        description = "대상/scope 누락, 이미 완료된 회차를 건너뛰려 한 경우 등",
+        description = "대상/scope 누락, 이미 완료된 회차를 건너뛰려 한 경우, 반복에 연결된 투두를 TODO로 지목, 하위 루틴 ID 지정",
         content =
             @Content(
-                examples =
-                    @ExampleObject(
-                        value =
-                            """
-                            {
-                              "status": 400,
-                              "success": false,
-                              "data": null,
-                              "error": {
-                                "code": "ROUTINE_OVERRIDE_CANNOT_SKIP_COMPLETED",
-                                "message": "이미 완료된 회차는 건너뛸 수 없습니다.",
-                                "detail": null
-                              }
-                            }
-                            """))),
-    @ApiResponse(responseCode = "404", description = "투두 또는 루틴을 찾을 수 없음")
+                examples = {
+                  @ExampleObject(name = "대상/scope 누락", value = ERR_INVALID_INPUT),
+                  @ExampleObject(name = "완료된 회차 건너뛰기 시도", value = ERR_CANNOT_SKIP_COMPLETED),
+                  @ExampleObject(
+                      name = "반복 연결 투두를 TODO로 지목",
+                      value = ERR_ROUTINE_TODO_USE_ROUTINE_API),
+                  @ExampleObject(name = "하위 루틴 ID 지정", value = ERR_ROUTINE_INVALID_TARGET)
+                })),
+    @ApiResponse(
+        responseCode = "404",
+        description = "투두 또는 루틴을 찾을 수 없음",
+        content =
+            @Content(
+                examples = {
+                  @ExampleObject(name = "투두 없음", value = ERR_TODO_NOT_FOUND),
+                  @ExampleObject(name = "루틴 없음", value = ERR_ROUTINE_NOT_FOUND)
+                }))
   })
   ResponseEntity<ApiResult<Void>> deleteItem(
       @AuthenticationPrincipal Long userId, @Valid @RequestBody ItemDeleteRequestDto request);
