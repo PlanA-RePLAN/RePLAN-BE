@@ -2,8 +2,12 @@ package plana.replan.domain.goal.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.time.Clock;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -42,18 +46,41 @@ public class GoalAiService {
   private static final String GEMINI_URL =
       "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent";
 
+  private static final String DEADLINE_PASSED_MESSAGE = "종료 일정이 이미 지났어요. 미래 날짜로 다시 설정해주세요.";
+
   private final RestClient geminiRestClient;
   private final TagRepository tagRepository;
+  private final Clock clock;
   private final ObjectMapper objectMapper = new ObjectMapper();
 
   @Value("${gemini.api-key}")
   private String apiKey;
 
   public GoalExploreResponse exploreGoal(GoalExploreRequest request) {
-    String today = LocalDate.now().format(DateTimeFormatter.ISO_LOCAL_DATE);
+    if (isDeadlinePassed(request.deadlineDate(), request.deadlineTime())) {
+      return new GoalExploreResponse(false, DEADLINE_PASSED_MESSAGE, List.of());
+    }
+    String today = LocalDate.now(clock).format(DateTimeFormatter.ISO_LOCAL_DATE);
     String prompt = buildExplorePrompt(request, today);
     String raw = callGemini(prompt);
     return parseExploreResponse(raw);
+  }
+
+  /**
+   * 종료 일정이 이미 지났는지 판단한다. 날짜 비교를 AI에 맡기면 결과가 오락가락하므로 반드시 코드로 검사한다. 시간이 없으면 그날 하루가 끝날 때까지를 기한으로 보고,
+   * 형식이 잘못된 값은 기존처럼 AI 판단에 맡긴다.
+   */
+  boolean isDeadlinePassed(String deadlineDate, String deadlineTime) {
+    if (deadlineDate == null) {
+      return false;
+    }
+    try {
+      LocalDate date = LocalDate.parse(deadlineDate);
+      LocalTime time = deadlineTime != null ? LocalTime.parse(deadlineTime) : LocalTime.MAX;
+      return LocalDateTime.of(date, time).isBefore(LocalDateTime.now(clock));
+    } catch (DateTimeParseException e) {
+      return false;
+    }
   }
 
   String buildExplorePrompt(GoalExploreRequest req, String today) {
@@ -68,9 +95,7 @@ public class GoalAiService {
         오늘 날짜: %s
 
         [1단계 — 목표 유효성 판단]
-        입력이 '달성할 수 있는 실제 목표'인지 판단한다.
-        - 종료 날짜가 입력되어 있고 그 날짜(또는 종료 날짜·시간)가 오늘 날짜보다 과거이면
-          valid를 false로, message에 "종료 일정이 이미 지났어요. 미래 날짜로 다시 설정해주세요."를 넣고 questions는 빈 배열로 둔다.
+        입력이 '달성할 수 있는 실제 목표'인지 판단한다. (종료 일정이 지났는지는 서버 코드가 이미 검사했으므로 판단하지 않는다.)
         - 목표가 아니거나(예: 무의미한 문자열, 욕설, 목표와 무관한 잡담), 너무 모호해 어떤 계획도 세울 수 없으면
           valid를 false로, message에 "달성할 수 있는 목표를 입력해주세요."를 넣고 questions는 빈 배열로 둔다.
         - 정상 목표면 valid를 true, message는 null로 둔다.
@@ -116,7 +141,7 @@ public class GoalAiService {
   }
 
   public GoalRefinementResponse refineGoal(GoalRefinementRequest request) {
-    String today = LocalDate.now().format(DateTimeFormatter.ISO_LOCAL_DATE);
+    String today = LocalDate.now(clock).format(DateTimeFormatter.ISO_LOCAL_DATE);
     String prompt = buildRefinePrompt(request, today);
     String raw = callGemini(prompt);
     return parseRefineResponse(raw);
