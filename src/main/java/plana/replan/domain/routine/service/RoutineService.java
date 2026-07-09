@@ -507,11 +507,8 @@ public class RoutineService {
   }
 
   private boolean isOccurrenceDay(Routine routine, LocalDate today) {
-    return switch (routine.getRoutineType()) {
-      case DAILY -> true;
-      case WEEKLY -> (routine.getRoutineDate() & (1 << (today.getDayOfWeek().getValue() - 1))) != 0;
-      case MONTHLY -> (routine.getRoutineDate() & (1 << (today.getDayOfMonth() - 1))) != 0;
-    };
+    // 발생일 판정은 RoutineDays.isOccurrence 한 곳에서만 관리한다 (회차 예외 검증과 규칙 공유)
+    return RoutineDays.isOccurrence(routine.getRoutineType(), routine.getRoutineDate(), today);
   }
 
   /**
