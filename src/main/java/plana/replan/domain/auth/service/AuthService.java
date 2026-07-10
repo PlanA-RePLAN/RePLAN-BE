@@ -325,11 +325,13 @@ public class AuthService {
       }
     }
 
-    // 2-2. sub로도 못 찾고 이메일도 없으면(우리 DB에 없는데 재로그인이라 이메일도 안 온 예외 상태)
-    //      찾을 수도 새로 만들 수도 없다. 애플 토큰 교환(refresh token 발급) '전에' 미리 거절해서,
-    //      저장도 철회도 못 하는 고아 refresh token이 생기지 않게 한다.
+    // 2-2. sub로도 못 찾고 이메일도 없는 신규 가입.
+    //      애플은 최초 인증 때만 이메일을 주므로, 최초 인증을 완료하지 못한(온보딩 이탈 등) 사용자는
+    //      재로그인 때 이메일이 오지 않아 다시 가입할 수 없게 된다. 신원은 어차피 sub로 식별하므로,
+    //      이메일이 없으면 sub 기반 내부 식별용 이메일을 만들어 가입을 계속 진행한다.
+    //      (email 컬럼의 NOT NULL/UNIQUE 제약을 채우기 위한 값일 뿐, 이후 로그인은 sub로만 조회한다.)
     if (found.isEmpty() && email == null) {
-      throw new CustomException(UserErrorCode.APPLE_TOKEN_INVALID);
+      email = "apple_" + sub + "@appleid.local";
     }
 
     // 3. authorizationCode 교환 → refresh token 확보(탈퇴 시 철회용)
@@ -358,7 +360,7 @@ public class AuthService {
       return OAuthLoginResponseDto.existingUser(tokens.getAccessToken(), tokens.getRefreshToken());
     }
 
-    // 5. 신규 유저: 여기 도달하면 email은 반드시 있다(이메일 없는 경우는 위 2-2에서 이미 걸러짐).
+    // 5. 신규 유저: 여기 도달하면 email은 반드시 있다(이메일이 없던 경우는 위 2-2에서 sub 기반 값으로 채워짐).
     //    가입 완료(register) 시점에 옮겨 쓸 수 있게 refresh token과 sub를 email 임시 키로 저장한다.
     redisTemplate
         .opsForValue()
