@@ -1086,7 +1086,7 @@ class RoutineServiceTest {
   }
 
   @Test
-  void getRoutinesByFilter_all_반복종료일_지난_루틴은_다음할일을_지어내지_않고_루틴_기본값_반환() {
+  void getRoutinesByFilter_all_반복종료일_지난_루틴은_미완료도_완료도_없으면_아무것도_반환하지_않는다() {
     given(userRepository.findById(1L)).willReturn(Optional.of(testUser()));
     Routine routine =
         Routine.builder()
@@ -1101,11 +1101,56 @@ class RoutineServiceTest {
     Map<String, List<RoutineResponseDto>> result =
         routineService.getRoutinesByFilter(1L, "all", null);
 
+    // 끝난 루틴이라 "다음 할 일"을 지어내지 않고, 낼 회차가 없으면 아무 항목도 남기지 않는다.
+    assertThat(result.get("all")).isEmpty();
+  }
+
+  @Test
+  void getRoutinesByFilter_all_반복종료일_지난_루틴은_미완료_회차를_전부_반환한다() {
+    given(userRepository.findById(1L)).willReturn(Optional.of(testUser()));
+    Routine routine =
+        Routine.builder()
+            .title("종료된 루틴")
+            .routineType(RoutineType.DAILY)
+            .dueDate(TEST_DATE.minusDays(1).atStartOfDay())
+            .user(testUser())
+            .build();
+    ReflectionTestUtils.setField(routine, "id", 11L);
+
+    Todo inc1 = routineTodo(routine, "미완료1", TEST_DATE.minusDays(3).atStartOfDay());
+    ReflectionTestUtils.setField(inc1, "id", 501L);
+    Todo inc2 = routineTodo(routine, "미완료2", TEST_DATE.minusDays(2).atStartOfDay());
+    ReflectionTestUtils.setField(inc2, "id", 502L);
+
+    // findIncompleteMotherTodosByRoutines는 마감일 최신순(DESC)으로 넘어온다.
+    givenAllFilterData(routine, List.of(), List.of(inc2, inc1), List.of());
+
+    Map<String, List<RoutineResponseDto>> result =
+        routineService.getRoutinesByFilter(1L, "all", null);
+
+    // 끝난 루틴은 대표 1건이 아니라 안 한 회차를 전부 준다.
+    assertThat(result.get("all"))
+        .extracting(RoutineResponseDto::getTodoId)
+        .containsExactlyInAnyOrder(501L, 502L);
+  }
+
+  @Test
+  void getRoutinesByFilter_all_반복_안끝난_루틴의_다음예정은_dueDate가_채워진다() {
+    given(userRepository.findById(1L)).willReturn(Optional.of(testUser()));
+    Routine routine = buildRoutine(RoutineType.DAILY, null); // 무기한 데일리
+    ReflectionTestUtils.setField(routine, "id", 12L);
+
+    // 완료·미완료·override 모두 없음 → 다음 발생일(오늘) 대표를 지어낸다.
+    givenAllFilterData(routine, List.of(), List.of(), List.of());
+
+    Map<String, List<RoutineResponseDto>> result =
+        routineService.getRoutinesByFilter(1L, "all", null);
+
     assertThat(result.get("all")).hasSize(1);
     RoutineResponseDto dto = result.get("all").get(0);
-    assertThat(dto.getTodoId()).isNull();
-    assertThat(dto.getDueDate()).isNull();
-    assertThat(dto.isHasOverride()).isFalse();
+    assertThat(dto.getTodoId()).isNull(); // 아직 만들어진 투두가 아닌 가상 회차
+    assertThat(dto.getDueDate()).isNotNull(); // 예전엔 null이었음 — 이제 날짜가 채워진다
+    assertThat(dto.getDueDate().toLocalDate()).isEqualTo(TEST_DATE);
   }
 
   @Test
