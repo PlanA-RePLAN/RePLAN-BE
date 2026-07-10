@@ -233,9 +233,10 @@ public class RoutineService {
     Map<Long, List<Todo>> completedByRoutine =
         todoRepository.findCompletedMotherTodosByRoutines(routines).stream()
             .collect(Collectors.groupingBy(t -> t.getRoutine().getId()));
-    Map<Long, Todo> latestIncompleteByRoutine =
+    // 마감일 최신순(DESC)으로 정렬돼 있어, 각 목록의 첫 번째가 가장 최근 미완료 회차다.
+    Map<Long, List<Todo>> incompletesByRoutine =
         todoRepository.findIncompleteMotherTodosByRoutines(routines).stream()
-            .collect(Collectors.toMap(t -> t.getRoutine().getId(), t -> t, (a, b) -> a));
+            .collect(Collectors.groupingBy(t -> t.getRoutine().getId()));
     Map<Long, List<RoutineOverride>> overridesByRoutine =
         routineOverrideRepository.findByRoutineIn(routines).stream()
             .collect(Collectors.groupingBy(o -> o.getRoutine().getId()));
@@ -247,21 +248,28 @@ public class RoutineService {
                     routine,
                     today,
                     completedByRoutine.getOrDefault(routine.getId(), List.of()),
-                    Optional.ofNullable(latestIncompleteByRoutine.get(routine.getId())),
+                    incompletesByRoutine.getOrDefault(routine.getId(), List.of()),
                     overridesByRoutine.getOrDefault(routine.getId(), List.of()))
                     .stream())
         .collect(Collectors.toList());
   }
 
   /**
-   * 루틴 1건에 대한 all 필터 응답: (1) 완료 Todo 전부 + Todo 없이 override만으로 완료 처리된 날짜 + (2) 아직 해야 할 일 1건. (2)는 완료
-   * 안 된 Todo 중 가장 최근 것(과거 미완료 포함)이 있으면 그 상태로, 없으면 다음 발생일의 override 또는 루틴 기본값으로 구성한다.
+   * 루틴 1건에 대한 all 필터 응답을 구성한다.
+   *
+   * <p>완료한 회차(완료 Todo + Todo 없이 override로만 완료된 날짜)는 언제나 전부 포함한다. 여기에 아직 해결 안 된 회차를 덧붙이는데, 반복 종료일이
+   * 지났는지에 따라 다르다.
+   *
+   * <ul>
+   *   <li>반복이 안 끝난 루틴: "지금 해야 할 것" 1건만 덧붙인다(미완료 중 최신, 없으면 다음 발생일).
+   *   <li>반복이 끝난 루틴: 아직 안 한 회차를 전부 덧붙인다(없으면 아무것도 안 붙인다).
+   * </ul>
    */
   private List<RoutineResponseDto> buildAllFilterResponses(
       Routine routine,
       LocalDate today,
       List<Todo> completedTodos,
-      Optional<Todo> latestIncomplete,
+      List<Todo> incompleteTodos,
       List<RoutineOverride> overrides) {
     Set<LocalDate> completedDates =
         completedTodos.stream()
@@ -284,29 +292,39 @@ public class RoutineService {
             .filter(o -> !completedDates.contains(o.getOverrideDate()))
             .map(o -> toRoutineResponseFromOverride(routine, o.getOverrideDate(), o));
 
-    RoutineResponseDto nextAction =
-        toNextActionableRoutineResponse(
-            routine, today, completedDates, latestIncomplete, overridesByDate);
+    boolean ended =
+        routine.getDueDate() != null && today.isAfter(routine.getDueDate().toLocalDate());
+    Stream<RoutineResponseDto> pending =
+        ended
+            ? incompleteTodos.stream().map(todo -> toRoutineResponseFromTodo(routine, todo))
+            : toNextActionableRoutineResponse(
+                routine,
+                today,
+                completedDates,
+                incompleteTodos.stream().findFirst(),
+                overridesByDate)
+                .stream();
 
-    return Stream.concat(
-            Stream.concat(completedFromTodos, completedFromOverrides), Stream.of(nextAction))
+    return Stream.concat(Stream.concat(completedFromTodos, completedFromOverrides), pending)
         .collect(Collectors.toList());
   }
 
   /**
-   * 완료 안 된 Todo 중 가장 최근 것이 있으면 그 상태를 반환한다. 없으면 다음 발생일부터 하루씩 훑어, 이미 완료 처리된 날짜(Todo 또는 override)이거나
-   * skip override가 있는 날짜는 건너뛰고, 아직 해결되지 않은 첫 날짜를 override(있으면) 또는 루틴 기본값으로 구성한다. 반복
-   * 종료일(routine.getDueDate())을 넘어서면 더 찾지 않고 루틴 기본값으로 되돌아간다. (DAILY 루틴은 오늘 회차가 이미 끝났어도
-   * nextOccurrence가 항상 오늘을 가리키므로, 이 건너뛰기 로직이 없으면 방금 완료 처리한 오늘 회차를 "다음 할 일"로 다시 보여주는 문제가 생긴다.)
+   * 반복이 안 끝난 루틴에 대해 "지금 해야 할 것" 1건을 구성한다. 완료 안 된 Todo 중 가장 최근 것이 있으면 그 상태로 반환한다. 없으면 다음 발생일부터 하루씩
+   * 훑어, 이미 완료 처리된 날짜(Todo 또는 override)이거나 skip override가 있는 날짜는 건너뛰고, 아직 해결되지 않은 첫 날짜를 그 회차
+   * 정보(override 있으면 override 값, 없으면 루틴 기본값 + 그 날짜)로 구성한다. (DAILY 루틴은 오늘 회차가 끝났어도 nextOccurrence가 항상
+   * 오늘을 가리키므로, 이 건너뛰기 로직이 없으면 방금 완료 처리한 오늘 회차를 다시 보여주는 문제가 생긴다.)
+   *
+   * <p>반복 종료일을 넘어가 더 이상 낼 회차가 없으면 빈 값을 반환해 아무 항목도 남기지 않는다.
    */
-  private RoutineResponseDto toNextActionableRoutineResponse(
+  private Optional<RoutineResponseDto> toNextActionableRoutineResponse(
       Routine routine,
       LocalDate today,
       Set<LocalDate> completedDates,
       Optional<Todo> latestIncomplete,
       Map<LocalDate, RoutineOverride> overridesByDate) {
     if (latestIncomplete.isPresent()) {
-      return toRoutineResponseFromTodo(routine, latestIncomplete.get());
+      return Optional.of(toRoutineResponseFromTodo(routine, latestIncomplete.get()));
     }
 
     LocalDate repeatEndDate =
@@ -326,11 +344,12 @@ public class RoutineService {
         candidate = nextOccurrence(routine, candidate.plusDays(1));
         continue;
       }
-      return override != null
-          ? toRoutineResponseFromOverride(routine, candidate, override)
-          : RoutineResponseDto.from(routine);
+      return Optional.of(
+          override != null
+              ? toRoutineResponseFromOverride(routine, candidate, override)
+              : toRoutineResponseFromCandidate(routine, candidate));
     }
-    return RoutineResponseDto.from(routine);
+    return Optional.empty();
   }
 
   private RoutineResponseDto toRoutineResponseFromTodo(Routine routine, Todo todo) {
@@ -361,6 +380,25 @@ public class RoutineService {
         Boolean.TRUE.equals(override.getIsPinned()),
         Boolean.TRUE.equals(override.getIsCompleted()),
         true);
+  }
+
+  /**
+   * 아직 Todo도 override도 없는 "다음 발생 예정" 회차를 응답으로 만든다. 마감 일시에 그 회차 날짜(candidate)와 루틴 시각을 채워, 프론트가 회차를
+   * 정확히 지목(routineId + 날짜)해 조회·조작할 수 있게 한다.
+   */
+  private RoutineResponseDto toRoutineResponseFromCandidate(Routine routine, LocalDate candidate) {
+    LocalTime time =
+        routine.getRoutineTime() != null ? routine.getRoutineTime() : LocalTime.of(23, 59, 59);
+    return buildRoutineResponse(
+        routine,
+        routine.getTitle(),
+        candidate.atTime(time),
+        routine.getTag(),
+        null,
+        routine.getDefaultSortOrder(),
+        false,
+        false,
+        false);
   }
 
   private RoutineResponseDto buildRoutineResponse(
