@@ -6,7 +6,6 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
 import java.util.Optional;
@@ -140,17 +139,24 @@ class AuthServiceAppleLoginTest {
   }
 
   @Test
-  @DisplayName("우리 DB에 없는데 이메일도 없는 예외 상태면 가입을 막고 토큰 무효 예외")
-  void newUserWithoutEmailFails() {
+  @DisplayName("우리 DB에 없고 이메일도 없는 신규 애플 유저는 sub 기반 내부 이메일로 가입을 진행한다")
+  void newUserWithoutEmailSignsUpWithSyntheticEmail() {
     given(appleTokenVerifier.verify(anyString()))
         .willReturn(new AppleIdTokenPayload(null, AUD, SUB));
     given(userRepository.findByAppleSub(SUB)).willReturn(Optional.empty());
 
-    assertThatThrownBy(() -> authService.appleLogin(request()))
-        .isInstanceOf(CustomException.class)
-        .hasFieldOrPropertyWithValue("errorCode", UserErrorCode.APPLE_TOKEN_INVALID);
-    // 고아 refresh token 방지: 거부는 토큰 교환 전에 이뤄져야 한다.
-    verify(appleAuthClient, never()).exchangeRefreshToken(anyString(), anyString());
+    String syntheticEmail = "apple_" + SUB + "@appleid.local";
+
+    OAuthLoginResponseDto res = authService.appleLogin(request());
+
+    assertThat(res.getTempToken()).isNotBlank();
+    verify(valueOperations)
+        .set(
+            eq("apple-refresh-temp:" + syntheticEmail),
+            eq(AUD + "|apple-refresh-token"),
+            eq(300L),
+            any());
+    verify(valueOperations).set(eq("apple-sub-temp:" + syntheticEmail), eq(SUB), eq(300L), any());
   }
 
   @Test
