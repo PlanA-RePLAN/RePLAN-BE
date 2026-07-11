@@ -130,7 +130,7 @@ public class NotificationService {
       case TODO -> user.isNotifyTodo();
       case STATS -> user.isNotifyStats();
       case NOTICE -> user.isNotifyNotice();
-      // 광고는 편의 토글이 아니라 수신 동의라서, 동의한 회원에게만 보낸다.
+        // 광고는 편의 토글이 아니라 수신 동의라서, 동의한 회원에게만 보낸다.
       case MARKETING -> user.isMarketingAgreed();
     };
   }
