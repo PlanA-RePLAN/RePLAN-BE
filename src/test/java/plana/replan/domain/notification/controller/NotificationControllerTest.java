@@ -127,18 +127,19 @@ class NotificationControllerTest {
   // ── GET /api/notifications/settings ──────────────────────────────────────
 
   @Test
-  @DisplayName("알림 설정 조회 성공: status=200, todoDue·todoFailed·report 필드 반환")
+  @DisplayName("알림 설정 조회 성공: status=200, todo·stats·notice·marketing 필드 반환")
   void getSettings_success() throws Exception {
     given(notificationSettingService.get(any()))
-        .willReturn(new NotificationSettingResponse(true, false, true));
+        .willReturn(new NotificationSettingResponse(true, false, true, false));
 
     mockMvc
         .perform(get("/api/notifications/settings").with(authentication(authToken(1L))))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.success").value(true))
-        .andExpect(jsonPath("$.data.todoDue").value(true))
-        .andExpect(jsonPath("$.data.todoFailed").value(false))
-        .andExpect(jsonPath("$.data.report").value(true))
+        .andExpect(jsonPath("$.data.todo").value(true))
+        .andExpect(jsonPath("$.data.stats").value(false))
+        .andExpect(jsonPath("$.data.notice").value(true))
+        .andExpect(jsonPath("$.data.marketing").value(false))
         .andExpect(jsonPath("$.error").doesNotExist());
   }
 }
