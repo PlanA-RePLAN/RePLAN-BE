@@ -29,7 +29,7 @@ public interface NotificationControllerDocs {
               + "### Query Parameters\n"
               + "| 파라미터명 | 필수 여부 | 타입 | 기본값 | 설명 | 예시 |\n"
               + "|-----------|-----------|------|--------|------|------|\n"
-              + "| category | ❌ 선택 | string | 없음 | 탭 분류 필터 (TODO/STATS/ETC). 생략 시 전체 조회 | `TODO` |\n"
+              + "| category | ❌ 선택 | string | 없음 | 탭 분류 필터 (TODO/STATS/NOTICE/MARKETING). 생략 시 전체 조회 | `TODO` |\n"
               + "| cursor | ❌ 선택 | integer | 없음 | 이전 응답의 nextCursor 값 | `37` |\n"
               + "| size | ❌ 선택 | integer | `10` | 한 페이지에 가져올 알림 수 | `10` |\n\n"
               + "### Response Elements\n"
@@ -80,7 +80,9 @@ public interface NotificationControllerDocs {
   })
   ResponseEntity<ApiResult<NotificationListResponse>> getNotifications(
       Long userId,
-      @Parameter(description = "탭 분류 필터 (TODO/STATS/ETC). 생략 시 전체 조회", example = "TODO")
+      @Parameter(
+              description = "탭 분류 필터 (TODO/STATS/NOTICE/MARKETING). 생략 시 전체 조회",
+              example = "TODO")
           NotificationCategory category,
       @Parameter(description = "이전 응답의 nextCursor 값", example = "37") Long cursor,
       @Parameter(description = "한 페이지에 가져올 알림 수", example = "10") int size);
@@ -199,9 +201,10 @@ public interface NotificationControllerDocs {
               + "### Response Elements\n"
               + "| 필드명 | 타입 | 설명 |\n"
               + "|--------|------|------|\n"
-              + "| todoDue | boolean | 마감 임박 알림 받기 |\n"
-              + "| todoFailed | boolean | 실패 리플랜 알림 받기 |\n"
-              + "| report | boolean | 리포트 도착 알림 받기 |")
+              + "| todo | boolean | 투두 알림 받기 (마감 임박, 실패 리플랜) |\n"
+              + "| stats | boolean | 통계 알림 받기 (리포트 도착) |\n"
+              + "| notice | boolean | 공지 알림 받기 |\n"
+              + "| marketing | boolean | 마케팅(광고성) 정보 수신 동의 여부 |")
   @ApiResponses({
     @ApiResponse(
         responseCode = "200",
@@ -211,7 +214,7 @@ public interface NotificationControllerDocs {
                 examples =
                     @ExampleObject(
                         value =
-                            "{\"status\":200,\"success\":true,\"data\":{\"todoDue\":true,\"todoFailed\":true,\"report\":true},\"error\":null}"))),
+                            "{\"status\":200,\"success\":true,\"data\":{\"todo\":true,\"stats\":true,\"notice\":true,\"marketing\":false},\"error\":null}"))),
     @ApiResponse(
         responseCode = "401",
         description = "인증 실패",
@@ -251,16 +254,20 @@ public interface NotificationControllerDocs {
               + "### Request Body\n"
               + "| 필드명 | 필수 여부 | 타입 | 설명 | 예시 |\n"
               + "|--------|-----------|------|------|------|\n"
-              + "| todoDue | ❌ 선택 | boolean | 마감 임박 알림 받기 | `false` |\n"
-              + "| todoFailed | ❌ 선택 | boolean | 실패 리플랜 알림 받기 | `true` |\n"
-              + "| report | ❌ 선택 | boolean | 리포트 도착 알림 받기 | `true` |\n\n"
+              + "| todo | ❌ 선택 | boolean | 투두 알림 받기 (마감 임박, 실패 리플랜) | `false` |\n"
+              + "| stats | ❌ 선택 | boolean | 통계 알림 받기 (리포트 도착) | `true` |\n"
+              + "| notice | ❌ 선택 | boolean | 공지 알림 받기 | `true` |\n"
+              + "| marketing | ❌ 선택 | boolean | 마케팅(광고성) 정보 수신 동의 | `true` |\n\n"
               + "❌ 선택 필드는 생략하거나 null로 전달해도 동일하게 처리됩니다.\n\n"
+              + "**주의사항**: `marketing`은 단순 알림 토글이 아니라 광고성 정보 수신 동의입니다. "
+              + "값이 바뀌면 서버가 동의/철회 시각을 함께 기록합니다.\n\n"
               + "### Response Elements\n"
               + "| 필드명 | 타입 | 설명 |\n"
               + "|--------|------|------|\n"
-              + "| todoDue | boolean | 변경 후 마감 임박 알림 받기 여부 |\n"
-              + "| todoFailed | boolean | 변경 후 실패 리플랜 알림 받기 여부 |\n"
-              + "| report | boolean | 변경 후 리포트 도착 알림 받기 여부 |")
+              + "| todo | boolean | 변경 후 투두 알림 받기 여부 |\n"
+              + "| stats | boolean | 변경 후 통계 알림 받기 여부 |\n"
+              + "| notice | boolean | 변경 후 공지 알림 받기 여부 |\n"
+              + "| marketing | boolean | 변경 후 마케팅 정보 수신 동의 여부 |")
   @ApiResponses({
     @ApiResponse(
         responseCode = "200",
@@ -270,7 +277,7 @@ public interface NotificationControllerDocs {
                 examples =
                     @ExampleObject(
                         value =
-                            "{\"status\":200,\"success\":true,\"data\":{\"todoDue\":false,\"todoFailed\":true,\"report\":true},\"error\":null}"))),
+                            "{\"status\":200,\"success\":true,\"data\":{\"todo\":false,\"stats\":true,\"notice\":true,\"marketing\":true},\"error\":null}"))),
     @ApiResponse(
         responseCode = "401",
         description = "인증 실패",
@@ -297,5 +304,25 @@ public interface NotificationControllerDocs {
                             "{\"status\":404,\"success\":false,\"data\":null,\"error\":{\"code\":\"USER_NOT_FOUND\",\"message\":\"유저를 찾을 수 없습니다.\"}}")))
   })
   ResponseEntity<ApiResult<NotificationSettingResponse>> updateSettings(
-      Long userId, NotificationSettingUpdateRequest request);
+      Long userId,
+      @io.swagger.v3.oas.annotations.parameters.RequestBody(
+              content =
+                  @Content(
+                      mediaType = "application/json",
+                      examples = {
+                        @ExampleObject(
+                            name = "전체 필드 포함",
+                            value =
+                                """
+                                { "todo": false, "stats": true, "notice": true, "marketing": true }
+                                """),
+                        @ExampleObject(
+                            name = "바꿀 항목만 (나머지 생략)",
+                            summary = "생략한 필드는 기존 값 유지",
+                            value =
+                                """
+                                { "marketing": true }
+                                """)
+                      }))
+          NotificationSettingUpdateRequest request);
 }

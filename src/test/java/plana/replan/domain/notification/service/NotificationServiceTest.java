@@ -35,7 +35,7 @@ class NotificationServiceTest {
   @Mock private PushSender pushSender;
   @InjectMocks private NotificationService notificationService;
 
-  private User userWithReportOff() {
+  private User userWithStatsOff() {
     User u =
         User.builder()
             .email("a@a.com")
@@ -43,7 +43,7 @@ class NotificationServiceTest {
             .role(Role.ROLE_USER)
             .provider(Provider.LOCAL)
             .build();
-    u.updateNotificationSettings(true, true, false); // report off
+    u.updateNotificationSettings(true, false, null); // 통계(리포트) 알림 끔
     return u;
   }
 
@@ -60,7 +60,7 @@ class NotificationServiceTest {
   @DisplayName("설정이 꺼져 있으면 저장도 발송도 하지 않는다")
   void skipsWhenSettingOff() {
     notificationService.send(
-        userWithReportOff(), NotificationType.REPORT_READY, "t", "b", TargetType.REPORT, 1L);
+        userWithStatsOff(), NotificationType.REPORT_READY, "t", "b", TargetType.REPORT, 1L);
 
     verify(notificationRepository, never()).save(any());
     verify(pushSender, never()).send(any(), any(), any(), anyMap(), any());
