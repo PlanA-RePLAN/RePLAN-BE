@@ -15,6 +15,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -136,8 +137,10 @@ class AuthServiceRegisterTest {
 
     authService.register(new OAuthRegisterRequestDto("홍길동", null, true), tempToken);
 
-    assertThat(savedUser.isMarketingAgreed()).isTrue();
-    assertThat(savedUser.getMarketingAgreedAt()).isNotNull();
+    ArgumentCaptor<User> captor = ArgumentCaptor.forClass(User.class);
+    verify(userRepository).save(captor.capture());
+    assertThat(captor.getValue().isMarketingAgreed()).isTrue();
+    assertThat(captor.getValue().getMarketingAgreedAt()).isNotNull();
   }
 
   @Test
@@ -158,8 +161,10 @@ class AuthServiceRegisterTest {
 
     authService.register(new OAuthRegisterRequestDto("홍길동", null, null), tempToken);
 
-    assertThat(savedUser.isMarketingAgreed()).isFalse();
-    assertThat(savedUser.getMarketingAgreedAt()).isNull();
+    ArgumentCaptor<User> captor = ArgumentCaptor.forClass(User.class);
+    verify(userRepository).save(captor.capture());
+    assertThat(captor.getValue().isMarketingAgreed()).isFalse();
+    assertThat(captor.getValue().getMarketingAgreedAt()).isNull();
   }
 
   @Test
