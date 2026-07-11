@@ -47,12 +47,20 @@ public class AuthController {
                   **비즈니스 로직**
                   1. 이메일 중복 여부 확인 → 중복이면 409 반환
                   2. 비밀번호 BCrypt 암호화
-                  3. LOCAL Provider 유저 엔티티 생성 후 DB 저장
+                  3. LOCAL Provider 유저 엔티티 생성 후 DB 저장 (마케팅 수신 동의 시 동의 시각도 함께 저장)
 
-                  **요청 조건**
-                  - 이메일: 이메일 형식 필수
-                  - 비밀번호: 8자 이상 필수
-                  - 닉네임: 필수
+                  ---
+
+                  ### Request Body
+
+                  | 필드명 | 필수 여부 | 타입 | 설명 | 예시 |
+                  |--------|-----------|------|------|------|
+                  | email | ✅ 필수 | string | 이메일. 형식이 올바르지 않으면 400 | `"replan@example.com"` |
+                  | password | ✅ 필수 | string | 비밀번호. 8자 미만이면 400 | `"password1234"` |
+                  | nickname | ✅ 필수 | string | 닉네임 | `"리플랜"` |
+                  | agreeMarketing | ❌ 선택 | boolean | 마케팅 정보 수신 동의(선택 약관). 동의하면 동의 시각이 함께 기록됨 | `true` |
+
+                  > ❌ 선택 필드는 생략하거나 null로 전달해도 동일하게 처리됩니다. (미동의로 저장)
                   """)
   @ApiResponses({
     @ApiResponse(
@@ -113,7 +121,29 @@ public class AuthController {
                                 """)))
   })
   @PostMapping("/signup")
-  public ResponseEntity<ApiResult<Void>> signUp(@Valid @RequestBody SignUpRequestDto request) {
+  public ResponseEntity<ApiResult<Void>> signUp(
+      @io.swagger.v3.oas.annotations.parameters.RequestBody(
+              content =
+                  @Content(
+                      mediaType = "application/json",
+                      examples = {
+                        @ExampleObject(
+                            name = "전체 필드 포함",
+                            value =
+                                """
+                                { "email": "replan@example.com", "password": "password1234", "nickname": "리플랜", "agreeMarketing": true }
+                                """),
+                        @ExampleObject(
+                            name = "필수 필드만 (agreeMarketing 생략)",
+                            summary = "agreeMarketing을 생략하면 미동의(false)로 저장됨",
+                            value =
+                                """
+                                { "email": "replan@example.com", "password": "password1234", "nickname": "리플랜" }
+                                """)
+                      }))
+          @Valid
+          @RequestBody
+          SignUpRequestDto request) {
     authService.signUp(request);
     return ResponseEntity.ok(ApiResult.ok());
   }
@@ -977,9 +1007,21 @@ public class AuthController {
                   1. tempToken으로 Redis에서 email, provider 조회 (5분 유효)
                   2. 닉네임 중복 확인
                   3. s3Key가 있으면 S3 temp → confirmed 이동 후 CloudFront URL 저장
-                  4. 유저 생성 및 DB 저장
+                  4. 유저 생성 및 DB 저장 (마케팅 수신 동의 시 동의 시각도 함께 저장)
                   5. tempToken Redis에서 삭제
                   6. AccessToken + RefreshToken 발급
+
+                  ---
+
+                  ### Request Body
+
+                  | 필드명 | 필수 여부 | 타입 | 설명 | 예시 |
+                  |--------|-----------|------|------|------|
+                  | nickname | ✅ 필수 | string | 닉네임. 중복이면 409 | `"리플랜"` |
+                  | s3Key | ❌ 선택 | string | 프로필 이미지 업로드 후 받은 S3 key | `"temp/abc.png"` |
+                  | agreeMarketing | ❌ 선택 | boolean | 마케팅 정보 수신 동의(선택 약관). 동의하면 동의 시각이 함께 기록됨 | `true` |
+
+                  > ❌ 선택 필드는 생략하거나 null로 전달해도 동일하게 처리됩니다. (agreeMarketing은 미동의로 저장)
                   """)
   @ApiResponses({
     @ApiResponse(responseCode = "200", description = "프로필 등록 성공 - AccessToken, RefreshToken 반환"),
@@ -1064,7 +1106,28 @@ public class AuthController {
   @PostMapping("/oauth/register")
   public ResponseEntity<ApiResult<LoginResponseDto>> register(
       @RequestHeader(value = "Authorization", required = false) String authHeader,
-      @Valid @RequestBody OAuthRegisterRequestDto request) {
+      @io.swagger.v3.oas.annotations.parameters.RequestBody(
+              content =
+                  @Content(
+                      mediaType = "application/json",
+                      examples = {
+                        @ExampleObject(
+                            name = "전체 필드 포함",
+                            value =
+                                """
+                                { "nickname": "리플랜", "s3Key": "temp/abc.png", "agreeMarketing": true }
+                                """),
+                        @ExampleObject(
+                            name = "필수 필드만 (optional 생략)",
+                            summary = "s3Key는 기본 프로필, agreeMarketing은 미동의(false)로 저장됨",
+                            value =
+                                """
+                                { "nickname": "리플랜" }
+                                """)
+                      }))
+          @Valid
+          @RequestBody
+          OAuthRegisterRequestDto request) {
 
     if (authHeader == null || !authHeader.startsWith("Bearer ")) {
       throw new CustomException(JwtErrorCode.EMPTY_TOKEN);

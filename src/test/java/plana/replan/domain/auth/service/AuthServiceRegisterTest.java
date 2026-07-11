@@ -15,6 +15,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -79,7 +80,7 @@ class AuthServiceRegisterTest {
     given(userRepository.save(any(User.class))).willReturn(savedUser);
 
     LoginResponseDto result =
-        authService.register(new OAuthRegisterRequestDto("홍길동", null), tempToken);
+        authService.register(new OAuthRegisterRequestDto("홍길동", null, null), tempToken);
 
     assertThat(result.getAccessToken()).isEqualTo("access-token");
     assertThat(result.getRefreshToken()).isEqualTo("refresh-token");
@@ -110,7 +111,7 @@ class AuthServiceRegisterTest {
 
     LoginResponseDto result =
         authService.register(
-            new OAuthRegisterRequestDto("홍길동", "profiles/temp/uuid_photo.jpg"), tempToken);
+            new OAuthRegisterRequestDto("홍길동", "profiles/temp/uuid_photo.jpg", null), tempToken);
 
     assertThat(result.getAccessToken()).isEqualTo("access-token");
     verify(s3Service).moveToConfirmed("profiles/temp/uuid_photo.jpg");
@@ -119,12 +120,60 @@ class AuthServiceRegisterTest {
   }
 
   @Test
+  @DisplayName("마케팅 수신 동의(true)로 등록하면 동의 여부와 동의 시각이 저장된다")
+  void register_withMarketingConsent_recordsAgreement() {
+    String tempToken = "valid-temp-token";
+    given(valueOperations.get("oauth-temp:" + tempToken)).willReturn("test@kakao.com:KAKAO");
+    given(userRepository.existsByNickname("홍길동")).willReturn(false);
+
+    User savedUser =
+        User.builder()
+            .email("test@kakao.com")
+            .nickname("홍길동")
+            .role(Role.ROLE_USER)
+            .provider(Provider.KAKAO)
+            .build();
+    given(userRepository.save(any(User.class))).willReturn(savedUser);
+
+    authService.register(new OAuthRegisterRequestDto("홍길동", null, true), tempToken);
+
+    ArgumentCaptor<User> captor = ArgumentCaptor.forClass(User.class);
+    verify(userRepository).save(captor.capture());
+    assertThat(captor.getValue().isMarketingAgreed()).isTrue();
+    assertThat(captor.getValue().getMarketingAgreedAt()).isNotNull();
+  }
+
+  @Test
+  @DisplayName("마케팅 수신 동의를 생략(null)하면 미동의로 저장된다")
+  void register_withoutMarketingConsent_staysFalse() {
+    String tempToken = "valid-temp-token";
+    given(valueOperations.get("oauth-temp:" + tempToken)).willReturn("test@kakao.com:KAKAO");
+    given(userRepository.existsByNickname("홍길동")).willReturn(false);
+
+    User savedUser =
+        User.builder()
+            .email("test@kakao.com")
+            .nickname("홍길동")
+            .role(Role.ROLE_USER)
+            .provider(Provider.KAKAO)
+            .build();
+    given(userRepository.save(any(User.class))).willReturn(savedUser);
+
+    authService.register(new OAuthRegisterRequestDto("홍길동", null, null), tempToken);
+
+    ArgumentCaptor<User> captor = ArgumentCaptor.forClass(User.class);
+    verify(userRepository).save(captor.capture());
+    assertThat(captor.getValue().isMarketingAgreed()).isFalse();
+    assertThat(captor.getValue().getMarketingAgreedAt()).isNull();
+  }
+
+  @Test
   @DisplayName("유효하지 않은 tempToken: INVALID_TEMP_TOKEN 예외")
   void register_invalidTempToken_throws() {
     given(valueOperations.get("oauth-temp:bad-token")).willReturn(null);
 
     assertThatThrownBy(
-            () -> authService.register(new OAuthRegisterRequestDto("홍길동", null), "bad-token"))
+            () -> authService.register(new OAuthRegisterRequestDto("홍길동", null, null), "bad-token"))
         .isInstanceOf(CustomException.class)
         .satisfies(
             e ->
@@ -153,7 +202,7 @@ class AuthServiceRegisterTest {
     ReflectionTestUtils.setField(saved, "id", 1L);
     given(userRepository.save(any(User.class))).willReturn(saved);
 
-    authService.register(new OAuthRegisterRequestDto("nick", null), tempToken);
+    authService.register(new OAuthRegisterRequestDto("nick", null, null), tempToken);
 
     verify(valueOperations)
         .set("apple:refresh:" + saved.getId(), "com.replan.service|apple-refresh-token");
@@ -179,7 +228,7 @@ class AuthServiceRegisterTest {
     given(userRepository.save(any(User.class))).willReturn(saved);
 
     assertThatThrownBy(
-            () -> authService.register(new OAuthRegisterRequestDto("nick", null), tempToken))
+            () -> authService.register(new OAuthRegisterRequestDto("nick", null, null), tempToken))
         .isInstanceOf(CustomException.class)
         .hasFieldOrPropertyWithValue("errorCode", UserErrorCode.INVALID_TEMP_TOKEN);
   }
@@ -192,7 +241,7 @@ class AuthServiceRegisterTest {
     given(userRepository.existsByNickname("중복닉네임")).willReturn(true);
 
     assertThatThrownBy(
-            () -> authService.register(new OAuthRegisterRequestDto("중복닉네임", null), tempToken))
+            () -> authService.register(new OAuthRegisterRequestDto("중복닉네임", null, null), tempToken))
         .isInstanceOf(CustomException.class)
         .satisfies(
             e ->

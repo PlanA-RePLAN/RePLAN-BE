@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.BDDMockito.given;
 
+import java.time.LocalDateTime;
 import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -35,15 +36,16 @@ class NotificationSettingServiceTest {
   }
 
   @Test
-  @DisplayName("기본값은 모두 켜짐이다")
-  void defaultsAllOn() {
+  @DisplayName("기본값: 알림 3종은 켜짐, 마케팅 동의는 꺼짐이다")
+  void defaults() {
     given(userRepository.findById(1L)).willReturn(Optional.of(user()));
 
     NotificationSettingResponse res = settingService.get(1L);
 
-    assertThat(res.todoDue()).isTrue();
-    assertThat(res.todoFailed()).isTrue();
-    assertThat(res.report()).isTrue();
+    assertThat(res.todo()).isTrue();
+    assertThat(res.stats()).isTrue();
+    assertThat(res.notice()).isTrue();
+    assertThat(res.marketing()).isFalse();
   }
 
   @Test
@@ -53,11 +55,54 @@ class NotificationSettingServiceTest {
     given(userRepository.findById(1L)).willReturn(Optional.of(u));
 
     NotificationSettingResponse res =
-        settingService.update(1L, new NotificationSettingUpdateRequest(false, null, null));
+        settingService.update(1L, new NotificationSettingUpdateRequest(false, null, null, null));
 
-    assertThat(res.todoDue()).isFalse();
-    assertThat(res.todoFailed()).isTrue();
-    assertThat(res.report()).isTrue();
+    assertThat(res.todo()).isFalse();
+    assertThat(res.stats()).isTrue();
+    assertThat(res.notice()).isTrue();
+    assertThat(res.marketing()).isFalse();
+  }
+
+  @Test
+  @DisplayName("마케팅 동의를 켜면 동의 시각이 함께 기록된다")
+  void marketingOnRecordsTimestamp() {
+    User u = user();
+    given(userRepository.findById(1L)).willReturn(Optional.of(u));
+
+    NotificationSettingResponse res =
+        settingService.update(1L, new NotificationSettingUpdateRequest(null, null, null, true));
+
+    assertThat(res.marketing()).isTrue();
+    assertThat(u.getMarketingAgreedAt()).isNotNull();
+  }
+
+  @Test
+  @DisplayName("마케팅 동의를 껐다 켜면 시각이 갱신된다")
+  void marketingToggleUpdatesTimestamp() {
+    User u = user();
+    given(userRepository.findById(1L)).willReturn(Optional.of(u));
+
+    settingService.update(1L, new NotificationSettingUpdateRequest(null, null, null, true));
+    LocalDateTime agreedAt = u.getMarketingAgreedAt();
+
+    settingService.update(1L, new NotificationSettingUpdateRequest(null, null, null, false));
+    LocalDateTime withdrawnAt = u.getMarketingAgreedAt();
+
+    assertThat(u.isMarketingAgreed()).isFalse();
+    assertThat(withdrawnAt).isNotNull().isAfterOrEqualTo(agreedAt);
+  }
+
+  @Test
+  @DisplayName("마케팅 값이 그대로면(미동의→false) 시각을 기록하지 않는다")
+  void marketingSameValueKeepsTimestamp() {
+    User u = user();
+    given(userRepository.findById(1L)).willReturn(Optional.of(u));
+
+    NotificationSettingResponse res =
+        settingService.update(1L, new NotificationSettingUpdateRequest(null, null, null, false));
+
+    assertThat(res.marketing()).isFalse();
+    assertThat(u.getMarketingAgreedAt()).isNull();
   }
 
   @Test

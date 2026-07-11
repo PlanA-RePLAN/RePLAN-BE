@@ -1,6 +1,7 @@
 package plana.replan.domain.user.entity;
 
 import jakarta.persistence.*;
+import java.time.LocalDateTime;
 import java.util.Objects;
 import lombok.AccessLevel;
 import lombok.Builder;
@@ -39,14 +40,23 @@ public class User extends BaseTimeEntity {
   @Column(name = "profile_image", columnDefinition = "TEXT")
   private String profileImage;
 
-  @Column(name = "notify_todo_due", nullable = false)
-  private boolean notifyTodoDue = true;
+  // 알림 카테고리별 수신 설정 (투두 / 통계 / 공지)
+  @Column(name = "notify_todo", nullable = false)
+  private boolean notifyTodo = true;
 
-  @Column(name = "notify_todo_failed", nullable = false)
-  private boolean notifyTodoFailed = true;
+  @Column(name = "notify_stats", nullable = false)
+  private boolean notifyStats = true;
 
-  @Column(name = "notify_report", nullable = false)
-  private boolean notifyReport = true;
+  @Column(name = "notify_notice", nullable = false)
+  private boolean notifyNotice = true;
+
+  // 마케팅 정보 수신 동의(선택 약관). 단순 토글이 아니라 '동의'라서 마지막으로 동의/철회한 시각을 남긴다.
+  // 광고성 알림은 2년마다 수신 동의를 다시 확인해야 하는데, 그 기준일이 이 시각이다.
+  @Column(name = "marketing_agreed", nullable = false)
+  private boolean marketingAgreed = false;
+
+  @Column(name = "marketing_agreed_at")
+  private LocalDateTime marketingAgreedAt;
 
   // 애플 고유 식별번호(sub). 애플 회원만 값이 있고, 재로그인 시 이메일 대신 이 값으로 사용자를 찾는다.
   // 값이 있는 경우 유일해야 하며, 그 제약은 마이그레이션(V22 ux_users_apple_sub)에서 관리한다.
@@ -88,15 +98,23 @@ public class User extends BaseTimeEntity {
    * 회원 탈퇴 처리. 개인정보(이메일·닉네임·비밀번호·프로필이미지)를 파기하고 soft delete 한다. 이메일/닉네임은 다른 회원과 겹치지 않도록 id를 붙인 익명값으로
    * 바꾼다. (id가 유일하므로 전역 유니크 제약과도 충돌하지 않는다.)
    */
-  public void updateNotificationSettings(Boolean todoDue, Boolean todoFailed, Boolean report) {
-    if (todoDue != null) {
-      this.notifyTodoDue = todoDue;
+  public void updateNotificationSettings(Boolean todo, Boolean stats, Boolean notice) {
+    if (todo != null) {
+      this.notifyTodo = todo;
     }
-    if (todoFailed != null) {
-      this.notifyTodoFailed = todoFailed;
+    if (stats != null) {
+      this.notifyStats = stats;
     }
-    if (report != null) {
-      this.notifyReport = report;
+    if (notice != null) {
+      this.notifyNotice = notice;
+    }
+  }
+
+  /** 마케팅 정보 수신 동의를 갱신한다. 값이 실제로 바뀔 때만 동의/철회 시각을 기록한다. */
+  public void updateMarketingAgreed(Boolean agreed) {
+    if (agreed != null && agreed != this.marketingAgreed) {
+      this.marketingAgreed = agreed;
+      this.marketingAgreedAt = LocalDateTime.now();
     }
   }
 

@@ -7,7 +7,7 @@ import plana.replan.domain.notification.entity.Notification;
 @Schema(description = "알림 한 건")
 public record NotificationResponse(
     @Schema(description = "알림 id", example = "12") Long id,
-    @Schema(description = "탭 분류 (TODO/STATS/ETC)", example = "TODO") String category,
+    @Schema(description = "탭 분류 (TODO/STATS/NOTICE/MARKETING)", example = "TODO") String category,
     @Schema(description = "알림 종류", example = "TODO_DUE_SOON") String type,
     @Schema(description = "제목", example = "'영단어 100개 암기' 투두") String title,
     @Schema(description = "내용", example = "주요 투두로 설정한 투두의 마감 시간이 하루 남았어요.") String body,
