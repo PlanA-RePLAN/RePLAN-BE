@@ -76,6 +76,9 @@ public class AuthService {
             .provider(Provider.LOCAL)
             .build();
 
+    // 마케팅 정보 수신 동의(선택). 동의했으면 여부와 함께 동의 시각이 기록된다.
+    user.updateMarketingAgreed(request.getAgreeMarketing());
+
     userRepository.save(user);
     tagService.createDefaultTags(user);
   }
@@ -172,6 +175,10 @@ public class AuthService {
                 .provider(provider)
                 .profileImage(profileImageUrl)
                 .build());
+
+    // 마케팅 정보 수신 동의(선택). 동의했으면 여부와 함께 동의 시각이 기록된다.
+    user.updateMarketingAgreed(request.getAgreeMarketing());
+
     tagService.createDefaultTags(user);
 
     // 5-1. 애플이면 임시 저장된 refresh token을 userId 키로 옮긴다

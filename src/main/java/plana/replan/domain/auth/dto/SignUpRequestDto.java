@@ -20,4 +20,7 @@ public class SignUpRequestDto {
 
   @NotBlank(message = "닉네임은 필수입니다.")
   private String nickname;
+
+  // 마케팅 정보 수신 동의(선택 약관). 생략하거나 null이면 미동의로 처리한다.
+  private Boolean agreeMarketing;
 }
