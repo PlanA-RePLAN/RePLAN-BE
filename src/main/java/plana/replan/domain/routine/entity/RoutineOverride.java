@@ -3,6 +3,7 @@ package plana.replan.domain.routine.entity;
 import jakarta.persistence.*;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
@@ -52,6 +53,10 @@ public class RoutineOverride {
   @Column(name = "completed_time")
   private LocalDateTime completedTime;
 
+  // 이 날짜 회차만의 마감시간. null이면 루틴 기본 시간(routineTime)을 따른다.
+  @Column(name = "override_time")
+  private LocalTime overrideTime;
+
   @CreationTimestamp
   @Column(name = "created_at", updatable = false)
   private LocalDateTime createdAt;
@@ -66,9 +71,10 @@ public class RoutineOverride {
     this.overrideDate = overrideDate;
   }
 
-  public void updateContent(String title, Tag tag) {
+  public void updateContent(String title, Tag tag, LocalTime overrideTime) {
     this.title = title;
     this.tag = tag;
+    this.overrideTime = overrideTime;
   }
 
   public void updateOrder(double sortOrder) {

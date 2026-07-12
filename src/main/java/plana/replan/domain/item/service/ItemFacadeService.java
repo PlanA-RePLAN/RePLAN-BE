@@ -178,7 +178,8 @@ public class ItemFacadeService {
           userId,
           request.routineId(),
           request.date(),
-          new RoutineOverrideContentRequestDto(request.title(), request.tagId()));
+          new RoutineOverrideContentRequestDto(
+              request.title(), request.tagId(), request.routineTime()));
       return;
     }
     // 반복 전체 수정 — 기존 루틴 수정 API의 필수값(title, routineType)을 여기서 미리 확인한다.
