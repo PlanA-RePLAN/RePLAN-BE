@@ -42,6 +42,34 @@ import plana.replan.global.common.ApiResult;
 public interface ItemControllerDocs {
 
   // ── 공통 에러 응답 예시 ──
+  String ERR_EMPTY_TOKEN =
+      """
+      {
+        "status": 401,
+        "success": false,
+        "data": null,
+        "error": {
+          "code": "EMPTY_TOKEN",
+          "message": "토큰이 없습니다.",
+          "detail": null
+        }
+      }
+      """;
+
+  String ERR_EXPIRED_TOKEN =
+      """
+      {
+        "status": 401,
+        "success": false,
+        "data": null,
+        "error": {
+          "code": "EXPIRED_TOKEN",
+          "message": "만료된 토큰입니다.",
+          "detail": null
+        }
+      }
+      """;
+
   String ERR_INVALID_FILTER =
       """
       {
@@ -140,6 +168,20 @@ public interface ItemControllerDocs {
       }
       """;
 
+  String ERR_OVERRIDE_SKIPPED =
+      """
+      {
+        "status": 400,
+        "success": false,
+        "data": null,
+        "error": {
+          "code": "ROUTINE_OVERRIDE_SKIPPED",
+          "message": "건너뛴 날짜에는 하위 투두를 추가할 수 없습니다.",
+          "detail": null
+        }
+      }
+      """;
+
   String ERR_TODO_NOT_FOUND =
       """
       {
@@ -163,20 +205,6 @@ public interface ItemControllerDocs {
         "error": {
           "code": "ROUTINE_NOT_FOUND",
           "message": "루틴을 찾을 수 없습니다.",
-          "detail": null
-        }
-      }
-      """;
-
-  String ERR_OVERRIDE_SKIPPED =
-      """
-      {
-        "status": 400,
-        "success": false,
-        "data": null,
-        "error": {
-          "code": "ROUTINE_OVERRIDE_SKIPPED",
-          "message": "건너뛴 날짜에는 하위 투두를 추가할 수 없습니다.",
           "detail": null
         }
       }
@@ -216,13 +244,42 @@ public interface ItemControllerDocs {
           """
           투두 목록과 루틴 회차 목록을 합쳐 한 배열로 반환한다. 두 목록은 서로 겹치지 않는다.
 
+          **Request Headers**
+
+          | 헤더명 | 필수 여부 | 타입 | 설명 |
+          |--------|-----------|------|------|
+          | Authorization | ✅ 필수 | string | `Bearer {accessToken}` 형식의 JWT 액세스 토큰 |
+
           **Query Parameters**
 
-          | 이름 | 필수 | 타입 | 설명 |
-          |------|------|------|------|
-          | filter | ❌ (기본 all) | string | all / day / week / month |
-          | sort | ❌ (기본 priority) | string | priority(정렬 순서) / dueDate(마감 빠른 순) |
-          | date | ❌ (기본 오늘) | string(yyyy-MM-dd) | 기준 날짜 |
+          | 파라미터명 | 필수 여부 | 타입 | 기본값 | 설명 | 예시 |
+          |-----------|-----------|------|--------|------|------|
+          | filter | ❌ 선택 | string | `all` | all / day / week / month | `day` |
+          | sort | ❌ 선택 | string | `priority` | priority(정렬 순서) / dueDate(마감 빠른 순) | `priority` |
+          | date | ❌ 선택 | string | 오늘 | 기준 날짜 (yyyy-MM-dd 형식) | `2026-07-10` |
+
+          **Response Elements** (배열 원소)
+
+          | 필드명 | 타입 | 설명 |
+          |--------|------|------|
+          | kind | string | TODO / ROUTINE |
+          | todoId | integer | 투두 ID. ROUTINE인데 null이면 아직 생성되지 않은 미래 회차 |
+          | routineId | integer | 루틴 ID. TODO면 null |
+          | date | string | 날짜 (yyyy-MM-dd 형식). all 필터의 "다음 할 일" 회차는 null일 수 있음 |
+          | title | string | 제목 (ROUTINE이면 회차 예외 적용값) |
+          | dueDate | string | 마감 일시 (ISO 8601 형식). 없으면 null |
+          | repeatEndDate | string | 반복 종료일 (ISO 8601 형식). ROUTINE만, 없으면 null |
+          | routineType | string | DAILY / WEEKLY / MONTHLY. TODO면 null |
+          | routineDays | array | 반복 요일(월=0…일=6) 또는 일자(1~31) 배열. 없으면 null |
+          | tagId | integer | 태그 ID. 없으면 null |
+          | tagTitle | string | 태그 제목. 없으면 null |
+          | tagColor | string | 태그 색상. 없으면 null |
+          | goalId | integer | 목표 ID. 없으면 null |
+          | sortOrder | number | 정렬 순서 |
+          | isPinned | boolean | 핀 여부 |
+          | isCompleted | boolean | 완료 여부 |
+          | isOverdue | boolean | 마감 지남 여부 (미완료 + 마감 경과) |
+          | hasOverride | boolean | 회차 예외 존재 여부. ROUTINE만 |
 
           **정렬**: 완료 아이템을 뒤로 보낸 뒤, sort 기준으로 정렬.
 
@@ -300,13 +357,28 @@ public interface ItemControllerDocs {
                 examples = {
                   @ExampleObject(name = "filter 오류", value = ERR_INVALID_FILTER),
                   @ExampleObject(name = "sort 오류", value = ERR_INVALID_SORT)
+                })),
+    @ApiResponse(
+        responseCode = "401",
+        description = "AccessToken 없음 또는 만료",
+        content =
+            @Content(
+                examples = {
+                  @ExampleObject(name = "토큰 없음", value = ERR_EMPTY_TOKEN),
+                  @ExampleObject(name = "만료된 토큰", value = ERR_EXPIRED_TOKEN)
                 }))
   })
   ResponseEntity<ApiResult<List<ItemResponseDto>>> getItems(
       @AuthenticationPrincipal Long userId,
-      @RequestParam(defaultValue = "all") String filter,
-      @RequestParam(defaultValue = "priority") String sort,
-      @RequestParam(required = false) LocalDate date);
+      @Parameter(description = "필터 (all/day/week/month)", example = "day")
+          @RequestParam(defaultValue = "all")
+          String filter,
+      @Parameter(description = "정렬 (priority/dueDate)", example = "priority")
+          @RequestParam(defaultValue = "priority")
+          String sort,
+      @Parameter(description = "기준 날짜 (yyyy-MM-dd 형식). 생략하면 오늘", example = "2026-07-10")
+          @RequestParam(required = false)
+          LocalDate date);
 
   @Operation(
       summary = "통합 아이템 상세 조회",
@@ -314,17 +386,53 @@ public interface ItemControllerDocs {
           """
           아이템 하나의 상세(하위 투두 포함)를 조회한다.
 
+          **Request Headers**
+
+          | 헤더명 | 필수 여부 | 타입 | 설명 |
+          |--------|-----------|------|------|
+          | Authorization | ✅ 필수 | string | `Bearer {accessToken}` 형식의 JWT 액세스 토큰 |
+
           **Query Parameters**
 
-          | 이름 | 필수 | 타입 | 설명 |
-          |------|------|------|------|
-          | kind | ✅ | string | TODO / ROUTINE |
-          | todoId | kind=TODO일 때 ✅ | number | 투두 ID |
-          | routineId | kind=ROUTINE일 때 ✅ | number | 루틴 ID |
-          | date | kind=ROUTINE일 때 ✅ | string(yyyy-MM-dd) | 회차 날짜 |
+          | 파라미터명 | 필수 여부 | 타입 | 기본값 | 설명 | 예시 |
+          |-----------|-----------|------|--------|------|------|
+          | kind | ✅ 필수 | string | 없음 | TODO / ROUTINE | `ROUTINE` |
+          | todoId | kind=TODO일 때 ✅ | integer | 없음 | 투두 ID | `42` |
+          | routineId | kind=ROUTINE일 때 ✅ | integer | 없음 | 루틴 ID | `7` |
+          | date | kind=ROUTINE일 때 ✅ | string | 없음 | 회차 날짜 (yyyy-MM-dd 형식) | `2026-07-10` |
+
+          **Response Elements**
+
+          | 필드명 | 타입 | 설명 |
+          |--------|------|------|
+          | kind | string | TODO / ROUTINE |
+          | todoId | integer | 투두 ID. ROUTINE이면 그날 투두가 생성된 경우에만 존재 |
+          | routineId | integer | 루틴 ID. ROUTINE일 때만 |
+          | date | string | 날짜 (yyyy-MM-dd 형식). ROUTINE=회차 날짜, TODO=마감일의 날짜 |
+          | title | string | 제목 (ROUTINE이면 회차 예외 적용값) |
+          | dueDate | string | 마감 일시 (ISO 8601 형식). TODO만, 없으면 null |
+          | isCompleted | boolean | 완료 여부 |
+          | isPinned | boolean | 핀 여부. TODO 상세에서는 null |
+          | isSkipped | boolean | 건너뜀 여부. ROUTINE만 |
+          | hasOverride | boolean | 회차 예외 존재 여부. ROUTINE만 |
+          | tagId | integer | 태그 ID (ROUTINE이면 회차 예외 적용값). 없으면 null |
+          | tagTitle | string | 태그 제목. 없으면 null |
+          | tagColor | string | 태그 색상. 없으면 null |
+          | routineType | string | 반복 유형. TODO 상세에서만 제공 |
+          | routineDays | array | 반복 날짜 배열. TODO 상세에서만 제공 |
+          | subTodos | array | 하위 투두 목록. 원소는 아래 표 참고 |
+
+          **subTodos 원소**
+
+          | 필드명 | 타입 | 설명 |
+          |--------|------|------|
+          | todoId | integer | 하위 투두 ID. 행이 없는 회차의 하위(예정분·예약분)는 null |
+          | title | string | 제목 |
+          | isCompleted | boolean | 완료 여부 |
+          | reservedIndex | integer | 예약 하위의 배열 위치(수정/삭제 시 지목용). 행 하위는 null, todoId와 둘 다 null이면 하위 루틴 예정분(읽기 전용) |
 
           **참고**: ROUTINE 상세의 반복 유형/요일 정보는 목록 응답에 이미 포함돼 있어 여기서는 null로 반환된다.
-          ROUTINE 회차의 하위 아이템은 그날 투두가 이미 생성된 경우에만 존재한다.
+          행(Todo)이 아직 없는 미래 회차의 `subTodos`에는 하위 루틴 예정분(읽기 전용)과 예약된 하위가 병합되어 내려온다.
           """,
       security = @SecurityRequirement(name = "Bearer Authentication"))
   @ApiResponses({
@@ -339,6 +447,15 @@ public interface ItemControllerDocs {
                   @ExampleObject(name = "하위 루틴 ID 지정", value = ERR_ROUTINE_INVALID_TARGET)
                 })),
     @ApiResponse(
+        responseCode = "401",
+        description = "AccessToken 없음 또는 만료",
+        content =
+            @Content(
+                examples = {
+                  @ExampleObject(name = "토큰 없음", value = ERR_EMPTY_TOKEN),
+                  @ExampleObject(name = "만료된 토큰", value = ERR_EXPIRED_TOKEN)
+                })),
+    @ApiResponse(
         responseCode = "404",
         description = "투두 또는 루틴을 찾을 수 없음 (존재하지 않거나 본인 소유가 아님)",
         content =
@@ -350,10 +467,17 @@ public interface ItemControllerDocs {
   })
   ResponseEntity<ApiResult<ItemDetailResponseDto>> getItemDetail(
       @AuthenticationPrincipal Long userId,
-      @Parameter(description = "아이템 종류 (TODO/ROUTINE)") @RequestParam ItemKind kind,
-      @RequestParam(required = false) Long todoId,
-      @RequestParam(required = false) Long routineId,
-      @RequestParam(required = false) LocalDate date);
+      @Parameter(description = "아이템 종류 (TODO/ROUTINE)", example = "ROUTINE") @RequestParam
+          ItemKind kind,
+      @Parameter(description = "투두 ID (kind=TODO일 때 필수)", example = "42")
+          @RequestParam(required = false)
+          Long todoId,
+      @Parameter(description = "루틴 ID (kind=ROUTINE일 때 필수)", example = "7")
+          @RequestParam(required = false)
+          Long routineId,
+      @Parameter(description = "회차 날짜 (yyyy-MM-dd 형식, kind=ROUTINE일 때 필수)", example = "2026-07-10")
+          @RequestParam(required = false)
+          LocalDate date);
 
   @Operation(
       summary = "통합 아이템 완료/미완료 처리",
@@ -363,8 +487,45 @@ public interface ItemControllerDocs {
 
           - kind=TODO → 기존 `PATCH /api/todos/{id}/complete`와 동일 동작
           - kind=ROUTINE → 기존 `PATCH /api/routines/{routineId}/overrides/{date}/complete`와 동일 동작 (그날 투두가 이미 있으면 함께 갱신)
+
+          **Request Headers**
+
+          | 헤더명 | 필수 여부 | 타입 | 설명 |
+          |--------|-----------|------|------|
+          | Authorization | ✅ 필수 | string | `Bearer {accessToken}` 형식의 JWT 액세스 토큰 |
+          | Content-Type | ✅ 필수 | string | `application/json` |
+
+          **Request Body**
+
+          | 필드명 | 필수 여부 | 타입 | 설명 | 예시 |
+          |--------|-----------|------|------|------|
+          | kind | ✅ 필수 | string | TODO / ROUTINE | `"TODO"` |
+          | todoId | kind=TODO일 때 ✅ | integer | 투두 ID | `42` |
+          | routineId | kind=ROUTINE일 때 ✅ | integer | 루틴 ID | `7` |
+          | date | kind=ROUTINE일 때 ✅ | string | 회차 날짜 (yyyy-MM-dd 형식) | `"2026-07-10"` |
+          | isCompleted | ✅ 필수 | boolean | true면 완료, false면 미완료 | `true` |
+
+          > ❌ 선택 필드는 생략하거나 null로 전달해도 동일하게 처리됩니다.
           """,
       security = @SecurityRequirement(name = "Bearer Authentication"))
+  @io.swagger.v3.oas.annotations.parameters.RequestBody(
+      content =
+          @Content(
+              mediaType = "application/json",
+              examples = {
+                @ExampleObject(
+                    name = "투두 완료",
+                    value =
+                        """
+                        {"kind": "TODO", "todoId": 42, "isCompleted": true}
+                        """),
+                @ExampleObject(
+                    name = "루틴 회차 완료",
+                    value =
+                        """
+                        {"kind": "ROUTINE", "routineId": 7, "date": "2026-07-10", "isCompleted": true}
+                        """)
+              }))
   @ApiResponses({
     @ApiResponse(responseCode = "200", description = "처리 성공"),
     @ApiResponse(
@@ -381,6 +542,15 @@ public interface ItemControllerDocs {
                   @ExampleObject(
                       name = "발생하지 않는 날짜(요일/일자 불일치, 종료일 이후)",
                       value = ERR_ROUTINE_INVALID_DATE)
+                })),
+    @ApiResponse(
+        responseCode = "401",
+        description = "AccessToken 없음 또는 만료",
+        content =
+            @Content(
+                examples = {
+                  @ExampleObject(name = "토큰 없음", value = ERR_EMPTY_TOKEN),
+                  @ExampleObject(name = "만료된 토큰", value = ERR_EXPIRED_TOKEN)
                 })),
     @ApiResponse(
         responseCode = "404",
@@ -400,8 +570,45 @@ public interface ItemControllerDocs {
       description =
           """
           TODO는 투두 핀 처리, ROUTINE은 해당 날짜 회차만 핀 처리(override)한다. 범위 선택(scope) 없음.
+
+          **Request Headers**
+
+          | 헤더명 | 필수 여부 | 타입 | 설명 |
+          |--------|-----------|------|------|
+          | Authorization | ✅ 필수 | string | `Bearer {accessToken}` 형식의 JWT 액세스 토큰 |
+          | Content-Type | ✅ 필수 | string | `application/json` |
+
+          **Request Body**
+
+          | 필드명 | 필수 여부 | 타입 | 설명 | 예시 |
+          |--------|-----------|------|------|------|
+          | kind | ✅ 필수 | string | TODO / ROUTINE | `"TODO"` |
+          | todoId | kind=TODO일 때 ✅ | integer | 투두 ID | `42` |
+          | routineId | kind=ROUTINE일 때 ✅ | integer | 루틴 ID | `7` |
+          | date | kind=ROUTINE일 때 ✅ | string | 회차 날짜 (yyyy-MM-dd 형식) | `"2026-07-10"` |
+          | isPinned | ✅ 필수 | boolean | true면 핀, false면 언핀 | `true` |
+
+          > ❌ 선택 필드는 생략하거나 null로 전달해도 동일하게 처리됩니다.
           """,
       security = @SecurityRequirement(name = "Bearer Authentication"))
+  @io.swagger.v3.oas.annotations.parameters.RequestBody(
+      content =
+          @Content(
+              mediaType = "application/json",
+              examples = {
+                @ExampleObject(
+                    name = "투두 핀",
+                    value =
+                        """
+                        {"kind": "TODO", "todoId": 42, "isPinned": true}
+                        """),
+                @ExampleObject(
+                    name = "루틴 회차 핀",
+                    value =
+                        """
+                        {"kind": "ROUTINE", "routineId": 7, "date": "2026-07-10", "isPinned": true}
+                        """)
+              }))
   @ApiResponses({
     @ApiResponse(responseCode = "200", description = "처리 성공"),
     @ApiResponse(
@@ -418,6 +625,15 @@ public interface ItemControllerDocs {
                   @ExampleObject(
                       name = "발생하지 않는 날짜(요일/일자 불일치, 종료일 이후)",
                       value = ERR_ROUTINE_INVALID_DATE)
+                })),
+    @ApiResponse(
+        responseCode = "401",
+        description = "AccessToken 없음 또는 만료",
+        content =
+            @Content(
+                examples = {
+                  @ExampleObject(name = "토큰 없음", value = ERR_EMPTY_TOKEN),
+                  @ExampleObject(name = "만료된 토큰", value = ERR_EXPIRED_TOKEN)
                 })),
     @ApiResponse(
         responseCode = "404",
@@ -441,8 +657,45 @@ public interface ItemControllerDocs {
           - 이웃 아이템이 아직 투두로 생성되지 않은 루틴 회차(id 없음)일 수 있어, 이웃 id 방식이 아니라 순서값(sortOrder)을 직접 받는다.
           - kind=TODO → 투두의 sortOrder를 직접 갱신 (신규 동작)
           - kind=ROUTINE → 기존 `PATCH /api/routines/{routineId}/overrides/{date}/order`와 동일 동작
+
+          **Request Headers**
+
+          | 헤더명 | 필수 여부 | 타입 | 설명 |
+          |--------|-----------|------|------|
+          | Authorization | ✅ 필수 | string | `Bearer {accessToken}` 형식의 JWT 액세스 토큰 |
+          | Content-Type | ✅ 필수 | string | `application/json` |
+
+          **Request Body**
+
+          | 필드명 | 필수 여부 | 타입 | 설명 | 예시 |
+          |--------|-----------|------|------|------|
+          | kind | ✅ 필수 | string | TODO / ROUTINE | `"TODO"` |
+          | todoId | kind=TODO일 때 ✅ | integer | 투두 ID | `42` |
+          | routineId | kind=ROUTINE일 때 ✅ | integer | 루틴 ID | `7` |
+          | date | kind=ROUTINE일 때 ✅ | string | 회차 날짜 (yyyy-MM-dd 형식) | `"2026-07-10"` |
+          | sortOrder | ✅ 필수 | number | 새 정렬 순서 (앞뒤 아이템 sortOrder의 중간값) | `5000.0` |
+
+          > ❌ 선택 필드는 생략하거나 null로 전달해도 동일하게 처리됩니다.
           """,
       security = @SecurityRequirement(name = "Bearer Authentication"))
+  @io.swagger.v3.oas.annotations.parameters.RequestBody(
+      content =
+          @Content(
+              mediaType = "application/json",
+              examples = {
+                @ExampleObject(
+                    name = "투두 정렬 변경",
+                    value =
+                        """
+                        {"kind": "TODO", "todoId": 42, "sortOrder": 5000.0}
+                        """),
+                @ExampleObject(
+                    name = "루틴 회차 정렬 변경",
+                    value =
+                        """
+                        {"kind": "ROUTINE", "routineId": 7, "date": "2026-07-10", "sortOrder": 5000.0}
+                        """)
+              }))
   @ApiResponses({
     @ApiResponse(responseCode = "200", description = "처리 성공"),
     @ApiResponse(
@@ -459,6 +712,15 @@ public interface ItemControllerDocs {
                   @ExampleObject(
                       name = "발생하지 않는 날짜(요일/일자 불일치, 종료일 이후)",
                       value = ERR_ROUTINE_INVALID_DATE)
+                })),
+    @ApiResponse(
+        responseCode = "401",
+        description = "AccessToken 없음 또는 만료",
+        content =
+            @Content(
+                examples = {
+                  @ExampleObject(name = "토큰 없음", value = ERR_EMPTY_TOKEN),
+                  @ExampleObject(name = "만료된 토큰", value = ERR_EXPIRED_TOKEN)
                 })),
     @ApiResponse(
         responseCode = "404",
@@ -480,13 +742,65 @@ public interface ItemControllerDocs {
           **kind=TODO** (todoId 필수): 기존 `PUT /api/todos/{id}`와 동일 — title은 null이면 유지,
           dueDate/tagId는 null이면 제거. 반복 필드(routineType 등)를 주면 투두가 반복으로 전환된다.
 
-          **kind=ROUTINE + scope=THIS** (routineId·date 필수): 그 날짜 회차만 title/tagId 수정.
-          null인 필드는 루틴 기본값 유지. 기존 `PATCH /api/routines/{routineId}/overrides/{date}`와 동일.
+          **kind=ROUTINE + scope=THIS** (routineId·date 필수): 그 날짜 회차만 title/tagId/routineTime 수정.
+          (routineTime은 그 회차만의 마감시간이 됨.) null인 필드는 루틴 기본값 유지.
+          기존 `PATCH /api/routines/{routineId}/overrides/{date}`와 동일.
 
           **kind=ROUTINE + scope=ALL** (routineId 필수): 반복 전체(엄마 루틴) 수정. title·routineType 필수.
           기존 `PUT /api/routines/{id}`와 동일 — 오늘 이후의 회차 예외(override)가 모두 삭제되고 새 값으로 통일된다.
+
+          **Request Headers**
+
+          | 헤더명 | 필수 여부 | 타입 | 설명 |
+          |--------|-----------|------|------|
+          | Authorization | ✅ 필수 | string | `Bearer {accessToken}` 형식의 JWT 액세스 토큰 |
+          | Content-Type | ✅ 필수 | string | `application/json` |
+
+          **Request Body**
+
+          | 필드명 | 필수 여부 | 타입 | 설명 | 예시 |
+          |--------|-----------|------|------|------|
+          | kind | ✅ 필수 | string | TODO / ROUTINE | `"TODO"` |
+          | todoId | kind=TODO일 때 ✅ | integer | 투두 ID | `42` |
+          | routineId | kind=ROUTINE일 때 ✅ | integer | 루틴 ID | `7` |
+          | date | ROUTINE+THIS일 때 ✅ | string | 회차 날짜 (yyyy-MM-dd 형식) | `"2026-07-10"` |
+          | scope | kind=ROUTINE일 때 ✅ | string | THIS(이 회차만) / ALL(반복 전체) | `"THIS"` |
+          | title | ROUTINE+ALL일 때 ✅, 그 외 ❌ 선택 | string | 제목 | `"영어 단어 100개 외우기"` |
+          | dueDate | ❌ 선택 | string | 마감 일시 (ISO 8601 형식, TODO 전용). null이면 마감일 제거 | `"2026-07-10T18:00:00"` |
+          | tagId | ❌ 선택 | integer | 태그 ID. null이면 태그 제거(TODO/전체수정) 또는 기본값 유지(회차수정) | `5` |
+          | routineType | ROUTINE+ALL일 때 ✅, 그 외 ❌ 선택 | string | DAILY / WEEKLY / MONTHLY | `"WEEKLY"` |
+          | routineDays | ❌ 선택 | array | 반복 요일(월=0…일=6) 또는 일자(1~31) 배열 | `[0, 2, 4]` |
+          | routineTime | ❌ 선택 | string | 반복 시각 (HH:mm:ss). ROUTINE+THIS일 땐 그 회차만의 마감시간 | `"19:00:00"` |
+          | repeatEndDate | ❌ 선택 | string | 반복 종료일 (ISO 8601 형식, ROUTINE+ALL 전용). null이면 종료일 제거 | `"2026-12-31T00:00:00"` |
+
+          > ❌ 선택 필드는 생략하거나 null로 전달해도 동일하게 처리됩니다.
           """,
       security = @SecurityRequirement(name = "Bearer Authentication"))
+  @io.swagger.v3.oas.annotations.parameters.RequestBody(
+      content =
+          @Content(
+              mediaType = "application/json",
+              examples = {
+                @ExampleObject(
+                    name = "투두 수정 (전체 필드)",
+                    value =
+                        """
+                        {"kind": "TODO", "todoId": 42, "title": "회의 준비", "dueDate": "2026-07-10T18:00:00", "tagId": 3}
+                        """),
+                @ExampleObject(
+                    name = "루틴 이 회차만 수정 (제목/태그/시간)",
+                    value =
+                        """
+                        {"kind": "ROUTINE", "routineId": 7, "date": "2026-07-10", "scope": "THIS", "title": "영어 단어 (특별)", "routineTime": "19:00:00"}
+                        """),
+                @ExampleObject(
+                    name = "루틴 전체 수정 (필수 필드만)",
+                    summary = "optional 필드를 생략하면 null로 처리됨",
+                    value =
+                        """
+                        {"kind": "ROUTINE", "routineId": 7, "scope": "ALL", "title": "영어 단어 외우기", "routineType": "DAILY"}
+                        """)
+              }))
   @ApiResponses({
     @ApiResponse(responseCode = "200", description = "수정 성공"),
     @ApiResponse(
@@ -503,6 +817,15 @@ public interface ItemControllerDocs {
                       name = "반복 연결 투두를 TODO로 지목",
                       value = ERR_ROUTINE_TODO_USE_ROUTINE_API),
                   @ExampleObject(name = "하위 루틴 ID 지정", value = ERR_ROUTINE_INVALID_TARGET)
+                })),
+    @ApiResponse(
+        responseCode = "401",
+        description = "AccessToken 없음 또는 만료",
+        content =
+            @Content(
+                examples = {
+                  @ExampleObject(name = "토큰 없음", value = ERR_EMPTY_TOKEN),
+                  @ExampleObject(name = "만료된 토큰", value = ERR_EXPIRED_TOKEN)
                 })),
     @ApiResponse(
         responseCode = "404",
@@ -532,8 +855,51 @@ public interface ItemControllerDocs {
 
           **요청 본문 주의**: DELETE지만 본문(body)이 필수다. axios는 `axios.delete(url, { data: {...} })`처럼
           설정 객체의 `data`로 본문을 전달해야 한다.
+
+          **Request Headers**
+
+          | 헤더명 | 필수 여부 | 타입 | 설명 |
+          |--------|-----------|------|------|
+          | Authorization | ✅ 필수 | string | `Bearer {accessToken}` 형식의 JWT 액세스 토큰 |
+          | Content-Type | ✅ 필수 | string | `application/json` |
+
+          **Request Body**
+
+          | 필드명 | 필수 여부 | 타입 | 설명 | 예시 |
+          |--------|-----------|------|------|------|
+          | kind | ✅ 필수 | string | TODO / ROUTINE | `"TODO"` |
+          | todoId | kind=TODO일 때 ✅ | integer | 투두 ID | `42` |
+          | routineId | kind=ROUTINE일 때 ✅ | integer | 루틴 ID | `7` |
+          | date | ROUTINE+THIS일 때 ✅ | string | 회차 날짜 (yyyy-MM-dd 형식) | `"2026-07-10"` |
+          | scope | kind=ROUTINE일 때 ✅ | string | THIS(이 회차만 건너뛰기) / ALL(반복 전체 삭제) | `"THIS"` |
+
+          > ❌ 선택 필드는 생략하거나 null로 전달해도 동일하게 처리됩니다.
           """,
       security = @SecurityRequirement(name = "Bearer Authentication"))
+  @io.swagger.v3.oas.annotations.parameters.RequestBody(
+      content =
+          @Content(
+              mediaType = "application/json",
+              examples = {
+                @ExampleObject(
+                    name = "투두 삭제",
+                    value =
+                        """
+                        {"kind": "TODO", "todoId": 42}
+                        """),
+                @ExampleObject(
+                    name = "루틴 이 회차만 건너뛰기",
+                    value =
+                        """
+                        {"kind": "ROUTINE", "routineId": 7, "date": "2026-07-10", "scope": "THIS"}
+                        """),
+                @ExampleObject(
+                    name = "루틴 반복 전체 삭제",
+                    value =
+                        """
+                        {"kind": "ROUTINE", "routineId": 7, "scope": "ALL"}
+                        """)
+              }))
   @ApiResponses({
     @ApiResponse(responseCode = "200", description = "삭제 성공"),
     @ApiResponse(
@@ -551,6 +917,15 @@ public interface ItemControllerDocs {
                   @ExampleObject(
                       name = "발생하지 않는 날짜(요일/일자 불일치, 종료일 이후)",
                       value = ERR_ROUTINE_INVALID_DATE)
+                })),
+    @ApiResponse(
+        responseCode = "401",
+        description = "AccessToken 없음 또는 만료",
+        content =
+            @Content(
+                examples = {
+                  @ExampleObject(name = "토큰 없음", value = ERR_EMPTY_TOKEN),
+                  @ExampleObject(name = "만료된 토큰", value = ERR_EXPIRED_TOKEN)
                 })),
     @ApiResponse(
         responseCode = "404",
@@ -575,8 +950,45 @@ public interface ItemControllerDocs {
           - 그날 행(Todo)이 이미 있으면 행에 바로 생성된다.
           - 아직 없으면(미래 회차) 회차 예외에 **예약**해 뒀다가 배치가 행을 만들 때 실체화한다.
           - 예약 하위는 상세 응답 `subTodos`에 `reservedIndex`가 채워진 항목으로 내려온다.
+
+          **Request Headers**
+
+          | 헤더명 | 필수 여부 | 타입 | 설명 |
+          |--------|-----------|------|------|
+          | Authorization | ✅ 필수 | string | `Bearer {accessToken}` 형식의 JWT 액세스 토큰 |
+          | Content-Type | ✅ 필수 | string | `application/json` |
+
+          **Request Body**
+
+          | 필드명 | 필수 여부 | 타입 | 설명 | 예시 |
+          |--------|-----------|------|------|------|
+          | kind | ✅ 필수 | string | TODO / ROUTINE | `"ROUTINE"` |
+          | todoId | kind=TODO일 때 ✅ | integer | 투두 ID | `42` |
+          | routineId | kind=ROUTINE일 때 ✅ | integer | 루틴 ID | `7` |
+          | date | kind=ROUTINE일 때 ✅ | string | 회차 날짜 (yyyy-MM-dd 형식) | `"2026-07-20"` |
+          | title | ✅ 필수 | string | 하위 투두 제목 | `"단어 50개 외우기"` |
+
+          > ❌ 선택 필드는 생략하거나 null로 전달해도 동일하게 처리됩니다.
           """,
       security = @SecurityRequirement(name = "Bearer Authentication"))
+  @io.swagger.v3.oas.annotations.parameters.RequestBody(
+      content =
+          @Content(
+              mediaType = "application/json",
+              examples = {
+                @ExampleObject(
+                    name = "투두에 하위 추가",
+                    value =
+                        """
+                        {"kind": "TODO", "todoId": 42, "title": "단어 50개 외우기"}
+                        """),
+                @ExampleObject(
+                    name = "루틴 회차에 하위 추가 (미래 회차면 예약)",
+                    value =
+                        """
+                        {"kind": "ROUTINE", "routineId": 7, "date": "2026-07-20", "title": "단어 50개 외우기"}
+                        """)
+              }))
   @ApiResponses({
     @ApiResponse(responseCode = "200", description = "추가 성공"),
     @ApiResponse(
@@ -590,6 +1002,15 @@ public interface ItemControllerDocs {
                       name = "발생하지 않는 날짜(요일/일자 불일치, 종료일 이후)",
                       value = ERR_ROUTINE_INVALID_DATE),
                   @ExampleObject(name = "건너뛴 날짜", value = ERR_OVERRIDE_SKIPPED)
+                })),
+    @ApiResponse(
+        responseCode = "401",
+        description = "AccessToken 없음 또는 만료",
+        content =
+            @Content(
+                examples = {
+                  @ExampleObject(name = "토큰 없음", value = ERR_EMPTY_TOKEN),
+                  @ExampleObject(name = "만료된 토큰", value = ERR_EXPIRED_TOKEN)
                 })),
     @ApiResponse(
         responseCode = "404",
@@ -612,14 +1033,51 @@ public interface ItemControllerDocs {
           행이 아직 없는 회차에 **예약된** 하위 투두의 제목을 수정한다. `index`는 상세 응답 `subTodos`의 `reservedIndex` 값.
 
           행이 있는 날짜의 하위 투두는 기존 `PUT /api/todos/{parentId}/sub-todos/{subTodoId}`를 사용한다.
+
+          **Request Headers**
+
+          | 헤더명 | 필수 여부 | 타입 | 설명 |
+          |--------|-----------|------|------|
+          | Authorization | ✅ 필수 | string | `Bearer {accessToken}` 형식의 JWT 액세스 토큰 |
+          | Content-Type | ✅ 필수 | string | `application/json` |
+
+          **Request Body**
+
+          | 필드명 | 필수 여부 | 타입 | 설명 | 예시 |
+          |--------|-----------|------|------|------|
+          | routineId | ✅ 필수 | integer | 루틴 ID | `7` |
+          | date | ✅ 필수 | string | 회차 날짜 (yyyy-MM-dd 형식) | `"2026-07-20"` |
+          | index | ✅ 필수 | integer | 예약 배열 위치 (상세 응답의 reservedIndex) | `0` |
+          | title | ✅ 필수 | string | 새 제목 | `"단어 100개 외우기"` |
           """,
       security = @SecurityRequirement(name = "Bearer Authentication"))
+  @io.swagger.v3.oas.annotations.parameters.RequestBody(
+      content =
+          @Content(
+              mediaType = "application/json",
+              examples =
+                  @ExampleObject(
+                      name = "예약 하위 제목 수정",
+                      value =
+                          """
+                          {"routineId": 7, "date": "2026-07-20", "index": 0, "title": "단어 100개 외우기"}
+                          """)))
   @ApiResponses({
     @ApiResponse(responseCode = "200", description = "수정 성공"),
     @ApiResponse(
         responseCode = "400",
-        description = "빈 제목",
-        content = @Content(examples = @ExampleObject(name = "빈 제목", value = ERR_INVALID_INPUT))),
+        description = "빈 제목 또는 필수 필드 누락",
+        content =
+            @Content(examples = @ExampleObject(name = "빈 제목/필수 누락", value = ERR_INVALID_INPUT))),
+    @ApiResponse(
+        responseCode = "401",
+        description = "AccessToken 없음 또는 만료",
+        content =
+            @Content(
+                examples = {
+                  @ExampleObject(name = "토큰 없음", value = ERR_EMPTY_TOKEN),
+                  @ExampleObject(name = "만료된 토큰", value = ERR_EXPIRED_TOKEN)
+                })),
     @ApiResponse(
         responseCode = "404",
         description = "루틴 없음 또는 예약된 하위 투두 없음(index 범위 밖)",
@@ -644,10 +1102,49 @@ public interface ItemControllerDocs {
 
           **요청 본문 주의**: DELETE지만 본문(body)이 필수다. axios는 `axios.delete(url, { data: {...} })`처럼
           설정 객체의 `data`로 본문을 전달해야 한다.
+
+          **Request Headers**
+
+          | 헤더명 | 필수 여부 | 타입 | 설명 |
+          |--------|-----------|------|------|
+          | Authorization | ✅ 필수 | string | `Bearer {accessToken}` 형식의 JWT 액세스 토큰 |
+          | Content-Type | ✅ 필수 | string | `application/json` |
+
+          **Request Body**
+
+          | 필드명 | 필수 여부 | 타입 | 설명 | 예시 |
+          |--------|-----------|------|------|------|
+          | routineId | ✅ 필수 | integer | 루틴 ID | `7` |
+          | date | ✅ 필수 | string | 회차 날짜 (yyyy-MM-dd 형식) | `"2026-07-20"` |
+          | index | ✅ 필수 | integer | 예약 배열 위치 (상세 응답의 reservedIndex) | `0` |
           """,
       security = @SecurityRequirement(name = "Bearer Authentication"))
+  @io.swagger.v3.oas.annotations.parameters.RequestBody(
+      content =
+          @Content(
+              mediaType = "application/json",
+              examples =
+                  @ExampleObject(
+                      name = "예약 하위 삭제",
+                      value =
+                          """
+                          {"routineId": 7, "date": "2026-07-20", "index": 0}
+                          """)))
   @ApiResponses({
     @ApiResponse(responseCode = "200", description = "삭제 성공"),
+    @ApiResponse(
+        responseCode = "400",
+        description = "필수 필드 누락",
+        content = @Content(examples = @ExampleObject(name = "필수 누락", value = ERR_INVALID_INPUT))),
+    @ApiResponse(
+        responseCode = "401",
+        description = "AccessToken 없음 또는 만료",
+        content =
+            @Content(
+                examples = {
+                  @ExampleObject(name = "토큰 없음", value = ERR_EMPTY_TOKEN),
+                  @ExampleObject(name = "만료된 토큰", value = ERR_EXPIRED_TOKEN)
+                })),
     @ApiResponse(
         responseCode = "404",
         description = "루틴 없음 또는 예약된 하위 투두 없음(index 범위 밖)",
