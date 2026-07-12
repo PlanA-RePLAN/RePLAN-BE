@@ -43,7 +43,7 @@ public interface RoutineRepository extends JpaRepository<Routine, Long> {
                  COALESCE(td.title, COALESCE(ro.title, r.title))      AS title,
                  r.due_date                                            AS repeatEndDate,
                  COALESCE(td.due_date,
-                   CAST(CAST(:targetDate AS date) + COALESCE(r.routine_time, TIME '23:59:59') AS timestamp)
+                   CAST(CAST(:targetDate AS date) + COALESCE(ro.override_time, r.routine_time, TIME '23:59:59') AS timestamp)
                  )                                                     AS dueDate,
                  r.routine_time                                        AS routineTime,
                  r.routine_type                                        AS routineType,
@@ -66,7 +66,7 @@ public interface RoutineRepository extends JpaRepository<Routine, Long> {
                  END                                                   AS isCompleted,
                  ro.override_date                                      AS overrideDate,
                  (COALESCE(td.due_date,
-                    CAST(CAST(:targetDate AS date) + COALESCE(r.routine_time, TIME '23:59:59') AS timestamp)
+                    CAST(CAST(:targetDate AS date) + COALESCE(ro.override_time, r.routine_time, TIME '23:59:59') AS timestamp)
                   ) < NOW() AT TIME ZONE 'Asia/Seoul'
                   AND CASE WHEN td.id IS NOT NULL THEN td.is_completed
                            ELSE COALESCE(ro.is_completed, FALSE)
@@ -110,7 +110,7 @@ public interface RoutineRepository extends JpaRepository<Routine, Long> {
                  COALESCE(td.title, COALESCE(ro.title, r.title))      AS title,
                  r.due_date                                            AS repeatEndDate,
                  COALESCE(td.due_date,
-                   CAST(ro.override_date + COALESCE(r.routine_time, TIME '23:59:59') AS timestamp)
+                   CAST(ro.override_date + COALESCE(ro.override_time, r.routine_time, TIME '23:59:59') AS timestamp)
                  )                                                     AS dueDate,
                  r.routine_time                                        AS routineTime,
                  r.routine_type                                        AS routineType,
@@ -133,7 +133,7 @@ public interface RoutineRepository extends JpaRepository<Routine, Long> {
                  END                                                   AS isCompleted,
                  ro.override_date                                      AS overrideDate,
                  (COALESCE(td.due_date,
-                    CAST(ro.override_date + COALESCE(r.routine_time, TIME '23:59:59') AS timestamp)
+                    CAST(ro.override_date + COALESCE(ro.override_time, r.routine_time, TIME '23:59:59') AS timestamp)
                   ) < NOW() AT TIME ZONE 'Asia/Seoul'
                   AND CASE WHEN td.id IS NOT NULL THEN td.is_completed
                            ELSE COALESCE(ro.is_completed, FALSE)

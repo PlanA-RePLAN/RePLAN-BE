@@ -3,6 +3,7 @@ package plana.replan.domain.routine.service;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -62,16 +63,23 @@ public class RoutineOverrideService {
     }
 
     RoutineOverride override = upsert(routine, date);
-    override.updateContent(request.title(), tag);
+    override.updateContent(request.title(), tag, request.time());
 
     // override의 null 필드는 "루틴 기본값 사용" 의미이므로, todo에는 실제 유효한 값을 세팅한다.
     String effectiveTitle = request.title() != null ? request.title() : routine.getTitle();
     Tag effectiveTag = tag != null ? tag : routine.getTag();
+    LocalTime effectiveTime =
+        request.time() != null
+            ? request.time()
+            : routine.getRoutineTime() != null
+                ? routine.getRoutineTime()
+                : LocalTime.of(23, 59, 59);
     Optional<Todo> existingTodo = findExistingTodo(routine, date);
     existingTodo.ifPresent(
         todo -> {
           todo.updateTitle(effectiveTitle);
           todo.updateTag(effectiveTag);
+          todo.updateDueDate(date.atTime(effectiveTime));
         });
 
     return RoutineOverrideResponseDto.of(

@@ -367,8 +367,13 @@ public class RoutineService {
 
   private RoutineResponseDto toRoutineResponseFromOverride(
       Routine routine, LocalDate date, RoutineOverride override) {
+    // 시간 우선순위: 회차 예외 시간 > 루틴 기본 시간 > 23:59:59
     LocalTime time =
-        routine.getRoutineTime() != null ? routine.getRoutineTime() : LocalTime.of(23, 59, 59);
+        override.getOverrideTime() != null
+            ? override.getOverrideTime()
+            : routine.getRoutineTime() != null
+                ? routine.getRoutineTime()
+                : LocalTime.of(23, 59, 59);
     Tag tag = override.getTag() != null ? override.getTag() : routine.getTag();
     return buildRoutineResponse(
         routine,
@@ -605,10 +610,13 @@ public class RoutineService {
       throw new IllegalStateException("createTodoTreeFromMother는 엄마 루틴에만 호출 가능합니다.");
     }
     LocalDate today = LocalDate.now(clock);
+    // 시간 우선순위: 회차 예외 시간 > 루틴 기본 시간 > 23:59:59 (조회 응답과 같은 규칙)
     LocalTime time =
-        motherRoutine.getRoutineTime() != null
-            ? motherRoutine.getRoutineTime()
-            : LocalTime.of(23, 59, 59);
+        (override != null && override.getOverrideTime() != null)
+            ? override.getOverrideTime()
+            : motherRoutine.getRoutineTime() != null
+                ? motherRoutine.getRoutineTime()
+                : LocalTime.of(23, 59, 59);
     LocalDateTime dueDate = nextOccurrence(motherRoutine, today).atTime(time);
 
     // 반복 종료일(dueDate)이 설정돼 있고 다음 회차가 그 날짜보다 뒤면 회차 Todo를 만들지 않는다.
