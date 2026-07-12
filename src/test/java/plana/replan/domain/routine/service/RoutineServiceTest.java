@@ -11,6 +11,7 @@ import static org.mockito.Mockito.verify;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.time.ZoneId;
 import java.util.Collections;
 import java.util.List;
@@ -851,7 +852,7 @@ class RoutineServiceTest {
 
     RoutineOverride override =
         RoutineOverride.builder().routine(routine).overrideDate(TEST_DATE).build();
-    override.updateContent("오버라이드 제목", tag);
+    override.updateContent("오버라이드 제목", tag, null);
 
     given(routineRepository.findAllActiveMotherRoutines()).willReturn(List.of(routine));
     given(routineOverrideRepository.findByRoutineIdInAndOverrideDate(any(), any()))
@@ -863,6 +864,26 @@ class RoutineServiceTest {
     verify(todoRepository).saveAndFlush(captor.capture());
     assertThat(captor.getValue().getTitle()).isEqualTo("오버라이드 제목");
     assertThat(captor.getValue().getTag()).isEqualTo(tag);
+  }
+
+  @Test
+  void generateDailyTodos_override_시간이_있으면_그_시간으로_생성된다() {
+    Routine routine = buildRoutine(RoutineType.DAILY, null);
+
+    RoutineOverride override =
+        RoutineOverride.builder().routine(routine).overrideDate(TEST_DATE).build();
+    override.updateContent(null, null, LocalTime.of(19, 0));
+
+    given(routineRepository.findAllActiveMotherRoutines()).willReturn(List.of(routine));
+    given(routineOverrideRepository.findByRoutineIdInAndOverrideDate(any(), any()))
+        .willReturn(List.of(override));
+
+    routineService.generateDailyTodos();
+
+    ArgumentCaptor<Todo> captor = ArgumentCaptor.forClass(Todo.class);
+    verify(todoRepository).saveAndFlush(captor.capture());
+    // 시간 우선순위: 회차 예외 시간(19:00) > 루틴 기본 시간(없음 → 23:59:59)
+    assertThat(captor.getValue().getDueDate()).isEqualTo(TEST_DATE.atTime(19, 0));
   }
 
   @Test
@@ -1026,7 +1047,7 @@ class RoutineServiceTest {
 
     RoutineOverride override =
         RoutineOverride.builder().routine(routine).overrideDate(TEST_DATE).build();
-    override.updateContent("오버라이드 제목", null);
+    override.updateContent("오버라이드 제목", null, null);
 
     givenAllFilterData(routine, List.of(), List.of(), List.of(override));
 
@@ -1038,6 +1059,26 @@ class RoutineServiceTest {
     assertThat(dto.getTodoId()).isNull();
     assertThat(dto.getTitle()).isEqualTo("오버라이드 제목");
     assertThat(dto.isHasOverride()).isTrue();
+  }
+
+  @Test
+  void getRoutinesByFilter_all_override_시간이_응답_마감일시에_반영된다() {
+    given(userRepository.findById(1L)).willReturn(Optional.of(testUser()));
+    Routine routine = buildRoutine(RoutineType.DAILY, null);
+    ReflectionTestUtils.setField(routine, "id", 10L);
+
+    RoutineOverride override =
+        RoutineOverride.builder().routine(routine).overrideDate(TEST_DATE).build();
+    override.updateContent(null, null, LocalTime.of(7, 30));
+
+    givenAllFilterData(routine, List.of(), List.of(), List.of(override));
+
+    Map<String, List<RoutineResponseDto>> result =
+        routineService.getRoutinesByFilter(1L, "all", null);
+
+    assertThat(result.get("all")).hasSize(1);
+    // 시간 우선순위: 회차 예외 시간(07:30) > 루틴 기본 시간(없음 → 23:59:59)
+    assertThat(result.get("all").get(0).getDueDate()).isEqualTo(TEST_DATE.atTime(7, 30));
   }
 
   @Test
