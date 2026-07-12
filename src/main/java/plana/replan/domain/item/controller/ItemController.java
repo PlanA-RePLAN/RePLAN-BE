@@ -9,6 +9,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -21,6 +22,9 @@ import plana.replan.domain.item.dto.ItemKind;
 import plana.replan.domain.item.dto.ItemOrderRequestDto;
 import plana.replan.domain.item.dto.ItemPinRequestDto;
 import plana.replan.domain.item.dto.ItemResponseDto;
+import plana.replan.domain.item.dto.ItemSubTodoCreateRequestDto;
+import plana.replan.domain.item.dto.ItemSubTodoDeleteRequestDto;
+import plana.replan.domain.item.dto.ItemSubTodoUpdateRequestDto;
 import plana.replan.domain.item.service.ItemFacadeService;
 import plana.replan.global.common.ApiResult;
 
@@ -90,6 +94,33 @@ public class ItemController implements ItemControllerDocs {
   public ResponseEntity<ApiResult<Void>> deleteItem(
       @AuthenticationPrincipal Long userId, @Valid @RequestBody ItemDeleteRequestDto request) {
     itemFacadeService.delete(userId, request);
+    return ResponseEntity.ok(ApiResult.ok());
+  }
+
+  @Override
+  @PostMapping("/subtodos")
+  public ResponseEntity<ApiResult<Void>> addItemSubTodo(
+      @AuthenticationPrincipal Long userId,
+      @Valid @RequestBody ItemSubTodoCreateRequestDto request) {
+    itemFacadeService.addSubTodo(userId, request);
+    return ResponseEntity.ok(ApiResult.ok());
+  }
+
+  @Override
+  @PatchMapping("/subtodos")
+  public ResponseEntity<ApiResult<Void>> updateItemReservedSubTodo(
+      @AuthenticationPrincipal Long userId,
+      @Valid @RequestBody ItemSubTodoUpdateRequestDto request) {
+    itemFacadeService.updateReservedSubTodo(userId, request);
+    return ResponseEntity.ok(ApiResult.ok());
+  }
+
+  @Override
+  @DeleteMapping("/subtodos")
+  public ResponseEntity<ApiResult<Void>> deleteItemReservedSubTodo(
+      @AuthenticationPrincipal Long userId,
+      @Valid @RequestBody ItemSubTodoDeleteRequestDto request) {
+    itemFacadeService.deleteReservedSubTodo(userId, request);
     return ResponseEntity.ok(ApiResult.ok());
   }
 }
