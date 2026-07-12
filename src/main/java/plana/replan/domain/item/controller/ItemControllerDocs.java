@@ -23,6 +23,9 @@ import plana.replan.domain.item.dto.ItemKind;
 import plana.replan.domain.item.dto.ItemOrderRequestDto;
 import plana.replan.domain.item.dto.ItemPinRequestDto;
 import plana.replan.domain.item.dto.ItemResponseDto;
+import plana.replan.domain.item.dto.ItemSubTodoCreateRequestDto;
+import plana.replan.domain.item.dto.ItemSubTodoDeleteRequestDto;
+import plana.replan.domain.item.dto.ItemSubTodoUpdateRequestDto;
 import plana.replan.global.common.ApiResult;
 
 @Tag(
@@ -160,6 +163,34 @@ public interface ItemControllerDocs {
         "error": {
           "code": "ROUTINE_NOT_FOUND",
           "message": "루틴을 찾을 수 없습니다.",
+          "detail": null
+        }
+      }
+      """;
+
+  String ERR_OVERRIDE_SKIPPED =
+      """
+      {
+        "status": 400,
+        "success": false,
+        "data": null,
+        "error": {
+          "code": "ROUTINE_OVERRIDE_SKIPPED",
+          "message": "건너뛴 날짜에는 하위 투두를 추가할 수 없습니다.",
+          "detail": null
+        }
+      }
+      """;
+
+  String ERR_OVERRIDE_SUBTODO_NOT_FOUND =
+      """
+      {
+        "status": 404,
+        "success": false,
+        "data": null,
+        "error": {
+          "code": "ROUTINE_OVERRIDE_SUBTODO_NOT_FOUND",
+          "message": "예약된 하위 투두를 찾을 수 없습니다.",
           "detail": null
         }
       }
@@ -533,4 +564,101 @@ public interface ItemControllerDocs {
   })
   ResponseEntity<ApiResult<Void>> deleteItem(
       @AuthenticationPrincipal Long userId, @Valid @RequestBody ItemDeleteRequestDto request);
+
+  @Operation(
+      summary = "통합 아이템 하위 투두 추가",
+      description =
+          """
+          **kind=TODO** (todoId 필수): 그 투두에 하위 투두 추가. 기존 `POST /api/todos/{parentId}/sub-todos`와 동일.
+
+          **kind=ROUTINE** (routineId·date 필수): 그 날짜 회차에 하위 투두 추가.
+          - 그날 행(Todo)이 이미 있으면 행에 바로 생성된다.
+          - 아직 없으면(미래 회차) 회차 예외에 **예약**해 뒀다가 배치가 행을 만들 때 실체화한다.
+          - 예약 하위는 상세 응답 `subTodos`에 `reservedIndex`가 채워진 항목으로 내려온다.
+          """,
+      security = @SecurityRequirement(name = "Bearer Authentication"))
+  @ApiResponses({
+    @ApiResponse(responseCode = "200", description = "추가 성공"),
+    @ApiResponse(
+        responseCode = "400",
+        description = "대상 누락/빈 제목, 발생하지 않는 날짜, 건너뛴 날짜",
+        content =
+            @Content(
+                examples = {
+                  @ExampleObject(name = "대상 누락/빈 제목", value = ERR_INVALID_INPUT),
+                  @ExampleObject(
+                      name = "발생하지 않는 날짜(요일/일자 불일치, 종료일 이후)",
+                      value = ERR_ROUTINE_INVALID_DATE),
+                  @ExampleObject(name = "건너뛴 날짜", value = ERR_OVERRIDE_SKIPPED)
+                })),
+    @ApiResponse(
+        responseCode = "404",
+        description = "투두 또는 루틴을 찾을 수 없음",
+        content =
+            @Content(
+                examples = {
+                  @ExampleObject(name = "투두 없음", value = ERR_TODO_NOT_FOUND),
+                  @ExampleObject(name = "루틴 없음", value = ERR_ROUTINE_NOT_FOUND)
+                }))
+  })
+  ResponseEntity<ApiResult<Void>> addItemSubTodo(
+      @AuthenticationPrincipal Long userId,
+      @Valid @RequestBody ItemSubTodoCreateRequestDto request);
+
+  @Operation(
+      summary = "예약된 하위 투두 제목 수정",
+      description =
+          """
+          행이 아직 없는 회차에 **예약된** 하위 투두의 제목을 수정한다. `index`는 상세 응답 `subTodos`의 `reservedIndex` 값.
+
+          행이 있는 날짜의 하위 투두는 기존 `PUT /api/todos/{parentId}/sub-todos/{subTodoId}`를 사용한다.
+          """,
+      security = @SecurityRequirement(name = "Bearer Authentication"))
+  @ApiResponses({
+    @ApiResponse(responseCode = "200", description = "수정 성공"),
+    @ApiResponse(
+        responseCode = "400",
+        description = "빈 제목",
+        content = @Content(examples = @ExampleObject(name = "빈 제목", value = ERR_INVALID_INPUT))),
+    @ApiResponse(
+        responseCode = "404",
+        description = "루틴 없음 또는 예약된 하위 투두 없음(index 범위 밖)",
+        content =
+            @Content(
+                examples = {
+                  @ExampleObject(name = "루틴 없음", value = ERR_ROUTINE_NOT_FOUND),
+                  @ExampleObject(name = "예약 하위 없음", value = ERR_OVERRIDE_SUBTODO_NOT_FOUND)
+                }))
+  })
+  ResponseEntity<ApiResult<Void>> updateItemReservedSubTodo(
+      @AuthenticationPrincipal Long userId,
+      @Valid @RequestBody ItemSubTodoUpdateRequestDto request);
+
+  @Operation(
+      summary = "예약된 하위 투두 삭제",
+      description =
+          """
+          행이 아직 없는 회차에 **예약된** 하위 투두를 삭제한다. `index`는 상세 응답 `subTodos`의 `reservedIndex` 값.
+
+          행이 있는 날짜의 하위 투두는 기존 `DELETE /api/todos/{parentId}/sub-todos/{subTodoId}`를 사용한다.
+
+          **요청 본문 주의**: DELETE지만 본문(body)이 필수다. axios는 `axios.delete(url, { data: {...} })`처럼
+          설정 객체의 `data`로 본문을 전달해야 한다.
+          """,
+      security = @SecurityRequirement(name = "Bearer Authentication"))
+  @ApiResponses({
+    @ApiResponse(responseCode = "200", description = "삭제 성공"),
+    @ApiResponse(
+        responseCode = "404",
+        description = "루틴 없음 또는 예약된 하위 투두 없음(index 범위 밖)",
+        content =
+            @Content(
+                examples = {
+                  @ExampleObject(name = "루틴 없음", value = ERR_ROUTINE_NOT_FOUND),
+                  @ExampleObject(name = "예약 하위 없음", value = ERR_OVERRIDE_SUBTODO_NOT_FOUND)
+                }))
+  })
+  ResponseEntity<ApiResult<Void>> deleteItemReservedSubTodo(
+      @AuthenticationPrincipal Long userId,
+      @Valid @RequestBody ItemSubTodoDeleteRequestDto request);
 }

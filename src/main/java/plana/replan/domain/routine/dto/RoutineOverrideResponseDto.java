@@ -3,6 +3,7 @@ package plana.replan.domain.routine.dto;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.LocalDate;
+import java.util.List;
 import plana.replan.domain.routine.entity.Routine;
 import plana.replan.domain.routine.entity.RoutineOverride;
 import plana.replan.domain.tag.entity.Tag;
@@ -23,7 +24,9 @@ public record RoutineOverrideResponseDto(
         boolean isCompleted,
     @JsonProperty("hasOverride") @Schema(description = "override 존재 여부", example = "true")
         boolean hasOverride,
-    @Schema(description = "이미 배치로 생성된 Todo ID. 없으면 null", example = "42") Long todoId) {
+    @Schema(description = "이미 배치로 생성된 Todo ID. 없으면 null", example = "42") Long todoId,
+    @Schema(description = "예약된 하위 투두 제목 목록 (행이 아직 없는 회차 전용). 없으면 빈 목록")
+        List<String> reservedSubtodos) {
 
   public static RoutineOverrideResponseDto ofNoOverride(
       Routine routine, LocalDate date, Long todoId) {
@@ -40,7 +43,8 @@ public record RoutineOverrideResponseDto(
         false,
         false,
         false,
-        todoId);
+        todoId,
+        List.of());
   }
 
   public static RoutineOverrideResponseDto of(
@@ -61,7 +65,8 @@ public record RoutineOverrideResponseDto(
         Boolean.TRUE.equals(override.getIsPinned()),
         Boolean.TRUE.equals(override.getIsCompleted()),
         true,
-        todoId);
+        todoId,
+        override.getOverrideSubtodos() != null ? override.getOverrideSubtodos() : List.of());
   }
 
   private static Tag resolveTag(Routine routine, RoutineOverride override) {

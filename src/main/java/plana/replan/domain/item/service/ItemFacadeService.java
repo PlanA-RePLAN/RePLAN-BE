@@ -18,6 +18,9 @@ import plana.replan.domain.item.dto.ItemOrderRequestDto;
 import plana.replan.domain.item.dto.ItemPinRequestDto;
 import plana.replan.domain.item.dto.ItemResponseDto;
 import plana.replan.domain.item.dto.ItemScope;
+import plana.replan.domain.item.dto.ItemSubTodoCreateRequestDto;
+import plana.replan.domain.item.dto.ItemSubTodoDeleteRequestDto;
+import plana.replan.domain.item.dto.ItemSubTodoUpdateRequestDto;
 import plana.replan.domain.routine.dto.RoutineOverrideCompleteRequestDto;
 import plana.replan.domain.routine.dto.RoutineOverrideContentRequestDto;
 import plana.replan.domain.routine.dto.RoutineOverrideOrderRequestDto;
@@ -27,6 +30,7 @@ import plana.replan.domain.routine.dto.RoutineResponseDto;
 import plana.replan.domain.routine.dto.RoutineUpdateRequestDto;
 import plana.replan.domain.routine.service.RoutineOverrideService;
 import plana.replan.domain.routine.service.RoutineService;
+import plana.replan.domain.todo.dto.SubTodoCreateRequestDto;
 import plana.replan.domain.todo.dto.TodoCompleteRequestDto;
 import plana.replan.domain.todo.dto.TodoPinRequestDto;
 import plana.replan.domain.todo.dto.TodoUpdateRequestDto;
@@ -99,12 +103,24 @@ public class ItemFacadeService {
     requireRoutineInstanceTarget(routineId, date);
     RoutineOverrideResponseDto override =
         routineOverrideService.getOverride(userId, routineId, date);
-    List<ItemDetailResponseDto.SubItemDto> subItems = List.of();
+    List<ItemDetailResponseDto.SubItemDto> subItems;
     if (override.todoId() != null) {
       subItems =
           todoService.getTodoDetail(userId, override.todoId()).getSubTodos().stream()
               .map(ItemDetailResponseDto.SubItemDto::from)
               .toList();
+    } else {
+      // 행이 아직 없는 회차: 그날 생길 예정인 하위(하위 루틴, 읽기 전용) + 예약해 둔 하위(index로 수정/삭제)를 병합해 보여준다.
+      List<ItemDetailResponseDto.SubItemDto> merged = new ArrayList<>();
+      routineService
+          .getAliveChildTitles(userId, routineId)
+          .forEach(
+              title -> merged.add(ItemDetailResponseDto.SubItemDto.plannedFromChildRoutine(title)));
+      List<String> reserved = override.reservedSubtodos();
+      for (int i = 0; i < reserved.size(); i++) {
+        merged.add(ItemDetailResponseDto.SubItemDto.reserved(reserved.get(i), i));
+      }
+      subItems = merged;
     }
     return ItemDetailResponseDto.fromRoutine(override, subItems);
   }
@@ -214,6 +230,30 @@ public class ItemFacadeService {
     }
     requireRoutineTarget(request.routineId());
     routineService.deleteMotherRoutine(userId, request.routineId());
+  }
+
+  @Transactional
+  public void addSubTodo(Long userId, ItemSubTodoCreateRequestDto request) {
+    if (request.kind() == ItemKind.TODO) {
+      requireTodoTarget(request.todoId());
+      todoService.createSubTodo(
+          userId, request.todoId(), new SubTodoCreateRequestDto(request.title()));
+      return;
+    }
+    requireRoutineInstanceTarget(request.routineId(), request.date());
+    routineOverrideService.addSubtodo(userId, request.routineId(), request.date(), request.title());
+  }
+
+  @Transactional
+  public void updateReservedSubTodo(Long userId, ItemSubTodoUpdateRequestDto request) {
+    routineOverrideService.updateSubtodo(
+        userId, request.routineId(), request.date(), request.index(), request.title());
+  }
+
+  @Transactional
+  public void deleteReservedSubTodo(Long userId, ItemSubTodoDeleteRequestDto request) {
+    routineOverrideService.deleteSubtodo(
+        userId, request.routineId(), request.date(), request.index());
   }
 
   private void requireTodoTarget(Long todoId) {

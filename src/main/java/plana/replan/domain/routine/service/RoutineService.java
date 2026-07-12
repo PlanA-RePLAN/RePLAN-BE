@@ -446,6 +446,19 @@ public class RoutineService {
         .collect(Collectors.toList());
   }
 
+  /**
+   * 살아있는 하위 루틴 제목 목록. 행(Todo)이 아직 없는 가상 회차 상세에서 "그날 생길 예정인 하위"를 보여주는 용도로, 배치가 하위 투두를 만드는 기준( {@code
+   * getChildren()})과 같은 목록을 쓴다.
+   */
+  @Transactional(readOnly = true)
+  public List<String> getAliveChildTitles(Long userId, Long routineId) {
+    Routine routine = findOwnedRoutine(userId, routineId);
+    if (routine.isChild()) {
+      throw new CustomException(RoutineErrorCode.ROUTINE_INVALID_TARGET);
+    }
+    return routine.getChildren().stream().map(Routine::getTitle).toList();
+  }
+
   @Transactional(readOnly = true)
   public Map<String, List<RoutineResponseDto>> getPinnedRoutines(Long userId) {
     if (userId == null) {
@@ -632,6 +645,22 @@ public class RoutineService {
       return;
     }
     motherRoutine.getChildren().forEach(child -> saveRoutineTodo(child, dueDate, motherTodo, null));
+
+    // 회차 예외에 예약해 둔 하위 투두를 실제 하위 투두로 실체화하고 예약을 비운다.
+    if (override != null && override.getOverrideSubtodos() != null) {
+      override
+          .getOverrideSubtodos()
+          .forEach(
+              title ->
+                  todoRepository.save(
+                      Todo.builder()
+                          .title(title)
+                          .user(motherRoutine.getUser())
+                          .parent(motherTodo)
+                          .isPinned(false)
+                          .build()));
+      override.clearSubtodos();
+    }
   }
 
   /** 기존 엄마 Todo에 하위 Todo 1개를 매단다. 하위 루틴 추가 API에서 호출. dueDate/tag/goal/user는 엄마 Todo에서 상속한다. */

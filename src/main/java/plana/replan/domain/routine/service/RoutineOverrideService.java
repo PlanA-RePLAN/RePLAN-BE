@@ -146,6 +146,76 @@ public class RoutineOverrideService {
         .orElseGet(() -> RoutineOverrideResponseDto.ofNoOverride(routine, date, todoId));
   }
 
+  /**
+   * 회차에 하위 투두를 추가한다. 행(Todo)이 이미 있으면 그 행에 실제 하위 투두를 만들고, 없으면(미래 회차) 회차 예외에 제목을 예약해 뒀다가 배치가 행을 만들 때
+   * 실체화한다. 행 유무 분기를 트랜잭션 안에서 하므로 자정 배치와 경합해도 안전하다.
+   */
+  @Transactional
+  public void addSubtodo(Long userId, Long routineId, LocalDate date, String title) {
+    Routine routine = findOwnedMotherRoutine(userId, routineId);
+    validateOccurrenceDate(routine, date);
+    validateSubtodoTitle(title);
+    rejectIfSkipped(routine, date);
+
+    Optional<Todo> existingTodo = findExistingTodo(routine, date);
+    if (existingTodo.isPresent()) {
+      todoRepository.save(
+          Todo.builder()
+              .title(title)
+              .user(routine.getUser())
+              .parent(existingTodo.get())
+              .isPinned(false)
+              .build());
+      return;
+    }
+    upsert(routine, date).addSubtodo(title);
+  }
+
+  /** 예약된 하위 투두의 제목 수정 (행이 있는 날짜의 하위는 기존 투두 API를 사용). */
+  @Transactional
+  public void updateSubtodo(Long userId, Long routineId, LocalDate date, int index, String title) {
+    Routine routine = findOwnedMotherRoutine(userId, routineId);
+    validateSubtodoTitle(title);
+    RoutineOverride override = requireOverrideWithSubtodo(routine, date, index);
+    override.updateSubtodo(index, title);
+  }
+
+  /** 예약된 하위 투두 삭제 (행이 있는 날짜의 하위는 기존 투두 API를 사용). */
+  @Transactional
+  public void deleteSubtodo(Long userId, Long routineId, LocalDate date, int index) {
+    Routine routine = findOwnedMotherRoutine(userId, routineId);
+    RoutineOverride override = requireOverrideWithSubtodo(routine, date, index);
+    override.removeSubtodo(index);
+  }
+
+  private void validateSubtodoTitle(String title) {
+    if (title == null || title.isBlank()) {
+      throw new CustomException(GlobalErrorCode.INVALID_INPUT);
+    }
+  }
+
+  private void rejectIfSkipped(Routine routine, LocalDate date) {
+    routineOverrideRepository
+        .findByRoutineAndOverrideDate(routine, date)
+        .filter(RoutineOverride::isSkipped)
+        .ifPresent(
+            o -> {
+              throw new CustomException(RoutineErrorCode.ROUTINE_OVERRIDE_SKIPPED);
+            });
+  }
+
+  private RoutineOverride requireOverrideWithSubtodo(Routine routine, LocalDate date, int index) {
+    RoutineOverride override =
+        routineOverrideRepository
+            .findByRoutineAndOverrideDate(routine, date)
+            .orElseThrow(
+                () -> new CustomException(RoutineErrorCode.ROUTINE_OVERRIDE_SUBTODO_NOT_FOUND));
+    if (index < 0 || index >= override.reservedSubtodoCount()) {
+      throw new CustomException(RoutineErrorCode.ROUTINE_OVERRIDE_SUBTODO_NOT_FOUND);
+    }
+    return override;
+  }
+
   @Transactional
   public void skip(Long userId, Long routineId, LocalDate date) {
     Routine routine = findOwnedMotherRoutine(userId, routineId);

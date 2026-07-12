@@ -887,6 +887,30 @@ class RoutineServiceTest {
   }
 
   @Test
+  void generateDailyTodos_예약된_하위_투두가_실체화되고_예약이_비워진다() {
+    Routine routine = buildRoutine(RoutineType.DAILY, null);
+
+    RoutineOverride override =
+        RoutineOverride.builder().routine(routine).overrideDate(TEST_DATE).build();
+    override.addSubtodo("단어 50개");
+    override.addSubtodo("문제 풀기");
+
+    given(routineRepository.findAllActiveMotherRoutines()).willReturn(List.of(routine));
+    given(routineOverrideRepository.findByRoutineIdInAndOverrideDate(any(), any()))
+        .willReturn(List.of(override));
+    // 엄마 행 저장이 저장된 엔티티를 돌려줘야 예약 실체화 단계로 진행된다
+    given(todoRepository.saveAndFlush(any())).willAnswer(inv -> inv.getArgument(0));
+
+    routineService.generateDailyTodos();
+
+    ArgumentCaptor<Todo> captor = ArgumentCaptor.forClass(Todo.class);
+    verify(todoRepository, org.mockito.Mockito.times(2)).save(captor.capture());
+    assertThat(captor.getAllValues()).extracting(Todo::getTitle).containsExactly("단어 50개", "문제 풀기");
+    assertThat(captor.getAllValues()).allMatch(t -> t.getParent() != null);
+    assertThat(override.getOverrideSubtodos()).isNull();
+  }
+
+  @Test
   void generateDailyTodos_override_skip_이면_생성_안됨() {
     Routine routine = buildRoutine(RoutineType.DAILY, null);
 
