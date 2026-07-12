@@ -4,12 +4,16 @@ import jakarta.persistence.*;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.util.ArrayList;
+import java.util.List;
 import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.annotations.UpdateTimestamp;
+import org.hibernate.type.SqlTypes;
 import plana.replan.domain.tag.entity.Tag;
 
 @Entity
@@ -57,6 +61,12 @@ public class RoutineOverride {
   @Column(name = "override_time")
   private LocalTime overrideTime;
 
+  // 행(Todo)이 아직 없는 이 날짜에 예약해 둔 하위 투두 제목 목록.
+  // 배치가 그날 행을 만들 때 실제 하위 투두로 실체화한 뒤 비운다. null = 예약 없음.
+  @JdbcTypeCode(SqlTypes.JSON)
+  @Column(name = "override_subtodos")
+  private List<String> overrideSubtodos;
+
   @CreationTimestamp
   @Column(name = "created_at", updatable = false)
   private LocalDateTime createdAt;
@@ -96,5 +106,34 @@ public class RoutineOverride {
 
   public void unskip() {
     this.isSkipped = false;
+  }
+
+  /** 예약 하위 투두 개수. 배열이 없으면 0. */
+  public int reservedSubtodoCount() {
+    return overrideSubtodos == null ? 0 : overrideSubtodos.size();
+  }
+
+  public void addSubtodo(String title) {
+    if (overrideSubtodos == null) {
+      overrideSubtodos = new ArrayList<>();
+    }
+    overrideSubtodos.add(title);
+  }
+
+  /** index 범위 검증은 호출부(서비스)에서 한다. */
+  public void updateSubtodo(int index, String title) {
+    overrideSubtodos.set(index, title);
+  }
+
+  public void removeSubtodo(int index) {
+    overrideSubtodos.remove(index);
+    if (overrideSubtodos.isEmpty()) {
+      overrideSubtodos = null;
+    }
+  }
+
+  /** 실체화(행 생성 시 하위 투두로 이관) 후 예약을 비운다. */
+  public void clearSubtodos() {
+    this.overrideSubtodos = null;
   }
 }

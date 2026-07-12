@@ -1,7 +1,11 @@
 package plana.replan.domain.routine.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 
 import java.time.Clock;
 import java.time.LocalDate;
@@ -9,6 +13,7 @@ import java.time.LocalTime;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -17,6 +22,7 @@ import plana.replan.domain.routine.dto.RoutineOverrideContentRequestDto;
 import plana.replan.domain.routine.entity.Routine;
 import plana.replan.domain.routine.entity.RoutineOverride;
 import plana.replan.domain.routine.entity.RoutineType;
+import plana.replan.domain.routine.exception.RoutineErrorCode;
 import plana.replan.domain.routine.repository.RoutineOverrideRepository;
 import plana.replan.domain.routine.repository.RoutineRepository;
 import plana.replan.domain.tag.repository.TagRepository;
@@ -25,6 +31,7 @@ import plana.replan.domain.todo.repository.TodoRepository;
 import plana.replan.domain.user.entity.Provider;
 import plana.replan.domain.user.entity.Role;
 import plana.replan.domain.user.entity.User;
+import plana.replan.global.exception.CustomException;
 
 @ExtendWith(MockitoExtension.class)
 class RoutineOverrideServiceTest {
@@ -149,5 +156,100 @@ class RoutineOverrideServiceTest {
 
     assertThat(existing.getDueDate()).isEqualTo(TEST_DATE.atTime(23, 59, 59));
     assertThat(existing.getTitle()).isEqualTo("제목만 수정");
+  }
+
+  // ========== 회차별 하위 투두 (예약) ==========
+
+  @Test
+  void addSubtodo_행이_없으면_쪽지에_예약된다() {
+    Routine routine = dailyRoutine(null);
+    given(routineRepository.findById(10L)).willReturn(Optional.of(routine));
+    RoutineOverride override = givenOverrideFor(routine);
+    given(
+            todoRepository.findMotherTodoByRoutineAndDate(
+                routine, TEST_DATE.atStartOfDay(), TEST_DATE.plusDays(1).atStartOfDay()))
+        .willReturn(Optional.empty());
+
+    routineOverrideService.addSubtodo(1L, 10L, TEST_DATE, "단어 50개");
+
+    assertThat(override.getOverrideSubtodos()).containsExactly("단어 50개");
+    verify(todoRepository, never()).save(any());
+  }
+
+  @Test
+  void addSubtodo_행이_있으면_그_행에_실제_하위_투두를_만든다() {
+    Routine routine = dailyRoutine(null);
+    given(routineRepository.findById(10L)).willReturn(Optional.of(routine));
+    given(routineOverrideRepository.findByRoutineAndOverrideDate(routine, TEST_DATE))
+        .willReturn(Optional.empty());
+
+    Todo existing =
+        Todo.builder()
+            .title("테스트 루틴")
+            .dueDate(TEST_DATE.atTime(23, 59, 59))
+            .user(routine.getUser())
+            .isPinned(false)
+            .routine(routine)
+            .build();
+    given(
+            todoRepository.findMotherTodoByRoutineAndDate(
+                routine, TEST_DATE.atStartOfDay(), TEST_DATE.plusDays(1).atStartOfDay()))
+        .willReturn(Optional.of(existing));
+
+    routineOverrideService.addSubtodo(1L, 10L, TEST_DATE, "단어 50개");
+
+    ArgumentCaptor<Todo> captor = ArgumentCaptor.forClass(Todo.class);
+    verify(todoRepository).save(captor.capture());
+    assertThat(captor.getValue().getTitle()).isEqualTo("단어 50개");
+    assertThat(captor.getValue().getParent()).isEqualTo(existing);
+  }
+
+  @Test
+  void addSubtodo_건너뛴_날짜면_거절한다() {
+    Routine routine = dailyRoutine(null);
+    given(routineRepository.findById(10L)).willReturn(Optional.of(routine));
+    RoutineOverride override = givenOverrideFor(routine);
+    override.skip();
+
+    assertThatThrownBy(() -> routineOverrideService.addSubtodo(1L, 10L, TEST_DATE, "단어 50개"))
+        .isInstanceOf(CustomException.class)
+        .hasFieldOrPropertyWithValue("errorCode", RoutineErrorCode.ROUTINE_OVERRIDE_SKIPPED);
+  }
+
+  @Test
+  void updateSubtodo_예약된_제목이_수정된다() {
+    Routine routine = dailyRoutine(null);
+    given(routineRepository.findById(10L)).willReturn(Optional.of(routine));
+    RoutineOverride override = givenOverrideFor(routine);
+    override.addSubtodo("단어 50개");
+
+    routineOverrideService.updateSubtodo(1L, 10L, TEST_DATE, 0, "단어 100개");
+
+    assertThat(override.getOverrideSubtodos()).containsExactly("단어 100개");
+  }
+
+  @Test
+  void updateSubtodo_index가_범위_밖이면_404() {
+    Routine routine = dailyRoutine(null);
+    given(routineRepository.findById(10L)).willReturn(Optional.of(routine));
+    RoutineOverride override = givenOverrideFor(routine);
+    override.addSubtodo("단어 50개");
+
+    assertThatThrownBy(() -> routineOverrideService.updateSubtodo(1L, 10L, TEST_DATE, 1, "x"))
+        .isInstanceOf(CustomException.class)
+        .hasFieldOrPropertyWithValue(
+            "errorCode", RoutineErrorCode.ROUTINE_OVERRIDE_SUBTODO_NOT_FOUND);
+  }
+
+  @Test
+  void deleteSubtodo_마지막_예약을_지우면_배열이_비워진다() {
+    Routine routine = dailyRoutine(null);
+    given(routineRepository.findById(10L)).willReturn(Optional.of(routine));
+    RoutineOverride override = givenOverrideFor(routine);
+    override.addSubtodo("단어 50개");
+
+    routineOverrideService.deleteSubtodo(1L, 10L, TEST_DATE, 0);
+
+    assertThat(override.getOverrideSubtodos()).isNull();
   }
 }
