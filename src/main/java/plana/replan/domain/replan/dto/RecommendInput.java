@@ -12,7 +12,8 @@ public record RecommendInput(
     String routineType,
     List<String> reasonLabels,
     List<AnswerInput> answers,
-    String today,
+    // 현재 일시 문자열(Asia/Seoul, ReplanAiService.PROMPT_NOW_FORMAT). 프롬프트에 그대로 들어간다.
+    String now,
     int refreshCount,
     // 유저가 가진 태그 목록(id+이름). AI가 신규 투두에 배정할 태그를 이 안에서 고르게 하고,
     // 응답 파싱 시 AI가 준 tagId가 실제 내 태그인지 검증하는 데 쓴다.

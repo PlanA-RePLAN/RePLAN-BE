@@ -2,10 +2,18 @@ package plana.replan.domain.replan.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.time.Clock;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -33,10 +41,15 @@ public class ReplanAiService {
   private static final String GEMINI_URL =
       "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent";
 
+  /** 프롬프트에 넣는 현재 일시 형식(예: 2026-07-14 23:05 (화요일)). ReplanService가 RecommendInput.now를 만들 때 쓴다. */
+  static final DateTimeFormatter PROMPT_NOW_FORMAT =
+      DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm (EEEE)", Locale.KOREAN);
+
   @Value("${gemini.api-key}")
   private String apiKey;
 
   private final RestClient geminiRestClient;
+  private final Clock clock;
   private final ObjectMapper objectMapper = new ObjectMapper();
 
   /** 카테고리별 로직에 따른 추천 작업 목록을 생성한다. */
@@ -56,7 +69,7 @@ public class ReplanAiService {
         당신은 일정 재계획(리플랜) 도우미입니다.
         사용자가 아래 투두를 끝내지 못한 이유에 맞춰, 투두 수정·추가 제안을 만드세요.
 
-        오늘 날짜: %s
+        현재 일시: %s
         대상 투두 ID: %d
         대상 투두: %s
         투두 종류: %s
@@ -112,6 +125,7 @@ public class ReplanAiService {
         5. changedFields: 수정(MODIFY_TODO/MODIFY_ROUTINE)에서 바뀐 필드만 {field, before, after}로 채운다. field는 title/dueDate/dueTime/tag/routineType/routineDays.
            새로 만드는 ADD·CREATE_ROUTINE은 changedFields를 빈 배열([])로 둔다.
         6. 새로 추가하거나(ADD) 기존 투두를 수정하는(MODIFY_TODO) 경우 dueDate(yyyy-MM-dd)를 반드시 오늘 이후의 구체적 날짜로 정한다. 절대 null로 두지 않는다(모든 투두는 마감기한이 있어야 한다). dueTime은 HH:mm 또는 null.
+           마감은 반드시 위 '현재 일시' 이후여야 한다 — dueDate가 오늘이면 dueTime은 현재 시각 이후로 정하고, 이미 지난 일시는 절대 만들지 않는다.
            routineType은 DAILY/WEEKLY/MONTHLY 또는 null. routineDays는 정수 배열 또는 null (DAILY는 null / WEEKLY는 요일 인덱스 배열: 월=0·화=1·수=2·목=3·금=4·토=5·일=6, 예 월·수·금=[0,2,4] / MONTHLY는 일자 배열 1~31, 예 3일·20일=[3,20]).
            - CREATE_ROUTINE의 dueDate는 '반복을 끝낼 종료일'을 뜻한다(이 날짜 이후로는 회차를 만들지 않음). 무기한 반복이면 null로 둔다. 새 루틴의 반복 시각은 dueTime으로 지정한다.
 
@@ -119,7 +133,7 @@ public class ReplanAiService {
         {"operations":[{"action":"","targetTodoId":null,"title":"","dueDate":null,"dueTime":null,"tagId":null,"routineType":null,"routineDays":null,"changedFields":[{"field":"","before":null,"after":""}]}]}
         """
             .formatted(
-                input.today(),
+                input.now(),
                 input.anchorTodoId(),
                 input.anchorTitle(),
                 routineInfo,
@@ -215,15 +229,31 @@ public class ReplanAiService {
       List<ReplanOperation> operations = new ArrayList<>();
       for (JsonNode op : root.path("operations")) {
         ReplanAction action = ReplanAction.valueOf(op.path("action").asText());
+        // 새 투두(ADD)·기존 투두 수정(MODIFY_TODO)의 마감이 이미 지났으면 코드로 보정한다.
+        // (루틴 작업의 dueDate는 반복 종료일, dueTime은 반복 시각이라 여기서 판단하지 않는다.)
+        String rawDueDate = textOrNull(op.path("dueDate"));
+        String rawDueTime = textOrNull(op.path("dueTime"));
+        String dueDate = rawDueDate;
+        String dueTime = rawDueTime;
+        if (action == ReplanAction.ADD || action == ReplanAction.MODIFY_TODO) {
+          DueDateTime clampedDue = clampPastDue(rawDueDate, rawDueTime);
+          dueDate = clampedDue.date();
+          dueTime = clampedDue.time();
+        }
         // 새로 만드는 작업(ADD/CREATE_ROUTINE)은 before/after diff가 없으므로 changedFields를 비운다.
         List<ChangedField> changed = new ArrayList<>();
         if (action == ReplanAction.MODIFY_TODO || action == ReplanAction.MODIFY_ROUTINE) {
           for (JsonNode cf : op.path("changedFields")) {
-            changed.add(
-                new ChangedField(
-                    cf.path("field").asText(),
-                    textOrNull(cf.path("before")),
-                    textOrNull(cf.path("after"))));
+            String field = cf.path("field").asText();
+            String after = textOrNull(cf.path("after"));
+            // 마감 보정이 일어났으면 diff의 after도 보정값으로 맞춰 화면 표기와 실제 적용값이 어긋나지 않게 한다.
+            if ("dueDate".equals(field) && !Objects.equals(rawDueDate, dueDate)) {
+              after = dueDate;
+            }
+            if ("dueTime".equals(field) && !Objects.equals(rawDueTime, dueTime)) {
+              after = dueTime;
+            }
+            changed.add(new ChangedField(field, textOrNull(cf.path("before")), after));
           }
         }
         // AI가 준 tagId를 유저의 실제 태그로 검증한다. 숫자로 못 바꾸거나(예: 태그 이름을 넣음)
@@ -252,8 +282,8 @@ public class ReplanAiService {
                 action,
                 longOrNull(op.path("targetTodoId")),
                 textOrNull(op.path("title")),
-                textOrNull(op.path("dueDate")),
-                textOrNull(op.path("dueTime")),
+                dueDate,
+                dueTime,
                 tagId,
                 tagName,
                 textOrNull(op.path("routineType")),
@@ -265,6 +295,31 @@ public class ReplanAiService {
       // 원문(raw)에는 사용자의 투두/사유 텍스트가 들어 있어 그대로 로깅하지 않고 길이만 남긴다.
       log.error("리플랜 추천 응답 파싱 실패 (rawLength={})", raw == null ? 0 : raw.length(), e);
       throw new CustomException(ReplanErrorCode.REPLAN_GEMINI_PARSE_ERROR);
+    }
+  }
+
+  /** 보정된 마감 일시 쌍. */
+  private record DueDateTime(String date, String time) {}
+
+  /**
+   * AI가 이미 지난 마감 일시를 주면 코드로 보정한다. 날짜 비교를 AI에만 맡기면 결과가 오락가락하므로 프롬프트 규칙과 별개로 반드시 검사한다. 지난 날짜는 오늘로
+   * 올리고, 시각까지 지났으면 시각을 비워 그날 끝까지로 취급한다. dueDate가 없거나(시간만 변경) 형식이 잘못된 값은 그대로 둔다.
+   */
+  private DueDateTime clampPastDue(String dueDate, String dueTime) {
+    if (dueDate == null) {
+      return new DueDateTime(null, dueTime);
+    }
+    try {
+      LocalDateTime now = LocalDateTime.now(clock);
+      LocalDate date = LocalDate.parse(dueDate);
+      LocalTime time = dueTime != null ? LocalTime.parse(dueTime) : LocalTime.MAX;
+      if (!LocalDateTime.of(date, time).isBefore(now)) {
+        return new DueDateTime(dueDate, dueTime);
+      }
+      String clampedTime = dueTime != null && time.isAfter(now.toLocalTime()) ? dueTime : null;
+      return new DueDateTime(now.toLocalDate().toString(), clampedTime);
+    } catch (DateTimeParseException e) {
+      return new DueDateTime(dueDate, dueTime);
     }
   }
 
