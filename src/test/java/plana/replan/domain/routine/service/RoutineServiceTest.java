@@ -3,6 +3,7 @@ package plana.replan.domain.routine.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
@@ -555,7 +556,7 @@ class RoutineServiceTest {
   void 루틴_생성_오늘_이미_Todo_존재시_중복_생성_안됨() {
     given(userRepository.findById(1L)).willReturn(Optional.of(testUser()));
     given(routineRepository.save(any(Routine.class))).willAnswer(inv -> inv.getArgument(0));
-    given(todoRepository.existsByRoutineAndDueDate(any(), any())).willReturn(true);
+    given(todoRepository.existsMotherTodoByRoutineOnDay(any(), any(), any())).willReturn(true);
 
     routineService.createRoutine(
         1L,
@@ -685,7 +686,25 @@ class RoutineServiceTest {
   void generateDailyTodos_오늘_투두_이미_존재시_중복_생성_안됨() {
     Routine routine = buildRoutine(RoutineType.DAILY, null);
     given(routineRepository.findAllActiveMotherRoutines()).willReturn(List.of(routine));
-    given(todoRepository.existsByRoutineAndDueDate(any(), any())).willReturn(true);
+    given(todoRepository.existsMotherTodoByRoutineOnDay(any(), any(), any())).willReturn(true);
+
+    routineService.generateDailyTodos();
+
+    verify(todoRepository, never()).saveAndFlush(any(Todo.class));
+  }
+
+  @Test
+  void generateDailyTodos_같은_날_다른_시각의_행이_있어도_중복_생성_안됨() {
+    // 회차별 시간 변경·투두→루틴 전환으로 행의 시각이 루틴 기본 시간과 달라도 날짜 기준으로 중복을 잡아야 한다
+    Routine routine = buildRoutine(RoutineType.DAILY, null);
+    given(routineRepository.findAllActiveMotherRoutines()).willReturn(List.of(routine));
+    // 그날(00:00~24:00)에 시각이 다른 행이 이미 존재
+    given(
+            todoRepository.existsMotherTodoByRoutineOnDay(
+                eq(routine),
+                eq(TEST_DATE.atStartOfDay()),
+                eq(TEST_DATE.plusDays(1).atStartOfDay())))
+        .willReturn(true);
 
     routineService.generateDailyTodos();
 
