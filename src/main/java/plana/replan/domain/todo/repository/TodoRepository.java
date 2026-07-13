@@ -24,7 +24,22 @@ public interface TodoRepository extends JpaRepository<Todo, Long> {
   @Query("UPDATE Todo t SET t.deletedAt = :now WHERE t.user.id = :userId AND t.deletedAt IS NULL")
   void softDeleteAllByUserId(@Param("userId") Long userId, @Param("now") LocalDateTime now);
 
-  boolean existsByRoutineAndDueDate(Routine routine, LocalDateTime dueDate);
+  // 중복 생성 방지는 시각이 아니라 날짜 단위로 판단한다 (행의 시각은 회차별 변경·전환 등으로 루틴 기본 시간과 다를 수 있음)
+  @Query(
+      "SELECT COUNT(t) > 0 FROM Todo t WHERE t.routine = :routine AND t.parent IS NULL"
+          + " AND t.dueDate >= :start AND t.dueDate < :end AND t.deletedAt IS NULL")
+  boolean existsMotherTodoByRoutineOnDay(
+      @Param("routine") Routine routine,
+      @Param("start") LocalDateTime start,
+      @Param("end") LocalDateTime end);
+
+  @Query(
+      "SELECT COUNT(t) > 0 FROM Todo t WHERE t.routine = :routine AND t.parent IS NOT NULL"
+          + " AND t.dueDate >= :start AND t.dueDate < :end AND t.deletedAt IS NULL")
+  boolean existsChildTodoByRoutineOnDay(
+      @Param("routine") Routine routine,
+      @Param("start") LocalDateTime start,
+      @Param("end") LocalDateTime end);
 
   List<Todo> findAllByRoutine(Routine routine);
 

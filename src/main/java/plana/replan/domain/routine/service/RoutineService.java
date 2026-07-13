@@ -735,7 +735,14 @@ public class RoutineService {
 
   private Todo saveRoutineTodo(
       Routine routine, LocalDateTime dueDate, Todo parentTodo, RoutineOverride override) {
-    if (todoRepository.existsByRoutineAndDueDate(routine, dueDate)) {
+    // 같은 날 다른 시각의 행(회차별 시간 변경, 투두→루틴 전환 등)도 중복으로 잡히게 날짜 범위로 검사한다
+    LocalDateTime dayStart = dueDate.toLocalDate().atStartOfDay();
+    LocalDateTime dayEnd = dayStart.plusDays(1);
+    boolean alreadyExists =
+        routine.isChild()
+            ? todoRepository.existsChildTodoByRoutineOnDay(routine, dayStart, dayEnd)
+            : todoRepository.existsMotherTodoByRoutineOnDay(routine, dayStart, dayEnd);
+    if (alreadyExists) {
       return null;
     }
 
