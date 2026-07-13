@@ -427,8 +427,9 @@ public interface ItemControllerDocs {
           | subRoutineId | integer | 하위 루틴 ID(반복 전체 수정/삭제 시 지목용). 하위 루틴과 무관한 하위면 null |
 
           **subTodos 원소 구분**: `todoId` 있음=행 하위(그날만 조작) / `reservedIndex` 있음=예약 하위(그날만 조작) /
-          `subRoutineId`만 있음=하위 루틴 예정분(반복 전체로만 조작). 하위 루틴 출신 행 하위는 `todoId`와 `subRoutineId`가 둘 다 있어
-          "그날만"과 "반복 전체" 조작을 모두 지원한다.
+          `subRoutineId`만 있음=하위 루틴 예정분 — `subRoutineId`+`date`로 그날만, `subRoutineId`만으로 반복 전체 조작.
+          하위 루틴 출신 행 하위는 `todoId`와 `subRoutineId`가 둘 다 있어 "그날만"과 "반복 전체" 조작을 모두 지원한다.
+          하위 루틴 예정분의 그날 개인화(제목/완료)는 반영된 값으로 내려오고, 그날 제외된 예정분은 목록에서 빠진다.
 
           **참고**: ROUTINE 상세의 `dueDate`는 그날의 실제 마감일시(회차 예외 반영), `routineTime`은 루틴의 기본 반복시간이다.
           둘을 비교하면 그날만 시간이 바뀌었는지 알 수 있다.
@@ -1044,7 +1045,7 @@ public interface ItemControllerDocs {
 
           - **행 하위 (그날만)**: `parentTodoId` + `subTodoId`
           - **예약 하위 (그날만, 행이 아직 없는 회차)**: `routineId` + `date` + `index` (상세 응답 `subTodos`의 `reservedIndex`) — 배치가 행을 만들 때 완료 상태가 승계된다
-          - 하위 루틴 예정분(`subRoutineId`만 있는 하위)은 회차 개념이 없어 완료 대상이 아니다
+          - **하위 루틴 예정분 (그날만)**: `subRoutineId` + `date` — 하위 루틴 명의의 회차 예외에 기록되고, 배치가 행을 만들 때 승계된다
 
           **Request Headers**
 
@@ -1062,6 +1063,7 @@ public interface ItemControllerDocs {
           | routineId | 예약 하위 지목 시 ✅ | integer | 루틴 ID | `7` |
           | date | 예약 하위 지목 시 ✅ | string | 회차 날짜 (yyyy-MM-dd 형식) | `"2026-07-20"` |
           | index | 예약 하위 지목 시 ✅ | integer | 예약 배열 위치 (상세 응답의 reservedIndex) | `0` |
+          | subRoutineId | 하위 루틴 예정분 지목 시 ✅ | integer | 하위 루틴 ID (date 필수) | `11` |
           | isCompleted | ✅ 필수 | boolean | `true`면 완료, `false`면 미완료 | `true` |
 
           > ❌ 선택 필드는 생략하거나 null로 전달해도 동일하게 처리됩니다.
@@ -1083,6 +1085,12 @@ public interface ItemControllerDocs {
                     value =
                         """
                         {"routineId": 7, "date": "2026-07-20", "index": 0, "isCompleted": true}
+                        """),
+                @ExampleObject(
+                    name = "하위 루틴 예정분 완료 (그날만)",
+                    value =
+                        """
+                        {"subRoutineId": 11, "date": "2026-07-20", "isCompleted": true}
                         """),
                 @ExampleObject(
                     name = "미완료 처리",
@@ -1119,11 +1127,12 @@ public interface ItemControllerDocs {
       summary = "통합 아이템 하위 투두 제목 수정",
       description =
           """
-          하위 투두의 제목을 수정한다. 아래 세 가지 지목 방법 중 정확히 하나를 사용한다.
+          하위 투두의 제목을 수정한다. 아래 지목 방법 중 정확히 하나를 사용한다.
 
           - **행 하위 (그날만)**: `parentTodoId` + `subTodoId` — 기존 `PUT /api/todos/{parentId}/sub-todos/{subTodoId}`와 동일
           - **예약 하위 (그날만, 행이 아직 없는 회차)**: `routineId` + `date` + `index` (상세 응답 `subTodos`의 `reservedIndex`)
-          - **하위 루틴 (반복 전체)**: `subRoutineId` (상세 응답 `subTodos`의 `subRoutineId`) — 기존 `PATCH /api/routines/children/{id}`와 동일
+          - **하위 루틴 예정분 (그날만)**: `subRoutineId` + `date` — 하위 루틴 명의의 회차 예외에 기록되어 그 날짜에만 적용
+          - **하위 루틴 (반복 전체)**: `subRoutineId`만 — 기존 `PATCH /api/routines/children/{id}`와 동일
 
           **Request Headers**
 
@@ -1141,7 +1150,8 @@ public interface ItemControllerDocs {
           | routineId | 예약 하위 지목 시 ✅ | integer | 루틴 ID | `7` |
           | date | 예약 하위 지목 시 ✅ | string | 회차 날짜 (yyyy-MM-dd 형식) | `"2026-07-20"` |
           | index | 예약 하위 지목 시 ✅ | integer | 예약 배열 위치 (상세 응답의 reservedIndex) | `0` |
-          | subRoutineId | 반복 전체 지목 시 ✅ | integer | 하위 루틴 ID (상세 응답의 subRoutineId) | `11` |
+          | subRoutineId | 하위 루틴 지목 시 ✅ | integer | 하위 루틴 ID (상세 응답의 subRoutineId). date와 함께면 그날만, 단독이면 반복 전체 | `11` |
+          | date | 그날만 지목 시 ✅ | string | 회차 날짜 (yyyy-MM-dd 형식) | `"2026-07-20"` |
           | title | ✅ 필수 | string | 새 제목 | `"단어 100개 외우기"` |
 
           > ❌ 선택 필드는 생략하거나 null로 전달해도 동일하게 처리됩니다.
@@ -1163,6 +1173,12 @@ public interface ItemControllerDocs {
                     value =
                         """
                         {"routineId": 7, "date": "2026-07-20", "index": 0, "title": "단어 100개 외우기"}
+                        """),
+                @ExampleObject(
+                    name = "하위 루틴 예정분 수정 (그날만)",
+                    value =
+                        """
+                        {"subRoutineId": 11, "date": "2026-07-20", "title": "유산소 30분"}
                         """),
                 @ExampleObject(
                     name = "하위 루틴 수정 (반복 전체)",
@@ -1210,11 +1226,13 @@ public interface ItemControllerDocs {
       summary = "통합 아이템 하위 투두 삭제",
       description =
           """
-          하위 투두를 삭제한다. 아래 세 가지 지목 방법 중 정확히 하나를 사용한다.
+          하위 투두를 삭제한다. 아래 지목 방법 중 정확히 하나를 사용한다.
+          하위 루틴 예정분에 `date`를 함께 주면 그 날짜에서만 제외되고 다른 날짜는 유지된다.
 
           - **행 하위 (그날만)**: `parentTodoId` + `subTodoId` — 기존 `DELETE /api/todos/{parentId}/sub-todos/{subTodoId}`와 동일
           - **예약 하위 (그날만, 행이 아직 없는 회차)**: `routineId` + `date` + `index` (상세 응답 `subTodos`의 `reservedIndex`)
-          - **하위 루틴 (반복 전체 — 이후 모든 회차에서 사라짐)**: `subRoutineId` — 기존 `DELETE /api/routines/children/{id}`와 동일
+          - **하위 루틴 예정분 (그날만 제외)**: `subRoutineId` + `date` — 그 날짜에서만 빠지고 다른 날짜는 유지
+          - **하위 루틴 (반복 전체 — 이후 모든 회차에서 사라짐)**: `subRoutineId`만 — 기존 `DELETE /api/routines/children/{id}`와 동일
 
           **요청 본문 주의**: DELETE지만 본문(body)이 필수다. axios는 `axios.delete(url, { data: {...} })`처럼
           설정 객체의 `data`로 본문을 전달해야 한다.
