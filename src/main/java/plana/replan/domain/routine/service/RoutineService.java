@@ -4,6 +4,7 @@ import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -262,7 +263,8 @@ public class RoutineService {
    * 지났는지에 따라 다르다.
    *
    * <ul>
-   *   <li>반복이 안 끝난 루틴: "지금 해야 할 것" 1건만 덧붙인다(미완료 중 최신, 없으면 다음 발생일).
+   *   <li>반복이 안 끝난 루틴: 밀린 회차(마감 일시가 지난 미완료)는 전부, 미래/당일 몫은 1건만 덧붙인다 (아직 안 지난 미완료 행 중 가장 이른 것, 없으면 다음
+   *       발생일).
    *   <li>반복이 끝난 루틴: 아직 안 한 회차를 전부 덧붙인다(없으면 아무것도 안 붙인다).
    * </ul>
    */
@@ -295,16 +297,34 @@ public class RoutineService {
 
     boolean ended =
         routine.getDueDate() != null && today.isAfter(routine.getDueDate().toLocalDate());
-    Stream<RoutineResponseDto> pending =
-        ended
-            ? incompleteTodos.stream().map(todo -> toRoutineResponseFromTodo(routine, todo))
-            : toNextActionableRoutineResponse(
-                routine,
-                today,
-                completedDates,
-                incompleteTodos.stream().findFirst(),
-                overridesByDate)
-                .stream();
+    Stream<RoutineResponseDto> pending;
+    if (ended) {
+      // 반복이 끝난 루틴: 안 한 회차 전부
+      pending = incompleteTodos.stream().map(todo -> toRoutineResponseFromTodo(routine, todo));
+    } else {
+      // 반복 진행 중: 밀린 회차(마감 일시가 지난 미완료)는 전부, 미래/당일 몫은 1건만
+      LocalDateTime now = LocalDateTime.now(clock);
+      List<Todo> pastDue =
+          incompleteTodos.stream()
+              .filter(t -> t.getDueDate() == null || t.getDueDate().isBefore(now))
+              .toList();
+      Optional<Todo> upcoming =
+          incompleteTodos.stream()
+              .filter(t -> t.getDueDate() != null && !t.getDueDate().isBefore(now))
+              .min(Comparator.comparing(Todo::getDueDate));
+      Set<LocalDate> pastDueDates =
+          pastDue.stream()
+              .map(Todo::getDueDate)
+              .filter(Objects::nonNull)
+              .map(LocalDateTime::toLocalDate)
+              .collect(Collectors.toSet());
+      pending =
+          Stream.concat(
+              pastDue.stream().map(todo -> toRoutineResponseFromTodo(routine, todo)),
+              toNextActionableRoutineResponse(
+                  routine, today, completedDates, pastDueDates, upcoming, overridesByDate)
+                  .stream());
+    }
 
     return Stream.concat(Stream.concat(completedFromTodos, completedFromOverrides), pending)
         .collect(Collectors.toList());
@@ -322,6 +342,7 @@ public class RoutineService {
       Routine routine,
       LocalDate today,
       Set<LocalDate> completedDates,
+      Set<LocalDate> occupiedDates,
       Optional<Todo> latestIncomplete,
       Map<LocalDate, RoutineOverride> overridesByDate) {
     if (latestIncomplete.isPresent()) {
@@ -335,7 +356,8 @@ public class RoutineService {
       if (repeatEndDate != null && candidate.isAfter(repeatEndDate)) {
         break;
       }
-      if (completedDates.contains(candidate)) {
+      // 이미 완료됐거나, 밀린 행으로 목록에 노출된 날짜는 건너뛴다 (같은 날짜 중복 노출 방지)
+      if (completedDates.contains(candidate) || occupiedDates.contains(candidate)) {
         candidate = nextOccurrence(routine, candidate.plusDays(1));
         continue;
       }
