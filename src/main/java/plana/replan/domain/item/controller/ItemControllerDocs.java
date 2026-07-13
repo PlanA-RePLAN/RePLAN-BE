@@ -267,21 +267,20 @@ public interface ItemControllerDocs {
           | routineId | integer | 루틴 ID. TODO면 null |
           | date | string | 날짜 (yyyy-MM-dd 형식). all 필터의 "다음 할 일" 회차는 null일 수 있음 |
           | title | string | 제목 (ROUTINE이면 회차 예외 적용값) |
-          | dueDate | string | 마감 일시 (ISO 8601 형식). 없으면 null |
-          | repeatEndDate | string | 반복 종료일 (ISO 8601 형식). ROUTINE만, 없으면 null |
-          | routineType | string | DAILY / WEEKLY / MONTHLY. TODO면 null |
-          | routineDays | array | 반복 요일(월=0…일=6) 또는 일자(1~31) 배열. 없으면 null |
+          | dueDate | string | 마감 일시 (ISO 8601 형식). TODO=본인 마감(없으면 null), ROUTINE=그날의 실제 마감일시 |
+          | routineType | string | DAILY / WEEKLY / MONTHLY. 반복 아니면 null |
           | tagId | integer | 태그 ID. 없으면 null |
           | tagTitle | string | 태그 제목. 없으면 null |
           | tagColor | string | 태그 색상. 없으면 null |
-          | goalId | integer | 목표 ID. 없으면 null |
           | sortOrder | number | 정렬 순서 |
           | isPinned | boolean | 핀 여부 |
           | isCompleted | boolean | 완료 여부 |
           | isOverdue | boolean | 마감 지남 여부 (미완료 + 마감 경과) |
-          | hasOverride | boolean | 회차 예외 존재 여부. ROUTINE만 |
 
           **정렬**: 완료 아이템을 뒤로 보낸 뒤, sort 기준으로 정렬.
+
+          **참고**: 목록은 카드 표시·조작에 필요한 최소 정보만 담는다.
+          반복 요일/종료일/기본 반복시간 등 나머지 정보는 상세 조회(GET /api/items/detail)로 받는다.
 
           **응답 아이템 구분**: `kind`가 `TODO`면 `todoId`로, `ROUTINE`이면 `routineId`+`date`로 이후 조작.
           `ROUTINE`인데 `todoId`가 null이면 아직 그날 투두가 생성되지 않은 미래 회차이다(조작 방법은 동일).
@@ -312,18 +311,14 @@ public interface ItemControllerDocs {
                                   "date": "2026-07-10",
                                   "title": "회의 준비",
                                   "dueDate": "2026-07-10T18:00:00",
-                                  "repeatEndDate": null,
                                   "routineType": null,
-                                  "routineDays": null,
                                   "tagId": 3,
                                   "tagTitle": "업무",
                                   "tagColor": "BLUE",
-                                  "goalId": null,
                                   "sortOrder": 10000.0,
                                   "isPinned": false,
                                   "isCompleted": false,
-                                  "isOverdue": false,
-                                  "hasOverride": false
+                                  "isOverdue": false
                                 },
                                 {
                                   "kind": "ROUTINE",
@@ -332,18 +327,14 @@ public interface ItemControllerDocs {
                                   "date": "2026-07-10",
                                   "title": "영어 단어 외우기",
                                   "dueDate": "2026-07-10T08:00:00",
-                                  "repeatEndDate": "2026-12-31T00:00:00",
                                   "routineType": "WEEKLY",
-                                  "routineDays": [0, 2, 4],
                                   "tagId": 1,
                                   "tagTitle": "영어",
                                   "tagColor": "GREEN",
-                                  "goalId": null,
                                   "sortOrder": 5000.0,
                                   "isPinned": false,
                                   "isCompleted": false,
-                                  "isOverdue": false,
-                                  "hasOverride": false
+                                  "isOverdue": false
                                 }
                               ],
                               "error": null
@@ -410,7 +401,7 @@ public interface ItemControllerDocs {
           | routineId | integer | 루틴 ID. ROUTINE일 때만 |
           | date | string | 날짜 (yyyy-MM-dd 형식). ROUTINE=회차 날짜, TODO=마감일의 날짜 |
           | title | string | 제목 (ROUTINE이면 회차 예외 적용값) |
-          | dueDate | string | 마감 일시 (ISO 8601 형식). TODO만, 없으면 null |
+          | dueDate | string | 마감 일시 (ISO 8601 형식). TODO=본인 마감(없으면 null), ROUTINE=그날의 실제 마감일시(회차 예외 시간 > 루틴 기본 시간 > 23:59:59) |
           | isCompleted | boolean | 완료 여부 |
           | isPinned | boolean | 핀 여부. TODO 상세에서는 null |
           | isSkipped | boolean | 건너뜀 여부. ROUTINE만 |
@@ -418,8 +409,10 @@ public interface ItemControllerDocs {
           | tagId | integer | 태그 ID (ROUTINE이면 회차 예외 적용값). 없으면 null |
           | tagTitle | string | 태그 제목. 없으면 null |
           | tagColor | string | 태그 색상. 없으면 null |
-          | routineType | string | 반복 유형. TODO 상세에서만 제공 |
-          | routineDays | array | 반복 날짜 배열. TODO 상세에서만 제공 |
+          | routineType | string | 반복 유형 (DAILY/WEEKLY/MONTHLY). 반복 아니면 null |
+          | routineDays | array | 반복 날짜 배열. WEEKLY=요일 인덱스(월0…일6), MONTHLY=일자(1~31). 아니면 null |
+          | routineTime | string | 루틴 기본 반복시간 (HH:mm:ss 형식). ROUTINE만, 설정 안 했으면 null |
+          | repeatEndDate | string | 반복 종료일 (ISO 8601 형식). ROUTINE만 |
           | subTodos | array | 하위 투두 목록. 원소는 아래 표 참고 |
 
           **subTodos 원소**
@@ -436,7 +429,8 @@ public interface ItemControllerDocs {
           `subRoutineId`만 있음=하위 루틴 예정분(반복 전체로만 조작). 하위 루틴 출신 행 하위는 `todoId`와 `subRoutineId`가 둘 다 있어
           "그날만"과 "반복 전체" 조작을 모두 지원한다.
 
-          **참고**: ROUTINE 상세의 반복 유형/요일 정보는 목록 응답에 이미 포함돼 있어 여기서는 null로 반환된다.
+          **참고**: ROUTINE 상세의 `dueDate`는 그날의 실제 마감일시(회차 예외 반영), `routineTime`은 루틴의 기본 반복시간이다.
+          둘을 비교하면 그날만 시간이 바뀌었는지 알 수 있다.
           행(Todo)이 아직 없는 미래 회차의 `subTodos`에는 하위 루틴 예정분(읽기 전용)과 예약된 하위가 병합되어 내려온다.
           """,
       security = @SecurityRequirement(name = "Bearer Authentication"))
