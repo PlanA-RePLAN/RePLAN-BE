@@ -1144,7 +1144,7 @@ class RoutineServiceTest {
   }
 
   @Test
-  void getRoutinesByFilter_all_과거_미완료Todo가_있으면_그것을_다음할일로_반영() {
+  void getRoutinesByFilter_all_과거_미완료Todo는_노출되고_다음_할_일도_함께_나온다() {
     given(userRepository.findById(1L)).willReturn(Optional.of(testUser()));
     Routine routine = buildRoutine(RoutineType.DAILY, null);
     ReflectionTestUtils.setField(routine, "id", 10L);
@@ -1158,11 +1158,66 @@ class RoutineServiceTest {
     Map<String, List<RoutineResponseDto>> result =
         routineService.getRoutinesByFilter(1L, "all", null);
 
-    assertThat(result.get("all")).hasSize(1);
-    RoutineResponseDto dto = result.get("all").get(0);
-    assertThat(dto.getTodoId()).isEqualTo(300L);
-    assertThat(dto.getTitle()).isEqualTo("어제 못한 스트레칭");
-    assertThat(dto.isCompleted()).isFalse();
+    // 밀린 회차 + 다음 할 일(오늘 가상 회차)
+    assertThat(result.get("all")).hasSize(2);
+    RoutineResponseDto overdue = result.get("all").get(0);
+    assertThat(overdue.getTodoId()).isEqualTo(300L);
+    assertThat(overdue.getTitle()).isEqualTo("어제 못한 스트레칭");
+    assertThat(overdue.isCompleted()).isFalse();
+    RoutineResponseDto next = result.get("all").get(1);
+    assertThat(next.getTodoId()).isNull();
+    assertThat(next.getDueDate().toLocalDate()).isEqualTo(TEST_DATE);
+  }
+
+  @Test
+  void getRoutinesByFilter_all_오늘_행이_밀렸으면_가상_오늘이_중복_생성되지_않는다() {
+    given(userRepository.findById(1L)).willReturn(Optional.of(testUser()));
+    // 기준 시각을 정오로 옮겨 "오늘 오전 회차가 이미 지난" 상황을 만든다
+    given(clock.instant()).willReturn(TEST_DATE.atTime(12, 0).atZone(KST).toInstant());
+    Routine routine = buildRoutine(RoutineType.DAILY, null);
+    ReflectionTestUtils.setField(routine, "id", 10L);
+
+    Todo overdueToday = routineTodo(routine, "오늘 오전 회차", TEST_DATE.atTime(9, 0));
+    ReflectionTestUtils.setField(overdueToday, "id", 310L);
+
+    givenAllFilterData(routine, List.of(), List.of(overdueToday), List.of());
+
+    Map<String, List<RoutineResponseDto>> result =
+        routineService.getRoutinesByFilter(1L, "all", null);
+
+    // 밀린 오늘 행 1건 + 가상 다음 할 일 1건 — 가상이 오늘로 또 생기면(중복) 안 된다
+    assertThat(result.get("all")).hasSize(2);
+    RoutineResponseDto virtual =
+        result.get("all").stream().filter(d -> d.getTodoId() == null).findFirst().orElseThrow();
+    assertThat(virtual.getDueDate().toLocalDate()).isEqualTo(TEST_DATE.plusDays(1));
+  }
+
+  @Test
+  void getRoutinesByFilter_all_밀린_회차는_전부_노출되고_미래_몫은_1건만() {
+    given(userRepository.findById(1L)).willReturn(Optional.of(testUser()));
+    Routine routine = buildRoutine(RoutineType.DAILY, null);
+    ReflectionTestUtils.setField(routine, "id", 10L);
+
+    Todo threeDaysAgo = routineTodo(routine, "3일 전", TEST_DATE.minusDays(3).atTime(8, 0));
+    ReflectionTestUtils.setField(threeDaysAgo, "id", 301L);
+    Todo twoDaysAgo = routineTodo(routine, "2일 전", TEST_DATE.minusDays(2).atTime(8, 0));
+    ReflectionTestUtils.setField(twoDaysAgo, "id", 302L);
+    Todo yesterday = routineTodo(routine, "어제", TEST_DATE.minusDays(1).atTime(8, 0));
+    ReflectionTestUtils.setField(yesterday, "id", 303L);
+    // 기준 시각(now)이 TEST_DATE 00:00이므로 오늘 09:00 행은 아직 안 지난 미래 몫
+    Todo todayRow = routineTodo(routine, "오늘", TEST_DATE.atTime(9, 0));
+    ReflectionTestUtils.setField(todayRow, "id", 304L);
+
+    givenAllFilterData(
+        routine, List.of(), List.of(todayRow, yesterday, twoDaysAgo, threeDaysAgo), List.of());
+
+    Map<String, List<RoutineResponseDto>> result =
+        routineService.getRoutinesByFilter(1L, "all", null);
+
+    assertThat(result.get("all")).hasSize(4);
+    assertThat(result.get("all"))
+        .extracting(RoutineResponseDto::getTodoId)
+        .containsExactlyInAnyOrder(301L, 302L, 303L, 304L);
   }
 
   @Test
