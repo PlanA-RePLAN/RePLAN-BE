@@ -197,6 +197,70 @@ public class RoutineOverrideService {
     override.removeSubtodo(index);
   }
 
+  // ── 하위 루틴의 그날(회차별) 개인화 — 부모와 같은 원장(routine_override)을 하위 루틴 명의로 쓴다 ──
+
+  /** 하위 루틴의 그날만 제목 변경. 그날 행이 이미 있으면 행에도 반영한다. */
+  @Transactional
+  public void updateChildTitleForDate(
+      Long userId, Long subRoutineId, LocalDate date, String title) {
+    Routine child = findOwnedChildRoutine(userId, subRoutineId);
+    validateOccurrenceDate(child.getParent(), date);
+    validateSubtodoTitle(title);
+
+    RoutineOverride override = upsert(child, date);
+    override.updateContent(title, override.getTag(), override.getOverrideTime());
+
+    findExistingChildTodo(child, date).ifPresent(todo -> todo.updateTitle(title));
+  }
+
+  /** 하위 루틴의 그날만 완료/미완료. 그날 행이 이미 있으면 행에도 반영한다. */
+  @Transactional
+  public void completeChildForDate(
+      Long userId, Long subRoutineId, LocalDate date, boolean isCompleted) {
+    Routine child = findOwnedChildRoutine(userId, subRoutineId);
+    validateOccurrenceDate(child.getParent(), date);
+    LocalDateTime now = LocalDateTime.now(clock);
+
+    RoutineOverride override = upsert(child, date);
+    override.updateComplete(isCompleted, now);
+
+    findExistingChildTodo(child, date).ifPresent(todo -> todo.updateCompleted(isCompleted, now));
+  }
+
+  /** 하위 루틴을 그날만 목록에서 제외(삭제). 그날 행이 이미 있으면 소프트 삭제한다. */
+  @Transactional
+  public void excludeChildForDate(Long userId, Long subRoutineId, LocalDate date) {
+    Routine child = findOwnedChildRoutine(userId, subRoutineId);
+    validateOccurrenceDate(child.getParent(), date);
+
+    findExistingChildTodo(child, date).ifPresent(todo -> todo.softDelete(LocalDateTime.now(clock)));
+
+    RoutineOverride override = upsert(child, date);
+    override.skip();
+  }
+
+  private Routine findOwnedChildRoutine(Long userId, Long subRoutineId) {
+    if (userId == null) {
+      throw new CustomException(UserErrorCode.USER_NOT_FOUND);
+    }
+    Routine routine =
+        routineRepository
+            .findById(subRoutineId)
+            .orElseThrow(() -> new CustomException(RoutineErrorCode.ROUTINE_NOT_FOUND));
+    if (!routine.getUser().getId().equals(userId)) {
+      throw new CustomException(RoutineErrorCode.ROUTINE_NOT_FOUND);
+    }
+    if (!routine.isChild()) {
+      throw new CustomException(RoutineErrorCode.ROUTINE_INVALID_TARGET);
+    }
+    return routine;
+  }
+
+  private java.util.Optional<Todo> findExistingChildTodo(Routine child, LocalDate date) {
+    return todoRepository.findChildTodoByRoutineAndDate(
+        child, date.atStartOfDay(), date.plusDays(1).atStartOfDay());
+  }
+
   private void validateSubtodoTitle(String title) {
     if (title == null || title.isBlank()) {
       throw new CustomException(GlobalErrorCode.INVALID_INPUT);

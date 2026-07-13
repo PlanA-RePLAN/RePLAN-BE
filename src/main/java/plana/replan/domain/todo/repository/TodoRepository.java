@@ -37,6 +37,14 @@ public interface TodoRepository extends JpaRepository<Todo, Long> {
       @Param("end") LocalDateTime end);
 
   @Query(
+      "SELECT t FROM Todo t WHERE t.routine = :routine AND t.parent IS NOT NULL"
+          + " AND t.dueDate >= :start AND t.dueDate < :end AND t.deletedAt IS NULL")
+  Optional<Todo> findChildTodoByRoutineAndDate(
+      @Param("routine") Routine routine,
+      @Param("start") LocalDateTime start,
+      @Param("end") LocalDateTime end);
+
+  @Query(
       "SELECT t FROM Todo t"
           + " WHERE t.routine = :routine"
           + " AND t.parent IS NULL"

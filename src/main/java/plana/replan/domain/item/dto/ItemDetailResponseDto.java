@@ -49,9 +49,10 @@ public record ItemDetailResponseDto(
           sub.getTodoId(), sub.getTitle(), sub.isCompleted(), null, sub.getSubRoutineId());
     }
 
-    /** 하위 루틴 예정분 — 그날이 되면 배치가 만들 하위. 이번만 조작은 불가, subRoutineId로 반복 전체 수정/삭제만 가능. */
-    public static SubItemDto plannedFromChildRoutine(Long subRoutineId, String title) {
-      return new SubItemDto(null, title, false, null, subRoutineId);
+    /** 하위 루틴 예정분 — 그날이 되면 배치가 만들 하위. subRoutineId(+date)로 그날만/반복 전체 조작이 가능하다. */
+    public static SubItemDto plannedFromChildRoutine(
+        Long subRoutineId, String title, boolean isCompleted) {
+      return new SubItemDto(null, title, isCompleted, null, subRoutineId);
     }
 
     /** 회차 예외에 예약된 하위 — index로 완료/수정/삭제한다. */

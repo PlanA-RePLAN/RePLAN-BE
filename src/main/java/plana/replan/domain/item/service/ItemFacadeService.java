@@ -118,12 +118,12 @@ public class ItemFacadeService {
       // 행이 아직 없는 회차: 그날 생길 예정인 하위(하위 루틴, 읽기 전용) + 예약해 둔 하위(index로 수정/삭제)를 병합해 보여준다.
       List<ItemDetailResponseDto.SubItemDto> merged = new ArrayList<>();
       routineService
-          .getAliveChildren(userId, routineId)
+          .getAliveChildrenForDate(userId, routineId, date)
           .forEach(
               child ->
                   merged.add(
                       ItemDetailResponseDto.SubItemDto.plannedFromChildRoutine(
-                          child.routineId(), child.title())));
+                          child.routineId(), child.title(), child.isCompleted())));
       List<ReservedSubtodo> reserved = override.reservedSubtodos();
       for (int i = 0; i < reserved.size(); i++) {
         merged.add(
@@ -273,6 +273,15 @@ public class ItemFacadeService {
           userId, request.parentTodoId(), request.subTodoId(), request.isCompleted());
       return;
     }
+    if (request.subRoutineId() != null) {
+      // 하위 루틴 (그날만) — 날짜 없이 반복 전체 완료라는 개념은 없다
+      if (request.date() == null) {
+        throw new CustomException(GlobalErrorCode.INVALID_INPUT);
+      }
+      routineOverrideService.completeChildForDate(
+          userId, request.subRoutineId(), request.date(), request.isCompleted());
+      return;
+    }
     // 예약 하위 (그날만, 행이 아직 없는 회차)
     requireReservedTarget(request.routineId(), request.date(), request.index());
     routineOverrideService.completeSubtodo(
@@ -292,6 +301,12 @@ public class ItemFacadeService {
       return;
     }
     if (request.subRoutineId() != null) {
+      if (request.date() != null) {
+        // 하위 루틴 (그날만) — 하위 루틴 명의의 회차 예외에 기록
+        routineOverrideService.updateChildTitleForDate(
+            userId, request.subRoutineId(), request.date(), request.title());
+        return;
+      }
       // 하위 루틴 (반복 전체)
       routineService.updateChildRoutine(
           userId, request.subRoutineId(), new SubRoutineUpdateRequestDto(request.title()));
@@ -312,6 +327,11 @@ public class ItemFacadeService {
       return;
     }
     if (request.subRoutineId() != null) {
+      if (request.date() != null) {
+        // 하위 루틴 (그날만 제외)
+        routineOverrideService.excludeChildForDate(userId, request.subRoutineId(), request.date());
+        return;
+      }
       // 하위 루틴 (반복 전체)
       routineService.deleteChildRoutine(userId, request.subRoutineId());
       return;
