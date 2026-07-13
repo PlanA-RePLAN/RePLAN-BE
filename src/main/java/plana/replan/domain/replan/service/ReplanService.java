@@ -257,7 +257,8 @@ public class ReplanService {
         routine ? String.valueOf(anchor.getRoutine().getRoutineType()) : null,
         labels,
         answerInputs,
-        LocalDate.now(clock).format(DateTimeFormatter.ISO_LOCAL_DATE),
+        // 날짜만 주면 "오늘인데 이미 지난 시각" 마감을 AI가 걸러낼 수 없어 시각·요일까지 준다.
+        LocalDateTime.now(clock).format(ReplanAiService.PROMPT_NOW_FORMAT),
         refreshCount,
         tagOptions);
   }

@@ -11,6 +11,7 @@ import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -47,6 +48,10 @@ public class GoalAiService {
       "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent";
 
   private static final String DEADLINE_PASSED_MESSAGE = "종료 일정이 이미 지났어요. 미래 날짜로 다시 설정해주세요.";
+
+  /** 프롬프트에 넣는 현재 일시 형식(예: 2026-07-14 23:05 (화요일)). 요일까지 줘야 반복 요일 배치에 쓸 수 있다. */
+  static final DateTimeFormatter PROMPT_NOW_FORMAT =
+      DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm (EEEE)", Locale.KOREAN);
 
   private final RestClient geminiRestClient;
   private final TagRepository tagRepository;
@@ -164,6 +169,7 @@ public class GoalAiService {
         목표: %s
         종료 날짜: %s
         종료 시간: %s
+        오늘 날짜: %s
         질문/답변:
         %s
 
@@ -190,6 +196,7 @@ public class GoalAiService {
             req.goal(),
             req.deadlineDate() != null ? req.deadlineDate() : "미입력",
             req.deadlineTime() != null ? req.deadlineTime() : "미입력",
+            today,
             qa.toString());
   }
 
@@ -227,7 +234,8 @@ public class GoalAiService {
   public TodoRecommendationResponse recommendTodos(Long userId, TodoRecommendationRequest request) {
     validateRefreshCount(request.refreshCount());
     List<Tag> tags = tagRepository.findAllByUserId(userId);
-    String prompt = buildRecommendPrompt(request, buildTagInfo(tags));
+    String now = LocalDateTime.now(clock).format(PROMPT_NOW_FORMAT);
+    String prompt = buildRecommendPrompt(request, buildTagInfo(tags), now);
     String raw = callGemini(prompt);
     return parseRecommendResponse(raw, tags);
   }
@@ -251,7 +259,7 @@ public class GoalAiService {
     }
   }
 
-  String buildRecommendPrompt(TodoRecommendationRequest req, String tagInfo) {
+  String buildRecommendPrompt(TodoRecommendationRequest req, String tagInfo, String now) {
     String deadlineInfo = buildDeadlineInfo(req.deadlineDate(), req.deadlineTime());
     String prompt =
         """
@@ -259,6 +267,7 @@ public class GoalAiService {
 
         목표: %s
         마감기한: %s
+        현재 일시: %s
         솔루션:
         %s
 
@@ -283,7 +292,7 @@ public class GoalAiService {
 
         [2단계 — 투두 생성 규칙]
         1. 솔루션에 언급된 모든 교재·강의를 빠짐없이 커버한다 (일부만 반영 금지)
-        2. 총 분량 ÷ 남은 기간 ÷ 하루 투자시간으로 1회 투두 분량을 계산하여 배분한다
+        2. 총 분량 ÷ 남은 기간 ÷ 하루 투자시간으로 1회 투두 분량을 계산하여 배분한다 (남은 기간은 '현재 일시'부터 마감기한까지로 계산)
         3. 투두 제목에 검색으로 확인된 실제 강의 제목 또는 챕터명을 포함한다
            예) "인프런 - 한입 리액트 13강 컴포넌트 만들기 수강" (검색으로 확인된 실제 제목)
         4. 1회 투두 분량은 하루 투자시간의 50%%를 초과하지 않는다
@@ -301,6 +310,8 @@ public class GoalAiService {
         15-1. ONE_TIME: dueDate/dueTime은 그 투두의 마감 일시, routineTime은 null
         15-2. RECURRING: routineTime은 매 회차를 수행할 시각(반복시간), dueDate/dueTime은 반복이 끝나는
               종료 일정(기본값: 목표 마감일, 목표 마감이 없으면 null). 수행 시각을 dueTime에 넣지 않는다
+        15-3. 모든 마감은 반드시 '현재 일시' 이후여야 한다. ONE_TIME의 dueDate/dueTime도, RECURRING의 종료 일정도
+              이미 지난 날짜·시각으로 절대 만들지 않는다. dueDate가 오늘이면 dueTime은 현재 시각 이후여야 한다
         16. overallReason: 이 추천 전체에 대한 총평을 서술체("~합니다", "~했습니다")로 작성. 조언·명령형("~하세요") 절대 금지.
             - 어떤 기준으로 투두를 구성했는지, 핵심 전략이 무엇인지 서술
             - 솔루션에 교재·강의가 포함된 경우 각 항목마다 아래 형식으로 출처 정보를 포함:
@@ -311,7 +322,7 @@ public class GoalAiService {
         반드시 아래 JSON만 출력하세요 (다른 설명 없이):
         {"overallReason":"","todos":[{"type":"","title":"","dueDate":null,"dueTime":null,"routineType":null,"routineDays":null,"routineTime":null,"tagId":null}]}
         """
-            .formatted(req.goal(), deadlineInfo, buildSolutionInfo(req.solutions()), tagInfo);
+            .formatted(req.goal(), deadlineInfo, now, buildSolutionInfo(req.solutions()), tagInfo);
     return prompt + refreshStyleBlock(req.refreshCount() == null ? 0 : req.refreshCount());
   }
 
@@ -432,21 +443,63 @@ public class GoalAiService {
         }
 
         todos.add(
-            new RecommendedTodo(
-                type,
-                title,
-                dueDate,
-                dueTime,
-                routineType,
-                routineDays,
-                routineTime,
-                tagId,
-                tagName));
+            clampPastDue(
+                new RecommendedTodo(
+                    type,
+                    title,
+                    dueDate,
+                    dueTime,
+                    routineType,
+                    routineDays,
+                    routineTime,
+                    tagId,
+                    tagName)));
       }
       return new TodoRecommendationResponse(overallReason, todos);
     } catch (Exception e) {
       log.error("Gemini recommend 응답 파싱 실패: {}", raw, e);
       throw new CustomException(GoalErrorCode.GEMINI_PARSE_ERROR);
+    }
+  }
+
+  /**
+   * AI가 이미 지난 마감 일시를 주면 코드로 보정한다. 날짜 비교를 AI에만 맡기면 결과가 오락가락하므로 프롬프트 규칙과 별개로 반드시 검사한다.
+   *
+   * <p>ONE_TIME: 지난 날짜는 오늘로 올리고, 시각까지 지났으면 시각을 비워 그날 끝까지로 취급한다. RECURRING: dueDate/dueTime은 반복 종료
+   * 일정이므로 지났으면 둘 다 비워 무기한으로 취급한다(수행 시각 routineTime은 건드리지 않는다). 형식이 잘못된 값은 여기서 판단하지 않고 그대로 둔다.
+   */
+  RecommendedTodo clampPastDue(RecommendedTodo todo) {
+    if (todo.dueDate() == null) {
+      return todo;
+    }
+    try {
+      LocalDateTime now = LocalDateTime.now(clock);
+      LocalDate date = LocalDate.parse(todo.dueDate());
+      LocalTime time = todo.dueTime() != null ? LocalTime.parse(todo.dueTime()) : LocalTime.MAX;
+      if (!LocalDateTime.of(date, time).isBefore(now)) {
+        return todo;
+      }
+      String dueDate;
+      String dueTime;
+      if ("RECURRING".equals(todo.type())) {
+        dueDate = null;
+        dueTime = null;
+      } else {
+        dueDate = now.toLocalDate().toString();
+        dueTime = todo.dueTime() != null && time.isAfter(now.toLocalTime()) ? todo.dueTime() : null;
+      }
+      return new RecommendedTodo(
+          todo.type(),
+          todo.title(),
+          dueDate,
+          dueTime,
+          todo.routineType(),
+          todo.routineDays(),
+          todo.routineTime(),
+          todo.tagId(),
+          todo.tagName());
+    } catch (DateTimeParseException e) {
+      return todo;
     }
   }
 
