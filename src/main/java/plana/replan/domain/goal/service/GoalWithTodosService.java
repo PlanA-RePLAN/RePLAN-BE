@@ -119,11 +119,15 @@ public class GoalWithTodosService {
     return new RoutineCreateRequestDto(
         item.title(),
         parseDateTime(item.dueDate(), item.dueTime()),
-        null,
+        parseTime(item.routineTime()),
         item.routineType(),
         item.routineDays(),
         item.tagId(),
         goalId);
+  }
+
+  private LocalTime parseTime(String time) {
+    return time != null ? LocalTime.parse(time, TIME_FORMATTER) : null;
   }
 
   private void validateSubTodos(List<String> subTodos) {
