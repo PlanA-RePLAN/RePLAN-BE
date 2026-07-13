@@ -64,8 +64,15 @@ public class TodoDetailResponseDto {
     @Schema(description = "완료 여부", example = "false")
     private boolean completed;
 
+    @Schema(description = "하위 루틴 ID. 하위 루틴이 찍어낸 하위 투두일 때만, 아니면 null", example = "11")
+    private Long subRoutineId;
+
     public static SubTodoDto from(Todo todo) {
-      return new SubTodoDto(todo.getId(), todo.getTitle(), todo.isCompleted());
+      return new SubTodoDto(
+          todo.getId(),
+          todo.getTitle(),
+          todo.isCompleted(),
+          todo.getRoutine() != null ? todo.getRoutine().getId() : null);
     }
   }
 

@@ -34,23 +34,23 @@ public record ItemDetailResponseDto(
       @Schema(description = "하위 투두 ID. 아직 행이 없는 회차의 하위(예정분·예약분)는 null") Long todoId,
       @Schema(description = "제목") String title,
       @JsonProperty("isCompleted") @Schema(description = "완료 여부") boolean isCompleted,
-      @Schema(
-              description =
-                  "예약 하위의 배열 위치 (수정/삭제 시 지목용). todoId가 있으면 null, todoId와 둘 다 null이면 하위 루틴 예정분(읽기 전용)")
-          Integer reservedIndex) {
+      @Schema(description = "예약 하위의 배열 위치 (수정/삭제 시 지목용). 예약 하위가 아니면 null") Integer reservedIndex,
+      @Schema(description = "하위 루틴 ID (반복 전체 수정/삭제 시 지목용). 하위 루틴과 무관한 하위면 null", example = "11")
+          Long subRoutineId) {
 
     public static SubItemDto from(TodoDetailResponseDto.SubTodoDto sub) {
-      return new SubItemDto(sub.getTodoId(), sub.getTitle(), sub.isCompleted(), null);
+      return new SubItemDto(
+          sub.getTodoId(), sub.getTitle(), sub.isCompleted(), null, sub.getSubRoutineId());
     }
 
-    /** 하위 루틴 예정분 — 그날이 되면 배치가 만들 하위. 읽기 전용. */
-    public static SubItemDto plannedFromChildRoutine(String title) {
-      return new SubItemDto(null, title, false, null);
+    /** 하위 루틴 예정분 — 그날이 되면 배치가 만들 하위. 이번만 조작은 불가, subRoutineId로 반복 전체 수정/삭제만 가능. */
+    public static SubItemDto plannedFromChildRoutine(Long subRoutineId, String title) {
+      return new SubItemDto(null, title, false, null, subRoutineId);
     }
 
     /** 회차 예외에 예약된 하위 — index로 수정/삭제한다. */
     public static SubItemDto reserved(String title, int index) {
-      return new SubItemDto(null, title, false, index);
+      return new SubItemDto(null, title, false, index, null);
     }
   }
 

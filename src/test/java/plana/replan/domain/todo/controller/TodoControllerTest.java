@@ -549,7 +549,7 @@ class TodoControllerTest {
             "BLUE",
             "DAILY",
             null,
-            List.of(new SubTodoDto(10L, "챕터 1 읽기", false)));
+            List.of(new SubTodoDto(10L, "챕터 1 읽기", false, null)));
 
     given(todoService.getTodoDetail(any(), any())).willReturn(response);
 

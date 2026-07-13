@@ -108,19 +108,19 @@ public class ItemController implements ItemControllerDocs {
 
   @Override
   @PatchMapping("/subtodos")
-  public ResponseEntity<ApiResult<Void>> updateItemReservedSubTodo(
+  public ResponseEntity<ApiResult<Void>> updateItemSubTodo(
       @AuthenticationPrincipal Long userId,
       @Valid @RequestBody ItemSubTodoUpdateRequestDto request) {
-    itemFacadeService.updateReservedSubTodo(userId, request);
+    itemFacadeService.updateSubTodo(userId, request);
     return ResponseEntity.ok(ApiResult.ok());
   }
 
   @Override
   @DeleteMapping("/subtodos")
-  public ResponseEntity<ApiResult<Void>> deleteItemReservedSubTodo(
+  public ResponseEntity<ApiResult<Void>> deleteItemSubTodo(
       @AuthenticationPrincipal Long userId,
       @Valid @RequestBody ItemSubTodoDeleteRequestDto request) {
-    itemFacadeService.deleteReservedSubTodo(userId, request);
+    itemFacadeService.deleteSubTodo(userId, request);
     return ResponseEntity.ok(ApiResult.ok());
   }
 }
