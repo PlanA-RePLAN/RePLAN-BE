@@ -28,9 +28,12 @@ import plana.replan.domain.routine.dto.RoutineOverridePinRequestDto;
 import plana.replan.domain.routine.dto.RoutineOverrideResponseDto;
 import plana.replan.domain.routine.dto.RoutineResponseDto;
 import plana.replan.domain.routine.dto.RoutineUpdateRequestDto;
+import plana.replan.domain.routine.dto.SubRoutineCreateRequestDto;
+import plana.replan.domain.routine.dto.SubRoutineUpdateRequestDto;
 import plana.replan.domain.routine.service.RoutineOverrideService;
 import plana.replan.domain.routine.service.RoutineService;
 import plana.replan.domain.todo.dto.SubTodoCreateRequestDto;
+import plana.replan.domain.todo.dto.SubTodoUpdateRequestDto;
 import plana.replan.domain.todo.dto.TodoCompleteRequestDto;
 import plana.replan.domain.todo.dto.TodoPinRequestDto;
 import plana.replan.domain.todo.dto.TodoUpdateRequestDto;
@@ -113,9 +116,12 @@ public class ItemFacadeService {
       // 행이 아직 없는 회차: 그날 생길 예정인 하위(하위 루틴, 읽기 전용) + 예약해 둔 하위(index로 수정/삭제)를 병합해 보여준다.
       List<ItemDetailResponseDto.SubItemDto> merged = new ArrayList<>();
       routineService
-          .getAliveChildTitles(userId, routineId)
+          .getAliveChildren(userId, routineId)
           .forEach(
-              title -> merged.add(ItemDetailResponseDto.SubItemDto.plannedFromChildRoutine(title)));
+              child ->
+                  merged.add(
+                      ItemDetailResponseDto.SubItemDto.plannedFromChildRoutine(
+                          child.routineId(), child.title())));
       List<String> reserved = override.reservedSubtodos();
       for (int i = 0; i < reserved.size(); i++) {
         merged.add(ItemDetailResponseDto.SubItemDto.reserved(reserved.get(i), i));
@@ -240,20 +246,66 @@ public class ItemFacadeService {
           userId, request.todoId(), new SubTodoCreateRequestDto(request.title()));
       return;
     }
-    requireRoutineInstanceTarget(request.routineId(), request.date());
-    routineOverrideService.addSubtodo(userId, request.routineId(), request.date(), request.title());
+    requireScope(request.scope());
+    if (request.scope() == ItemScope.THIS) {
+      requireRoutineInstanceTarget(request.routineId(), request.date());
+      routineOverrideService.addSubtodo(
+          userId, request.routineId(), request.date(), request.title());
+      return;
+    }
+    // 반복 전체 — 하위 루틴 생성 (모든 회차에 반복)
+    requireRoutineTarget(request.routineId());
+    routineService.createChildRoutine(
+        userId, request.routineId(), new SubRoutineCreateRequestDto(request.title()));
   }
 
   @Transactional
-  public void updateReservedSubTodo(Long userId, ItemSubTodoUpdateRequestDto request) {
+  public void updateSubTodo(Long userId, ItemSubTodoUpdateRequestDto request) {
+    if (request.subTodoId() != null) {
+      // 행 하위 (그날만)
+      requireTodoTarget(request.parentTodoId());
+      todoService.updateSubTodo(
+          userId,
+          request.parentTodoId(),
+          request.subTodoId(),
+          new SubTodoUpdateRequestDto(request.title()));
+      return;
+    }
+    if (request.subRoutineId() != null) {
+      // 하위 루틴 (반복 전체)
+      routineService.updateChildRoutine(
+          userId, request.subRoutineId(), new SubRoutineUpdateRequestDto(request.title()));
+      return;
+    }
+    // 예약 하위 (그날만, 행이 아직 없는 회차)
+    requireReservedTarget(request.routineId(), request.date(), request.index());
     routineOverrideService.updateSubtodo(
         userId, request.routineId(), request.date(), request.index(), request.title());
   }
 
   @Transactional
-  public void deleteReservedSubTodo(Long userId, ItemSubTodoDeleteRequestDto request) {
+  public void deleteSubTodo(Long userId, ItemSubTodoDeleteRequestDto request) {
+    if (request.subTodoId() != null) {
+      // 행 하위 (그날만)
+      requireTodoTarget(request.parentTodoId());
+      todoService.deleteSubTodo(userId, request.parentTodoId(), request.subTodoId());
+      return;
+    }
+    if (request.subRoutineId() != null) {
+      // 하위 루틴 (반복 전체)
+      routineService.deleteChildRoutine(userId, request.subRoutineId());
+      return;
+    }
+    // 예약 하위 (그날만, 행이 아직 없는 회차)
+    requireReservedTarget(request.routineId(), request.date(), request.index());
     routineOverrideService.deleteSubtodo(
         userId, request.routineId(), request.date(), request.index());
+  }
+
+  private void requireReservedTarget(Long routineId, java.time.LocalDate date, Integer index) {
+    if (routineId == null || date == null || index == null) {
+      throw new CustomException(GlobalErrorCode.INVALID_INPUT);
+    }
   }
 
   private void requireTodoTarget(Long todoId) {
