@@ -423,7 +423,7 @@ public interface ItemControllerDocs {
           | todoId | integer | 하위 투두 ID. 행이 없는 회차의 하위(예정분·예약분)는 null |
           | title | string | 제목 |
           | isCompleted | boolean | 완료 여부 |
-          | reservedIndex | integer | 예약 하위의 배열 위치(수정/삭제 시 지목용). 예약 하위가 아니면 null |
+          | reservedIndex | integer | 예약 하위의 배열 위치(완료/수정/삭제 시 지목용). 예약 하위가 아니면 null |
           | subRoutineId | integer | 하위 루틴 ID(반복 전체 수정/삭제 시 지목용). 하위 루틴과 무관한 하위면 null |
 
           **subTodos 원소 구분**: `todoId` 있음=행 하위(그날만 조작) / `reservedIndex` 있음=예약 하위(그날만 조작) /
@@ -1040,8 +1040,11 @@ public interface ItemControllerDocs {
       summary = "통합 아이템 하위 투두 완료/미완료 처리",
       description =
           """
-          하위 투두를 완료 또는 미완료 처리한다. **행이 있는 하위(상세 응답 `subTodos`의 `todoId`가 있는 항목)만 가능**하다.
-          예약 하위·하위 루틴 예정분은 아직 행이 없어 완료 개념이 없다.
+          하위 투두를 완료 또는 미완료 처리한다. 아래 두 가지 지목 방법 중 정확히 하나를 사용한다.
+
+          - **행 하위 (그날만)**: `parentTodoId` + `subTodoId`
+          - **예약 하위 (그날만, 행이 아직 없는 회차)**: `routineId` + `date` + `index` (상세 응답 `subTodos`의 `reservedIndex`) — 배치가 행을 만들 때 완료 상태가 승계된다
+          - 하위 루틴 예정분(`subRoutineId`만 있는 하위)은 회차 개념이 없어 완료 대상이 아니다
 
           **Request Headers**
 
@@ -1054,9 +1057,14 @@ public interface ItemControllerDocs {
 
           | 필드명 | 필수 여부 | 타입 | 설명 | 예시 |
           |--------|-----------|------|------|------|
-          | parentTodoId | ✅ 필수 | integer | 부모 투두 ID (상세 응답의 todoId) | `42` |
-          | subTodoId | ✅ 필수 | integer | 하위 투두 ID (상세 응답 subTodos의 todoId) | `128` |
+          | parentTodoId | 행 하위 지목 시 ✅ | integer | 부모 투두 ID | `42` |
+          | subTodoId | 행 하위 지목 시 ✅ | integer | 하위 투두 ID | `128` |
+          | routineId | 예약 하위 지목 시 ✅ | integer | 루틴 ID | `7` |
+          | date | 예약 하위 지목 시 ✅ | string | 회차 날짜 (yyyy-MM-dd 형식) | `"2026-07-20"` |
+          | index | 예약 하위 지목 시 ✅ | integer | 예약 배열 위치 (상세 응답의 reservedIndex) | `0` |
           | isCompleted | ✅ 필수 | boolean | `true`면 완료, `false`면 미완료 | `true` |
+
+          > ❌ 선택 필드는 생략하거나 null로 전달해도 동일하게 처리됩니다.
           """,
       security = @SecurityRequirement(name = "Bearer Authentication"))
   @io.swagger.v3.oas.annotations.parameters.RequestBody(
@@ -1065,10 +1073,16 @@ public interface ItemControllerDocs {
               mediaType = "application/json",
               examples = {
                 @ExampleObject(
-                    name = "완료 처리",
+                    name = "행 하위 완료 (그날만)",
                     value =
                         """
                         {"parentTodoId": 42, "subTodoId": 128, "isCompleted": true}
+                        """),
+                @ExampleObject(
+                    name = "예약 하위 완료 (그날만, 미래 회차)",
+                    value =
+                        """
+                        {"routineId": 7, "date": "2026-07-20", "index": 0, "isCompleted": true}
                         """),
                 @ExampleObject(
                     name = "미완료 처리",

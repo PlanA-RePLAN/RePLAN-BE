@@ -911,6 +911,28 @@ class RoutineServiceTest {
   }
 
   @Test
+  void generateDailyTodos_완료된_예약_하위는_완료_상태로_실체화된다() {
+    Routine routine = buildRoutine(RoutineType.DAILY, null);
+
+    RoutineOverride override =
+        RoutineOverride.builder().routine(routine).overrideDate(TEST_DATE).build();
+    override.addSubtodo("단어 50개");
+    override.completeSubtodo(0, true);
+
+    given(routineRepository.findAllActiveMotherRoutines()).willReturn(List.of(routine));
+    given(routineOverrideRepository.findByRoutineIdInAndOverrideDate(any(), any()))
+        .willReturn(List.of(override));
+    given(todoRepository.saveAndFlush(any())).willAnswer(inv -> inv.getArgument(0));
+    given(todoRepository.save(any())).willAnswer(inv -> inv.getArgument(0));
+
+    routineService.generateDailyTodos();
+
+    ArgumentCaptor<Todo> captor = ArgumentCaptor.forClass(Todo.class);
+    verify(todoRepository).save(captor.capture());
+    assertThat(captor.getValue().isCompleted()).isTrue();
+  }
+
+  @Test
   void generateDailyTodos_override_skip_이면_생성_안됨() {
     Routine routine = buildRoutine(RoutineType.DAILY, null);
 

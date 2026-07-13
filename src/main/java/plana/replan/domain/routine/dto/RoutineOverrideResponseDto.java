@@ -6,6 +6,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.List;
+import plana.replan.domain.routine.entity.ReservedSubtodo;
 import plana.replan.domain.routine.entity.Routine;
 import plana.replan.domain.routine.entity.RoutineOverride;
 import plana.replan.domain.routine.util.RoutineDays;
@@ -35,8 +36,8 @@ public record RoutineOverrideResponseDto(
     @JsonProperty("hasOverride") @Schema(description = "override 존재 여부", example = "true")
         boolean hasOverride,
     @Schema(description = "이미 배치로 생성된 Todo ID. 없으면 null", example = "42") Long todoId,
-    @Schema(description = "예약된 하위 투두 제목 목록 (행이 아직 없는 회차 전용). 없으면 빈 목록")
-        List<String> reservedSubtodos) {
+    @Schema(description = "예약된 하위 투두 목록 ({title, isCompleted}, 행이 아직 없는 회차 전용). 없으면 빈 목록")
+        List<ReservedSubtodo> reservedSubtodos) {
 
   public static RoutineOverrideResponseDto ofNoOverride(
       Routine routine, LocalDate date, Long todoId) {

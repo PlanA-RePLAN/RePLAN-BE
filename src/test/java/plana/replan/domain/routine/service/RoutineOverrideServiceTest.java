@@ -20,6 +20,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 import plana.replan.domain.routine.dto.RoutineOverrideContentRequestDto;
 import plana.replan.domain.routine.dto.RoutineOverrideResponseDto;
+import plana.replan.domain.routine.entity.ReservedSubtodo;
 import plana.replan.domain.routine.entity.Routine;
 import plana.replan.domain.routine.entity.RoutineOverride;
 import plana.replan.domain.routine.entity.RoutineType;
@@ -173,7 +174,9 @@ class RoutineOverrideServiceTest {
 
     routineOverrideService.addSubtodo(1L, 10L, TEST_DATE, "단어 50개");
 
-    assertThat(override.getOverrideSubtodos()).containsExactly("단어 50개");
+    assertThat(override.getOverrideSubtodos())
+        .extracting(ReservedSubtodo::title)
+        .containsExactly("단어 50개");
     verify(todoRepository, never()).save(any());
   }
 
@@ -226,7 +229,9 @@ class RoutineOverrideServiceTest {
 
     routineOverrideService.updateSubtodo(1L, 10L, TEST_DATE, 0, "단어 100개");
 
-    assertThat(override.getOverrideSubtodos()).containsExactly("단어 100개");
+    assertThat(override.getOverrideSubtodos())
+        .extracting(ReservedSubtodo::title)
+        .containsExactly("단어 100개");
   }
 
   @Test
@@ -252,6 +257,34 @@ class RoutineOverrideServiceTest {
     routineOverrideService.deleteSubtodo(1L, 10L, TEST_DATE, 0);
 
     assertThat(override.getOverrideSubtodos()).isNull();
+  }
+
+  @Test
+  void completeSubtodo_예약_하위의_완료_상태가_바뀐다() {
+    Routine routine = dailyRoutine(null);
+    given(routineRepository.findById(10L)).willReturn(Optional.of(routine));
+    RoutineOverride override = givenOverrideFor(routine);
+    override.addSubtodo("단어 50개");
+
+    routineOverrideService.completeSubtodo(1L, 10L, TEST_DATE, 0, true);
+    assertThat(override.getOverrideSubtodos().get(0).isCompleted()).isTrue();
+    assertThat(override.getOverrideSubtodos().get(0).title()).isEqualTo("단어 50개");
+
+    routineOverrideService.completeSubtodo(1L, 10L, TEST_DATE, 0, false);
+    assertThat(override.getOverrideSubtodos().get(0).isCompleted()).isFalse();
+  }
+
+  @Test
+  void completeSubtodo_index가_범위_밖이면_404() {
+    Routine routine = dailyRoutine(null);
+    given(routineRepository.findById(10L)).willReturn(Optional.of(routine));
+    RoutineOverride override = givenOverrideFor(routine);
+    override.addSubtodo("단어 50개");
+
+    assertThatThrownBy(() -> routineOverrideService.completeSubtodo(1L, 10L, TEST_DATE, 1, true))
+        .isInstanceOf(CustomException.class)
+        .hasFieldOrPropertyWithValue(
+            "errorCode", RoutineErrorCode.ROUTINE_OVERRIDE_SUBTODO_NOT_FOUND);
   }
 
   @Test

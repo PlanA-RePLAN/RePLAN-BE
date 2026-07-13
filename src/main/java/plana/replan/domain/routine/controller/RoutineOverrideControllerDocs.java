@@ -496,7 +496,7 @@ public interface RoutineOverrideControllerDocs {
           | isCompleted | boolean | 완료 여부 |
           | hasOverride | boolean | override 존재 여부 |
           | todoId | integer | 생성된 Todo ID. 없으면 null |
-          | reservedSubtodos | array | 예약된 하위 투두 제목 목록. 없으면 빈 목록 |
+          | reservedSubtodos | array | 예약된 하위 투두 목록 ({title, isCompleted}). 없으면 빈 목록 |
           """,
       security = @SecurityRequirement(name = "Bearer Authentication"))
   @ApiResponses({
