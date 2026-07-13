@@ -19,6 +19,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 import plana.replan.domain.routine.dto.RoutineOverrideContentRequestDto;
+import plana.replan.domain.routine.dto.RoutineOverrideResponseDto;
 import plana.replan.domain.routine.entity.Routine;
 import plana.replan.domain.routine.entity.RoutineOverride;
 import plana.replan.domain.routine.entity.RoutineType;
@@ -251,5 +252,48 @@ class RoutineOverrideServiceTest {
     routineOverrideService.deleteSubtodo(1L, 10L, TEST_DATE, 0);
 
     assertThat(override.getOverrideSubtodos()).isNull();
+  }
+
+  @Test
+  void getOverride_반복정보와_그날의_유효시간을_함께_내려준다() {
+    Routine routine = dailyRoutine(LocalTime.of(9, 0));
+    ReflectionTestUtils.setField(routine, "dueDate", LocalDate.of(2099, 12, 31).atTime(8, 0));
+    given(routineRepository.findById(10L)).willReturn(Optional.of(routine));
+    RoutineOverride override = givenOverrideFor(routine);
+    override.updateContent(null, null, LocalTime.of(15, 0));
+
+    RoutineOverrideResponseDto result = routineOverrideService.getOverride(1L, 10L, TEST_DATE);
+
+    assertThat(result.routineType()).isEqualTo("DAILY");
+    assertThat(result.routineTime()).isEqualTo(LocalTime.of(9, 0));
+    assertThat(result.effectiveTime()).isEqualTo(LocalTime.of(15, 0));
+    assertThat(result.repeatEndDate()).isEqualTo(LocalDate.of(2099, 12, 31).atTime(8, 0));
+  }
+
+  @Test
+  void getOverride_쪽지_시간이_없으면_루틴_기본_시간이_유효시간이다() {
+    Routine routine = dailyRoutine(LocalTime.of(9, 0));
+    given(routineRepository.findById(10L)).willReturn(Optional.of(routine));
+    given(routineOverrideRepository.findByRoutineAndOverrideDate(routine, TEST_DATE))
+        .willReturn(Optional.empty());
+
+    RoutineOverrideResponseDto result = routineOverrideService.getOverride(1L, 10L, TEST_DATE);
+
+    assertThat(result.effectiveTime()).isEqualTo(LocalTime.of(9, 0));
+    assertThat(result.routineTime()).isEqualTo(LocalTime.of(9, 0));
+    assertThat(result.routineType()).isEqualTo("DAILY");
+  }
+
+  @Test
+  void getOverride_시간_설정이_아무데도_없으면_235959가_유효시간이고_routineTime은_null이다() {
+    Routine routine = dailyRoutine(null);
+    given(routineRepository.findById(10L)).willReturn(Optional.of(routine));
+    given(routineOverrideRepository.findByRoutineAndOverrideDate(routine, TEST_DATE))
+        .willReturn(Optional.empty());
+
+    RoutineOverrideResponseDto result = routineOverrideService.getOverride(1L, 10L, TEST_DATE);
+
+    assertThat(result.effectiveTime()).isEqualTo(LocalTime.of(23, 59, 59));
+    assertThat(result.routineTime()).isNull();
   }
 }
