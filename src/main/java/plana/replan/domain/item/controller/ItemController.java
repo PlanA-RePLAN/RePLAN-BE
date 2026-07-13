@@ -22,6 +22,7 @@ import plana.replan.domain.item.dto.ItemKind;
 import plana.replan.domain.item.dto.ItemOrderRequestDto;
 import plana.replan.domain.item.dto.ItemPinRequestDto;
 import plana.replan.domain.item.dto.ItemResponseDto;
+import plana.replan.domain.item.dto.ItemSubTodoCompleteRequestDto;
 import plana.replan.domain.item.dto.ItemSubTodoCreateRequestDto;
 import plana.replan.domain.item.dto.ItemSubTodoDeleteRequestDto;
 import plana.replan.domain.item.dto.ItemSubTodoUpdateRequestDto;
@@ -103,6 +104,15 @@ public class ItemController implements ItemControllerDocs {
       @AuthenticationPrincipal Long userId,
       @Valid @RequestBody ItemSubTodoCreateRequestDto request) {
     itemFacadeService.addSubTodo(userId, request);
+    return ResponseEntity.ok(ApiResult.ok());
+  }
+
+  @Override
+  @PatchMapping("/subtodos/complete")
+  public ResponseEntity<ApiResult<Void>> completeItemSubTodo(
+      @AuthenticationPrincipal Long userId,
+      @Valid @RequestBody ItemSubTodoCompleteRequestDto request) {
+    itemFacadeService.completeSubTodo(userId, request);
     return ResponseEntity.ok(ApiResult.ok());
   }
 
