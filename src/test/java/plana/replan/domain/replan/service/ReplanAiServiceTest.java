@@ -2,6 +2,9 @@ package plana.replan.domain.replan.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneId;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import plana.replan.domain.replan.dto.RecommendInput;
@@ -10,7 +13,11 @@ import plana.replan.domain.replan.dto.ReplanOperation;
 
 class ReplanAiServiceTest {
 
-  private final ReplanAiService service = new ReplanAiService(null);
+  // 한국시간 2026-06-01 18:00 고정 — 기존 테스트 데이터(2026-06-08~)보다 이전이라 보정이 끼어들지 않는다.
+  private static final Clock FIXED_CLOCK =
+      Clock.fixed(Instant.parse("2026-06-01T09:00:00Z"), ZoneId.of("Asia/Seoul"));
+
+  private final ReplanAiService service = new ReplanAiService(null, FIXED_CLOCK);
 
   @Test
   void 추천_JSON_파싱_성공() {
@@ -85,6 +92,66 @@ class ReplanAiServiceTest {
 
     assertThat(ops.get(0).tagId()).isNull();
     assertThat(ops.get(0).tagName()).isNull();
+  }
+
+  @Test
+  void 추천파싱_지난_마감의_ADD는_오늘로_보정한다() {
+    // 고정된 현재 일시는 2026-06-01 18:00 — 하루 전 09:00 마감이 온 경우
+    String raw =
+        """
+        {"operations":[
+          {"action":"ADD","targetTodoId":null,"title":"3~4강","dueDate":"2026-05-31",
+           "dueTime":"09:00","tagId":null,"routineType":null,"routineDays":null,
+           "changedFields":[]}
+        ]}
+        """;
+
+    List<ReplanOperation> ops = service.parseRecommend(raw, List.of());
+
+    assertThat(ops.get(0).dueDate()).isEqualTo("2026-06-01");
+    // 시각(09:00)도 이미 지났으므로 비워서 그날 끝까지로 취급
+    assertThat(ops.get(0).dueTime()).isNull();
+  }
+
+  @Test
+  void 추천파싱_지난_마감의_MODIFY_TODO는_보정하고_changedFields의_after도_맞춘다() {
+    String raw =
+        """
+        {"operations":[
+          {"action":"MODIFY_TODO","targetTodoId":42,"title":"데이터 분석 1~2강",
+           "dueDate":"2026-05-31","dueTime":"20:00","tagId":null,
+           "routineType":null,"routineDays":null,
+           "changedFields":[{"field":"dueDate","before":"2026-05-30","after":"2026-05-31"},
+                            {"field":"dueTime","before":"09:00","after":"20:00"}]}
+        ]}
+        """;
+
+    List<ReplanOperation> ops = service.parseRecommend(raw, List.of());
+
+    // 날짜는 오늘로, 시각(20:00)은 현재(18:00)보다 나중이라 유지
+    assertThat(ops.get(0).dueDate()).isEqualTo("2026-06-01");
+    assertThat(ops.get(0).dueTime()).isEqualTo("20:00");
+    // 화면에 보여줄 diff의 after도 보정값과 어긋나지 않아야 한다
+    assertThat(ops.get(0).changedFields().get(0).after()).isEqualTo("2026-06-01");
+    assertThat(ops.get(0).changedFields().get(1).after()).isEqualTo("20:00");
+  }
+
+  @Test
+  void 추천파싱_루틴_작업의_지난_dueDate는_보정하지_않는다() {
+    // CREATE_ROUTINE의 dueDate는 반복 종료일, dueTime은 반복 시각이라 마감 보정 대상이 아니다.
+    String raw =
+        """
+        {"operations":[
+          {"action":"CREATE_ROUTINE","targetTodoId":null,"title":"매일 스트레칭",
+           "dueDate":"2026-05-31","dueTime":"09:00","tagId":null,
+           "routineType":"DAILY","routineDays":null,"changedFields":[]}
+        ]}
+        """;
+
+    List<ReplanOperation> ops = service.parseRecommend(raw, List.of());
+
+    assertThat(ops.get(0).dueDate()).isEqualTo("2026-05-31");
+    assertThat(ops.get(0).dueTime()).isEqualTo("09:00");
   }
 
   @Test

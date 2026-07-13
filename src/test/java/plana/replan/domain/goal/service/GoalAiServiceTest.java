@@ -31,6 +31,9 @@ class GoalAiServiceTest {
   private static final Clock FIXED_CLOCK =
       Clock.fixed(Instant.parse("2026-07-09T09:00:00Z"), ZoneId.of("Asia/Seoul"));
 
+  // 추천 프롬프트에 넣는 현재 일시 문자열(고정 시각 기준)
+  private static final String NOW = "2026-07-09 18:00 (목요일)";
+
   private final GoalAiService service = new GoalAiService(null, null, FIXED_CLOCK);
 
   private Tag tag(long id, String title) {
@@ -165,19 +168,19 @@ class GoalAiServiceTest {
 
   @Test
   void 새로고침_0회차면_스타일_블록이_없다() {
-    String prompt = service.buildRecommendPrompt(req(0), "없음");
+    String prompt = service.buildRecommendPrompt(req(0), "없음", NOW);
     assertThat(prompt).doesNotContain("[이번 새로고침 스타일]");
   }
 
   @Test
   void 새로고침_생략_null이면_0회차처럼_스타일_블록이_없다() {
-    String prompt = service.buildRecommendPrompt(req(null), "없음");
+    String prompt = service.buildRecommendPrompt(req(null), "없음", NOW);
     assertThat(prompt).doesNotContain("[이번 새로고침 스타일]");
   }
 
   @Test
   void 새로고침_2회차면_벼락치기_스타일_블록이_붙는다() {
-    String prompt = service.buildRecommendPrompt(req(2), "없음");
+    String prompt = service.buildRecommendPrompt(req(2), "없음", NOW);
     assertThat(prompt).contains("[이번 새로고침 스타일]");
     assertThat(prompt).contains("벼락치기");
     assertThat(prompt).contains("todos"); // 기존 JSON 포맷 규칙 유지
@@ -185,7 +188,7 @@ class GoalAiServiceTest {
 
   @Test
   void 추천_프롬프트에_솔루션이_들어간다() {
-    String prompt = service.buildRecommendPrompt(req(0), "없음");
+    String prompt = service.buildRecommendPrompt(req(0), "없음", NOW);
     assertThat(prompt).contains("[현재 수준]");
     assertThat(prompt).contains("실력: 토익 600점");
   }
@@ -193,11 +196,81 @@ class GoalAiServiceTest {
   @Test
   void 추천_프롬프트에_태그_목록이_들어간다() {
     String prompt =
-        service.buildRecommendPrompt(req(0), "- id=1, name=Study\n- id=2, name=Health\n");
+        service.buildRecommendPrompt(req(0), "- id=1, name=Study\n- id=2, name=Health\n", NOW);
     assertThat(prompt).contains("[사용 가능한 태그 목록]");
     assertThat(prompt).contains("id=1, name=Study");
     assertThat(prompt).contains("id=2, name=Health");
     assertThat(prompt).contains("tagId"); // 출력 JSON 스키마에 tagId 포함
+  }
+
+  @Test
+  void 추천_프롬프트에_현재_일시와_마감_규칙이_들어간다() {
+    String prompt = service.buildRecommendPrompt(req(0), "없음", NOW);
+    assertThat(prompt).contains("현재 일시: 2026-07-09 18:00 (목요일)");
+    assertThat(prompt).contains("이미 지난 날짜·시각으로 절대 만들지 않는다");
+  }
+
+  @Test
+  void 추천파싱_지난_날짜의_ONE_TIME_마감은_오늘로_보정한다() {
+    // 고정된 현재 일시는 2026-07-09 18:00 — 하루 전 09:00 마감이 온 경우
+    String raw =
+        "{\"overallReason\":\"r\",\"todos\":[{\"type\":\"ONE_TIME\",\"title\":\"단어 암기\","
+            + "\"dueDate\":\"2026-07-08\",\"dueTime\":\"09:00\",\"routineType\":null,\"tagId\":null}]}";
+    TodoRecommendationResponse res = service.parseRecommendResponse(raw, List.of());
+    assertThat(res.todos().get(0).dueDate()).isEqualTo("2026-07-09");
+    // 시각(09:00)도 이미 지났으므로 비워서 그날 끝까지로 취급
+    assertThat(res.todos().get(0).dueTime()).isNull();
+  }
+
+  @Test
+  void 추천파싱_지난_날짜지만_시각은_안_지났으면_시각을_유지한다() {
+    String raw =
+        "{\"overallReason\":\"r\",\"todos\":[{\"type\":\"ONE_TIME\",\"title\":\"단어 암기\","
+            + "\"dueDate\":\"2026-07-08\",\"dueTime\":\"20:00\",\"routineType\":null,\"tagId\":null}]}";
+    TodoRecommendationResponse res = service.parseRecommendResponse(raw, List.of());
+    assertThat(res.todos().get(0).dueDate()).isEqualTo("2026-07-09");
+    assertThat(res.todos().get(0).dueTime()).isEqualTo("20:00");
+  }
+
+  @Test
+  void 추천파싱_오늘인데_지난_시각이면_시각만_비운다() {
+    String raw =
+        "{\"overallReason\":\"r\",\"todos\":[{\"type\":\"ONE_TIME\",\"title\":\"단어 암기\","
+            + "\"dueDate\":\"2026-07-09\",\"dueTime\":\"17:00\",\"routineType\":null,\"tagId\":null}]}";
+    TodoRecommendationResponse res = service.parseRecommendResponse(raw, List.of());
+    assertThat(res.todos().get(0).dueDate()).isEqualTo("2026-07-09");
+    assertThat(res.todos().get(0).dueTime()).isNull();
+  }
+
+  @Test
+  void 추천파싱_미래_마감은_보정하지_않는다() {
+    String raw =
+        "{\"overallReason\":\"r\",\"todos\":[{\"type\":\"ONE_TIME\",\"title\":\"단어 암기\","
+            + "\"dueDate\":\"2026-08-25\",\"dueTime\":\"08:00\",\"routineType\":null,\"tagId\":null}]}";
+    TodoRecommendationResponse res = service.parseRecommendResponse(raw, List.of());
+    assertThat(res.todos().get(0).dueDate()).isEqualTo("2026-08-25");
+    assertThat(res.todos().get(0).dueTime()).isEqualTo("08:00");
+  }
+
+  @Test
+  void 추천파싱_RECURRING의_지난_종료일정은_무기한으로_보정하고_반복시간은_유지한다() {
+    String raw =
+        "{\"overallReason\":\"r\",\"todos\":[{\"type\":\"RECURRING\",\"title\":\"매일 단어 암기\","
+            + "\"dueDate\":\"2026-07-01\",\"dueTime\":null,\"routineType\":\"DAILY\","
+            + "\"routineTime\":\"09:00\",\"tagId\":null}]}";
+    TodoRecommendationResponse res = service.parseRecommendResponse(raw, List.of());
+    assertThat(res.todos().get(0).dueDate()).isNull();
+    assertThat(res.todos().get(0).dueTime()).isNull();
+    assertThat(res.todos().get(0).routineTime()).isEqualTo("09:00");
+  }
+
+  @Test
+  void 추천파싱_형식이_잘못된_마감은_보정하지_않고_그대로_둔다() {
+    String raw =
+        "{\"overallReason\":\"r\",\"todos\":[{\"type\":\"ONE_TIME\",\"title\":\"단어 암기\","
+            + "\"dueDate\":\"이번 주\",\"dueTime\":null,\"routineType\":null,\"tagId\":null}]}";
+    TodoRecommendationResponse res = service.parseRecommendResponse(raw, List.of());
+    assertThat(res.todos().get(0).dueDate()).isEqualTo("이번 주");
   }
 
   @Test
@@ -264,6 +337,7 @@ class GoalAiServiceTest {
     String prompt = service.buildRefinePrompt(refineReq(), "2026-06-20");
     assertThat(prompt).contains("토익 850점");
     assertThat(prompt).contains("현재 영어 실력: 토익 600점대");
+    assertThat(prompt).contains("오늘 날짜: 2026-06-20");
   }
 
   @Test
