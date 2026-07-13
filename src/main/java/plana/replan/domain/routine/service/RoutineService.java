@@ -646,19 +646,24 @@ public class RoutineService {
     }
     motherRoutine.getChildren().forEach(child -> saveRoutineTodo(child, dueDate, motherTodo, null));
 
-    // 회차 예외에 예약해 둔 하위 투두를 실제 하위 투두로 실체화하고 예약을 비운다.
+    // 회차 예외에 예약해 둔 하위 투두를 실제 하위 투두로 실체화하고(완료 상태 승계) 예약을 비운다.
     if (override != null && override.getOverrideSubtodos() != null) {
       override
           .getOverrideSubtodos()
           .forEach(
-              title ->
-                  todoRepository.save(
-                      Todo.builder()
-                          .title(title)
-                          .user(motherRoutine.getUser())
-                          .parent(motherTodo)
-                          .isPinned(false)
-                          .build()));
+              reserved -> {
+                Todo sub =
+                    todoRepository.save(
+                        Todo.builder()
+                            .title(reserved.title())
+                            .user(motherRoutine.getUser())
+                            .parent(motherTodo)
+                            .isPinned(false)
+                            .build());
+                if (reserved.isCompleted()) {
+                  sub.updateCompleted(true, LocalDateTime.now(clock));
+                }
+              });
       override.clearSubtodos();
     }
   }

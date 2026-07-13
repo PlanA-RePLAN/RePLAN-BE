@@ -31,6 +31,7 @@ import plana.replan.domain.routine.dto.RoutineResponseDto;
 import plana.replan.domain.routine.dto.RoutineUpdateRequestDto;
 import plana.replan.domain.routine.dto.SubRoutineCreateRequestDto;
 import plana.replan.domain.routine.dto.SubRoutineUpdateRequestDto;
+import plana.replan.domain.routine.entity.ReservedSubtodo;
 import plana.replan.domain.routine.service.RoutineOverrideService;
 import plana.replan.domain.routine.service.RoutineService;
 import plana.replan.domain.todo.dto.SubTodoCreateRequestDto;
@@ -123,9 +124,11 @@ public class ItemFacadeService {
                   merged.add(
                       ItemDetailResponseDto.SubItemDto.plannedFromChildRoutine(
                           child.routineId(), child.title())));
-      List<String> reserved = override.reservedSubtodos();
+      List<ReservedSubtodo> reserved = override.reservedSubtodos();
       for (int i = 0; i < reserved.size(); i++) {
-        merged.add(ItemDetailResponseDto.SubItemDto.reserved(reserved.get(i), i));
+        merged.add(
+            ItemDetailResponseDto.SubItemDto.reserved(
+                reserved.get(i).title(), reserved.get(i).isCompleted(), i));
       }
       subItems = merged;
     }
@@ -263,8 +266,17 @@ public class ItemFacadeService {
   /** 하위 투두 완료/미완료 — 행이 있는 하위 전용 (예약분·예정분은 행이 없어 완료 개념이 없다). */
   @Transactional
   public void completeSubTodo(Long userId, ItemSubTodoCompleteRequestDto request) {
-    todoService.completeSubTodo(
-        userId, request.parentTodoId(), request.subTodoId(), request.isCompleted());
+    if (request.subTodoId() != null) {
+      // 행 하위 (그날만)
+      requireTodoTarget(request.parentTodoId());
+      todoService.completeSubTodo(
+          userId, request.parentTodoId(), request.subTodoId(), request.isCompleted());
+      return;
+    }
+    // 예약 하위 (그날만, 행이 아직 없는 회차)
+    requireReservedTarget(request.routineId(), request.date(), request.index());
+    routineOverrideService.completeSubtodo(
+        userId, request.routineId(), request.date(), request.index(), request.isCompleted());
   }
 
   @Transactional

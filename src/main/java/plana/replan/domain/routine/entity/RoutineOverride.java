@@ -61,11 +61,11 @@ public class RoutineOverride {
   @Column(name = "override_time")
   private LocalTime overrideTime;
 
-  // 행(Todo)이 아직 없는 이 날짜에 예약해 둔 하위 투두 제목 목록.
-  // 배치가 그날 행을 만들 때 실제 하위 투두로 실체화한 뒤 비운다. null = 예약 없음.
+  // 행(Todo)이 아직 없는 이 날짜에 예약해 둔 하위 투두 목록 ({title, isCompleted}).
+  // 배치가 그날 행을 만들 때 완료 상태까지 실제 하위 투두로 실체화한 뒤 비운다. null = 예약 없음.
   @JdbcTypeCode(SqlTypes.JSON)
   @Column(name = "override_subtodos")
-  private List<String> overrideSubtodos;
+  private List<ReservedSubtodo> overrideSubtodos;
 
   @CreationTimestamp
   @Column(name = "created_at", updatable = false)
@@ -117,12 +117,17 @@ public class RoutineOverride {
     if (overrideSubtodos == null) {
       overrideSubtodos = new ArrayList<>();
     }
-    overrideSubtodos.add(title);
+    overrideSubtodos.add(ReservedSubtodo.of(title));
   }
 
   /** index 범위 검증은 호출부(서비스)에서 한다. */
   public void updateSubtodo(int index, String title) {
-    overrideSubtodos.set(index, title);
+    overrideSubtodos.set(index, overrideSubtodos.get(index).withTitle(title));
+  }
+
+  /** 예약 하위 완료/미완료. index 범위 검증은 호출부(서비스)에서 한다. */
+  public void completeSubtodo(int index, boolean isCompleted) {
+    overrideSubtodos.set(index, overrideSubtodos.get(index).withCompleted(isCompleted));
   }
 
   public void removeSubtodo(int index) {
