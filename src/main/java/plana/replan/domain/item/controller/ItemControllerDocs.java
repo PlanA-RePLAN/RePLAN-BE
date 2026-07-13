@@ -23,6 +23,7 @@ import plana.replan.domain.item.dto.ItemKind;
 import plana.replan.domain.item.dto.ItemOrderRequestDto;
 import plana.replan.domain.item.dto.ItemPinRequestDto;
 import plana.replan.domain.item.dto.ItemResponseDto;
+import plana.replan.domain.item.dto.ItemSubTodoCompleteRequestDto;
 import plana.replan.domain.item.dto.ItemSubTodoCreateRequestDto;
 import plana.replan.domain.item.dto.ItemSubTodoDeleteRequestDto;
 import plana.replan.domain.item.dto.ItemSubTodoUpdateRequestDto;
@@ -1034,6 +1035,71 @@ public interface ItemControllerDocs {
   ResponseEntity<ApiResult<Void>> addItemSubTodo(
       @AuthenticationPrincipal Long userId,
       @Valid @RequestBody ItemSubTodoCreateRequestDto request);
+
+  @Operation(
+      summary = "통합 아이템 하위 투두 완료/미완료 처리",
+      description =
+          """
+          하위 투두를 완료 또는 미완료 처리한다. **행이 있는 하위(상세 응답 `subTodos`의 `todoId`가 있는 항목)만 가능**하다.
+          예약 하위·하위 루틴 예정분은 아직 행이 없어 완료 개념이 없다.
+
+          **Request Headers**
+
+          | 헤더명 | 필수 여부 | 타입 | 설명 |
+          |--------|-----------|------|------|
+          | Authorization | ✅ 필수 | string | `Bearer {accessToken}` 형식의 JWT 액세스 토큰 |
+          | Content-Type | ✅ 필수 | string | `application/json` |
+
+          **Request Body**
+
+          | 필드명 | 필수 여부 | 타입 | 설명 | 예시 |
+          |--------|-----------|------|------|------|
+          | parentTodoId | ✅ 필수 | integer | 부모 투두 ID (상세 응답의 todoId) | `42` |
+          | subTodoId | ✅ 필수 | integer | 하위 투두 ID (상세 응답 subTodos의 todoId) | `128` |
+          | isCompleted | ✅ 필수 | boolean | `true`면 완료, `false`면 미완료 | `true` |
+          """,
+      security = @SecurityRequirement(name = "Bearer Authentication"))
+  @io.swagger.v3.oas.annotations.parameters.RequestBody(
+      content =
+          @Content(
+              mediaType = "application/json",
+              examples = {
+                @ExampleObject(
+                    name = "완료 처리",
+                    value =
+                        """
+                        {"parentTodoId": 42, "subTodoId": 128, "isCompleted": true}
+                        """),
+                @ExampleObject(
+                    name = "미완료 처리",
+                    value =
+                        """
+                        {"parentTodoId": 42, "subTodoId": 128, "isCompleted": false}
+                        """)
+              }))
+  @ApiResponses({
+    @ApiResponse(responseCode = "200", description = "처리 성공"),
+    @ApiResponse(
+        responseCode = "400",
+        description = "필수 필드 누락",
+        content = @Content(examples = @ExampleObject(name = "필수 누락", value = ERR_INVALID_INPUT))),
+    @ApiResponse(
+        responseCode = "401",
+        description = "AccessToken 없음 또는 만료",
+        content =
+            @Content(
+                examples = {
+                  @ExampleObject(name = "토큰 없음", value = ERR_EMPTY_TOKEN),
+                  @ExampleObject(name = "만료된 토큰", value = ERR_EXPIRED_TOKEN)
+                })),
+    @ApiResponse(
+        responseCode = "404",
+        description = "하위 투두 없음 (존재하지 않거나 본인 소유가 아니거나 부모-하위 관계 불일치)",
+        content = @Content(examples = @ExampleObject(name = "투두 없음", value = ERR_TODO_NOT_FOUND)))
+  })
+  ResponseEntity<ApiResult<Void>> completeItemSubTodo(
+      @AuthenticationPrincipal Long userId,
+      @Valid @RequestBody ItemSubTodoCompleteRequestDto request);
 
   @Operation(
       summary = "통합 아이템 하위 투두 제목 수정",

@@ -18,6 +18,7 @@ import plana.replan.domain.item.dto.ItemOrderRequestDto;
 import plana.replan.domain.item.dto.ItemPinRequestDto;
 import plana.replan.domain.item.dto.ItemResponseDto;
 import plana.replan.domain.item.dto.ItemScope;
+import plana.replan.domain.item.dto.ItemSubTodoCompleteRequestDto;
 import plana.replan.domain.item.dto.ItemSubTodoCreateRequestDto;
 import plana.replan.domain.item.dto.ItemSubTodoDeleteRequestDto;
 import plana.replan.domain.item.dto.ItemSubTodoUpdateRequestDto;
@@ -257,6 +258,13 @@ public class ItemFacadeService {
     requireRoutineTarget(request.routineId());
     routineService.createChildRoutine(
         userId, request.routineId(), new SubRoutineCreateRequestDto(request.title()));
+  }
+
+  /** 하위 투두 완료/미완료 — 행이 있는 하위 전용 (예약분·예정분은 행이 없어 완료 개념이 없다). */
+  @Transactional
+  public void completeSubTodo(Long userId, ItemSubTodoCompleteRequestDto request) {
+    todoService.completeSubTodo(
+        userId, request.parentTodoId(), request.subTodoId(), request.isCompleted());
   }
 
   @Transactional
