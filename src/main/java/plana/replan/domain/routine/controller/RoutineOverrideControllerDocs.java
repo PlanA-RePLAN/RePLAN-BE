@@ -79,11 +79,17 @@ public interface RoutineOverrideControllerDocs {
                                 "effectiveTagTitle": "운동",
                                 "effectiveTagColor": "GREEN",
                                 "effectiveSortOrder": 10000.0,
+                                "effectiveTime": "15:00:00",
+                                "routineType": "DAILY",
+                                "routineDays": null,
+                                "routineTime": "09:00:00",
+                                "repeatEndDate": "2099-12-31T08:00:00",
                                 "isSkipped": false,
                                 "isPinned": false,
                                 "isCompleted": false,
                                 "hasOverride": true,
-                                "todoId": null
+                                "todoId": null,
+                                "reservedSubtodos": []
                               },
                               "error": null
                             }
@@ -197,11 +203,17 @@ public interface RoutineOverrideControllerDocs {
                                 "effectiveTagTitle": null,
                                 "effectiveTagColor": null,
                                 "effectiveSortOrder": 5000.0,
+                                "effectiveTime": "09:00:00",
+                                "routineType": "DAILY",
+                                "routineDays": null,
+                                "routineTime": "09:00:00",
+                                "repeatEndDate": "2099-12-31T08:00:00",
                                 "isSkipped": false,
                                 "isPinned": false,
                                 "isCompleted": false,
                                 "hasOverride": true,
-                                "todoId": null
+                                "todoId": null,
+                                "reservedSubtodos": []
                               },
                               "error": null
                             }
@@ -265,11 +277,17 @@ public interface RoutineOverrideControllerDocs {
                               "effectiveTagTitle": null,
                               "effectiveTagColor": null,
                               "effectiveSortOrder": 10000.0,
+                              "effectiveTime": "09:00:00",
+                              "routineType": "DAILY",
+                              "routineDays": null,
+                              "routineTime": "09:00:00",
+                              "repeatEndDate": "2099-12-31T08:00:00",
                               "isSkipped": false,
                               "isPinned": false,
                               "isCompleted": true,
                               "hasOverride": true,
-                              "todoId": null
+                              "todoId": null,
+                              "reservedSubtodos": []
                             },
                             "error": null
                           }
@@ -289,11 +307,17 @@ public interface RoutineOverrideControllerDocs {
                               "effectiveTagTitle": null,
                               "effectiveTagColor": null,
                               "effectiveSortOrder": 10000.0,
+                              "effectiveTime": "09:00:00",
+                              "routineType": "DAILY",
+                              "routineDays": null,
+                              "routineTime": "09:00:00",
+                              "repeatEndDate": "2099-12-31T08:00:00",
                               "isSkipped": false,
                               "isPinned": false,
                               "isCompleted": false,
                               "hasOverride": true,
-                              "todoId": null
+                              "todoId": null,
+                              "reservedSubtodos": []
                             },
                             "error": null
                           }
@@ -462,11 +486,17 @@ public interface RoutineOverrideControllerDocs {
           | effectiveTagTitle | string | 실제 적용될 태그 제목. 없으면 null |
           | effectiveTagColor | string | 실제 적용될 태그 색상. 없으면 null |
           | effectiveSortOrder | number | 실제 적용될 정렬 순서 |
+          | effectiveTime | string | 그날의 실제 마감시간 (HH:mm:ss 형식, 회차 예외 시간 > 루틴 기본 시간 > 23:59:59) |
+          | routineType | string | 반복 유형 (DAILY/WEEKLY/MONTHLY) |
+          | routineDays | array | 반복 날짜 배열. WEEKLY=요일 인덱스(월0…일6), MONTHLY=일자(1~31), DAILY=null |
+          | routineTime | string | 루틴 기본 반복시간 (HH:mm:ss 형식). 설정 안 했으면 null |
+          | repeatEndDate | string | 반복 종료일 (ISO 8601 형식) |
           | isSkipped | boolean | 건너뜀 여부 |
           | isPinned | boolean | 핀 여부 |
           | isCompleted | boolean | 완료 여부 |
           | hasOverride | boolean | override 존재 여부 |
           | todoId | integer | 생성된 Todo ID. 없으면 null |
+          | reservedSubtodos | array | 예약된 하위 투두 제목 목록. 없으면 빈 목록 |
           """,
       security = @SecurityRequirement(name = "Bearer Authentication"))
   @ApiResponses({
@@ -490,11 +520,17 @@ public interface RoutineOverrideControllerDocs {
                                 "effectiveTagTitle": "운동",
                                 "effectiveTagColor": "GREEN",
                                 "effectiveSortOrder": 10000.0,
+                                "effectiveTime": "09:00:00",
+                                "routineType": "DAILY",
+                                "routineDays": null,
+                                "routineTime": "09:00:00",
+                                "repeatEndDate": "2099-12-31T08:00:00",
                                 "isSkipped": false,
                                 "isPinned": false,
                                 "isCompleted": false,
                                 "hasOverride": false,
-                                "todoId": 42
+                                "todoId": 42,
+                                "reservedSubtodos": []
                               },
                               "error": null
                             }

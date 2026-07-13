@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.List;
 import plana.replan.domain.routine.dto.RoutineOverrideResponseDto;
 import plana.replan.domain.todo.dto.TodoDetailResponseDto;
@@ -15,7 +16,8 @@ public record ItemDetailResponseDto(
     @Schema(description = "루틴 ID. ROUTINE일 때만") Long routineId,
     @Schema(description = "날짜. ROUTINE=회차 날짜, TODO=마감일의 날짜") LocalDate date,
     @Schema(description = "제목 (ROUTINE이면 override 적용값)") String title,
-    @Schema(description = "마감 일시. TODO만, 없으면 null") LocalDateTime dueDate,
+    @Schema(description = "마감 일시. TODO=본인 마감(없으면 null), ROUTINE=그날의 실제 마감일시(회차 예외 시간 반영)")
+        LocalDateTime dueDate,
     @JsonProperty("isCompleted") @Schema(description = "완료 여부") boolean isCompleted,
     @JsonProperty("isPinned") @Schema(description = "핀 여부. TODO 상세에서는 제공하지 않음(null)")
         Boolean isPinned,
@@ -25,8 +27,12 @@ public record ItemDetailResponseDto(
     @Schema(description = "태그 ID (ROUTINE이면 override 적용값)") Long tagId,
     @Schema(description = "태그 제목") String tagTitle,
     @Schema(description = "태그 색상") String tagColor,
-    @Schema(description = "반복 유형. TODO 상세에서만 제공") String routineType,
-    @Schema(description = "반복 날짜 배열. TODO 상세에서만 제공") List<Integer> routineDays,
+    @Schema(description = "반복 유형 (DAILY/WEEKLY/MONTHLY). 반복 아니면 null") String routineType,
+    @Schema(description = "반복 날짜 배열. WEEKLY=요일 인덱스(월0…일6), MONTHLY=일자(1~31), 아니면 null")
+        List<Integer> routineDays,
+    @Schema(description = "루틴 기본 반복시간. ROUTINE만, 설정 안 했으면 null", example = "09:00:00")
+        LocalTime routineTime,
+    @Schema(description = "반복 종료일. ROUTINE만") LocalDateTime repeatEndDate,
     @Schema(description = "하위 아이템 목록 (하위 투두)") List<SubItemDto> subItems) {
 
   @Schema(description = "하위 아이템")
@@ -71,6 +77,8 @@ public record ItemDetailResponseDto(
         todo.getTagColor(),
         todo.getRoutineType(),
         todo.getRoutineDays(),
+        null,
+        null,
         todo.getSubTodos().stream().map(SubItemDto::from).toList());
   }
 
@@ -82,7 +90,7 @@ public record ItemDetailResponseDto(
         override.routineId(),
         override.overrideDate(),
         override.effectiveTitle(),
-        null,
+        override.overrideDate().atTime(override.effectiveTime()),
         override.isCompleted(),
         override.isPinned(),
         override.isSkipped(),
@@ -90,8 +98,10 @@ public record ItemDetailResponseDto(
         override.effectiveTagId(),
         override.effectiveTagTitle(),
         override.effectiveTagColor(),
-        null,
-        null,
+        override.routineType(),
+        override.routineDays(),
+        override.routineTime(),
+        override.repeatEndDate(),
         subItems);
   }
 }
