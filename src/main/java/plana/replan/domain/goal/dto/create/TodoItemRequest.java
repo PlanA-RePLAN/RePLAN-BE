@@ -13,13 +13,17 @@ public record TodoItemRequest(
     @Schema(description = "투두 제목", example = "단어 암기") @NotBlank(message = "투두 제목은 필수입니다.")
         String title,
     @Schema(
-            description = "마감 날짜 (yyyy-MM-dd 형식). ONE_TIME만 사용. RECURRING이면 null.",
+            description = "마감 날짜 (yyyy-MM-dd 형식). ONE_TIME=마감일, RECURRING=반복 종료일.",
             example = "2025-06-01")
         String dueDate,
-    @Schema(description = "마감 시간 (HH:mm 형식). ONE_TIME만 사용. RECURRING이면 null.", example = "09:00")
+    @Schema(
+            description = "마감 시간 (HH:mm 형식). ONE_TIME=마감 시각, RECURRING=반복 종료일의 시각. 없으면 null.",
+            example = "09:00")
         String dueTime,
     @Schema(description = "반복 유형. RECURRING만 사용. ONE_TIME이면 null.", example = "DAILY")
         RoutineType routineType,
+    @Schema(description = "반복시간 (HH:mm 형식). RECURRING만 사용. 없으면 null(시간 미설정).", example = "09:00")
+        String routineTime,
     @Schema(
             description =
                 "반복 날짜 배열. RECURRING만 사용. WEEKLY: 요일 인덱스(월=0, 화=1 … 일=6). MONTHLY: 일자(1~31). ONE_TIME: null. DAILY: null 또는 빈 배열([]) — 값이 있으면 400. 예) 월·수·금=[0,2,4], 매월 3·20일=[3,20].",
