@@ -287,6 +287,86 @@ class RoutineOverrideServiceTest {
             "errorCode", RoutineErrorCode.ROUTINE_OVERRIDE_SUBTODO_NOT_FOUND);
   }
 
+  private Routine childOf(Routine mother) {
+    Routine child = Routine.builder().title("하위 루틴").user(mother.getUser()).parent(mother).build();
+    ReflectionTestUtils.setField(child, "id", 20L);
+    return child;
+  }
+
+  @Test
+  void updateChildTitleForDate_하위_루틴_명의의_회차_예외에_그날만_제목이_기록된다() {
+    Routine mother = dailyRoutine(null);
+    Routine child = childOf(mother);
+    given(routineRepository.findById(20L)).willReturn(Optional.of(child));
+    given(routineOverrideRepository.findByRoutineAndOverrideDate(child, TEST_DATE))
+        .willReturn(Optional.empty());
+    given(routineOverrideRepository.saveAndFlush(any())).willAnswer(inv -> inv.getArgument(0));
+
+    routineOverrideService.updateChildTitleForDate(1L, 20L, TEST_DATE, "그날만 제목");
+
+    ArgumentCaptor<RoutineOverride> captor = ArgumentCaptor.forClass(RoutineOverride.class);
+    verify(routineOverrideRepository).saveAndFlush(captor.capture());
+    assertThat(captor.getValue().getRoutine()).isEqualTo(child);
+    assertThat(captor.getValue().getTitle()).isEqualTo("그날만 제목");
+  }
+
+  @Test
+  void completeChildForDate_그날_행이_있으면_행에도_반영된다() {
+    Routine mother = dailyRoutine(null);
+    Routine child = childOf(mother);
+    given(routineRepository.findById(20L)).willReturn(Optional.of(child));
+    RoutineOverride override =
+        RoutineOverride.builder().routine(child).overrideDate(TEST_DATE).build();
+    given(routineOverrideRepository.findByRoutineAndOverrideDate(child, TEST_DATE))
+        .willReturn(Optional.of(override));
+    given(clock.instant()).willReturn(java.time.Instant.parse("2024-01-15T10:00:00Z"));
+    given(clock.getZone()).willReturn(java.time.ZoneId.of("UTC"));
+
+    Todo row =
+        Todo.builder()
+            .title("하위 루틴")
+            .user(child.getUser())
+            .parent(Todo.builder().title("부모행").user(child.getUser()).isPinned(false).build())
+            .isPinned(false)
+            .routine(child)
+            .build();
+    given(
+            todoRepository.findChildTodoByRoutineAndDate(
+                child, TEST_DATE.atStartOfDay(), TEST_DATE.plusDays(1).atStartOfDay()))
+        .willReturn(Optional.of(row));
+
+    routineOverrideService.completeChildForDate(1L, 20L, TEST_DATE, true);
+
+    assertThat(override.getIsCompleted()).isTrue();
+    assertThat(row.isCompleted()).isTrue();
+  }
+
+  @Test
+  void excludeChildForDate_회차_예외에_skip이_기록된다() {
+    Routine mother = dailyRoutine(null);
+    Routine child = childOf(mother);
+    given(routineRepository.findById(20L)).willReturn(Optional.of(child));
+    RoutineOverride override =
+        RoutineOverride.builder().routine(child).overrideDate(TEST_DATE).build();
+    given(routineOverrideRepository.findByRoutineAndOverrideDate(child, TEST_DATE))
+        .willReturn(Optional.of(override));
+
+    routineOverrideService.excludeChildForDate(1L, 20L, TEST_DATE);
+
+    assertThat(override.isSkipped()).isTrue();
+  }
+
+  @Test
+  void updateChildTitleForDate_엄마_루틴을_지목하면_400() {
+    Routine mother = dailyRoutine(null);
+    given(routineRepository.findById(10L)).willReturn(Optional.of(mother));
+
+    assertThatThrownBy(
+            () -> routineOverrideService.updateChildTitleForDate(1L, 10L, TEST_DATE, "제목"))
+        .isInstanceOf(CustomException.class)
+        .hasFieldOrPropertyWithValue("errorCode", RoutineErrorCode.ROUTINE_INVALID_TARGET);
+  }
+
   @Test
   void getOverride_반복정보와_그날의_유효시간을_함께_내려준다() {
     Routine routine = dailyRoutine(LocalTime.of(9, 0));

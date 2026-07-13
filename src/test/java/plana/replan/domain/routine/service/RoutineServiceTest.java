@@ -911,6 +911,67 @@ class RoutineServiceTest {
   }
 
   @Test
+  void generateDailyTodos_하위_루틴의_그날_개인화가_적용된다() {
+    Routine mother = buildRoutine(RoutineType.DAILY, null);
+    ReflectionTestUtils.setField(mother, "id", 1L);
+    Routine child = Routine.builder().title("하위").user(mother.getUser()).parent(mother).build();
+    ReflectionTestUtils.setField(child, "id", 2L);
+    mother.getChildren().add(child);
+
+    RoutineOverride childOverride =
+        RoutineOverride.builder().routine(child).overrideDate(TEST_DATE).build();
+    childOverride.updateContent("그날만 제목", null, null);
+    childOverride.updateComplete(true, TEST_DATE.atStartOfDay());
+
+    given(routineRepository.findAllActiveMotherRoutines()).willReturn(List.of(mother));
+    given(routineOverrideRepository.findByRoutineIdInAndOverrideDate(any(), any()))
+        .willAnswer(
+            inv -> {
+              List<Long> ids = inv.getArgument(0);
+              return ids.contains(2L) ? List.of(childOverride) : List.of();
+            });
+    given(todoRepository.saveAndFlush(any())).willAnswer(inv -> inv.getArgument(0));
+
+    routineService.generateDailyTodos();
+
+    // 엄마 행 + 하위 행이 saveAndFlush로 저장되며, 하위 행에 그날 개인화가 반영된다
+    ArgumentCaptor<Todo> captor = ArgumentCaptor.forClass(Todo.class);
+    verify(todoRepository, org.mockito.Mockito.atLeast(2)).saveAndFlush(captor.capture());
+    Todo childRow =
+        captor.getAllValues().stream().filter(t -> t.getParent() != null).findFirst().orElseThrow();
+    assertThat(childRow.getTitle()).isEqualTo("그날만 제목");
+    assertThat(childRow.isCompleted()).isTrue();
+  }
+
+  @Test
+  void generateDailyTodos_그날_제외된_하위_루틴은_행을_만들지_않는다() {
+    Routine mother = buildRoutine(RoutineType.DAILY, null);
+    ReflectionTestUtils.setField(mother, "id", 1L);
+    Routine child = Routine.builder().title("하위").user(mother.getUser()).parent(mother).build();
+    ReflectionTestUtils.setField(child, "id", 2L);
+    mother.getChildren().add(child);
+
+    RoutineOverride childOverride =
+        RoutineOverride.builder().routine(child).overrideDate(TEST_DATE).build();
+    childOverride.skip();
+
+    given(routineRepository.findAllActiveMotherRoutines()).willReturn(List.of(mother));
+    given(routineOverrideRepository.findByRoutineIdInAndOverrideDate(any(), any()))
+        .willAnswer(
+            inv -> {
+              List<Long> ids = inv.getArgument(0);
+              return ids.contains(2L) ? List.of(childOverride) : List.of();
+            });
+    given(todoRepository.saveAndFlush(any())).willAnswer(inv -> inv.getArgument(0));
+
+    routineService.generateDailyTodos();
+
+    ArgumentCaptor<Todo> captor = ArgumentCaptor.forClass(Todo.class);
+    verify(todoRepository, org.mockito.Mockito.atLeastOnce()).saveAndFlush(captor.capture());
+    assertThat(captor.getAllValues()).allMatch(t -> t.getParent() == null);
+  }
+
+  @Test
   void generateDailyTodos_완료된_예약_하위는_완료_상태로_실체화된다() {
     Routine routine = buildRoutine(RoutineType.DAILY, null);
 

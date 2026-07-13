@@ -23,6 +23,7 @@ import plana.replan.domain.routine.dto.RoutineCreateRequestDto;
 import plana.replan.domain.routine.dto.RoutineResponseDto;
 import plana.replan.domain.routine.dto.RoutineUpdateRequestDto;
 import plana.replan.domain.routine.dto.SubRoutineCreateRequestDto;
+import plana.replan.domain.routine.dto.SubRoutineDayViewDto;
 import plana.replan.domain.routine.dto.SubRoutineResponseDto;
 import plana.replan.domain.routine.dto.SubRoutineUpdateRequestDto;
 import plana.replan.domain.routine.entity.Routine;
@@ -451,6 +452,39 @@ public class RoutineService {
    * 용도로, 배치가 하위 투두를 만드는 기준({@code getChildren()})과 같은 목록을 쓴다.
    */
   @Transactional(readOnly = true)
+  /** 그 날짜 기준 하위 루틴 예정분 목록 — 하위 루틴의 그날 개인화(제목/완료)를 반영하고, 그날 제외(skip)된 것은 뺀다. */
+  public List<SubRoutineDayViewDto> getAliveChildrenForDate(
+      Long userId, Long routineId, LocalDate date) {
+    Routine routine = findOwnedRoutine(userId, routineId);
+    if (routine.isChild()) {
+      throw new CustomException(RoutineErrorCode.ROUTINE_INVALID_TARGET);
+    }
+    List<Routine> children = routine.getChildren();
+    if (children.isEmpty()) {
+      return List.of();
+    }
+    Map<Long, RoutineOverride> overrides =
+        routineOverrideRepository
+            .findByRoutineIdInAndOverrideDate(children.stream().map(Routine::getId).toList(), date)
+            .stream()
+            .collect(Collectors.toMap(o -> o.getRoutine().getId(), o -> o));
+    return children.stream()
+        .map(
+            child -> {
+              RoutineOverride ov = overrides.get(child.getId());
+              if (ov != null && ov.isSkipped()) {
+                return null;
+              }
+              return new SubRoutineDayViewDto(
+                  child.getId(),
+                  ov != null && ov.getTitle() != null ? ov.getTitle() : child.getTitle(),
+                  ov != null && Boolean.TRUE.equals(ov.getIsCompleted()));
+            })
+        .filter(java.util.Objects::nonNull)
+        .toList();
+  }
+
+  @Transactional(readOnly = true)
   public List<SubRoutineResponseDto> getAliveChildren(Long userId, Long routineId) {
     Routine routine = findOwnedRoutine(userId, routineId);
     if (routine.isChild()) {
@@ -644,7 +678,19 @@ public class RoutineService {
     if (motherTodo == null) {
       return;
     }
-    motherRoutine.getChildren().forEach(child -> saveRoutineTodo(child, dueDate, motherTodo, null));
+    // 하위 루틴의 그날 개인화(제목/완료/제외)를 적용해 하위 행을 만든다
+    Map<Long, RoutineOverride> childOverrides =
+        childOverridesFor(motherRoutine, dueDate.toLocalDate());
+    motherRoutine
+        .getChildren()
+        .forEach(
+            child -> {
+              RoutineOverride childOv = childOverrides.get(child.getId());
+              if (childOv != null && childOv.isSkipped()) {
+                return;
+              }
+              saveRoutineTodo(child, dueDate, motherTodo, childOv);
+            });
 
     // 회차 예외에 예약해 둔 하위 투두를 실제 하위 투두로 실체화하고(완료 상태 승계) 예약을 비운다.
     if (override != null && override.getOverrideSubtodos() != null) {
@@ -674,6 +720,17 @@ public class RoutineService {
       throw new IllegalStateException("attachChildTodoUnder는 하위 루틴에만 호출 가능합니다.");
     }
     saveRoutineTodo(childRoutine, motherTodo.getDueDate(), motherTodo, null);
+  }
+
+  private Map<Long, RoutineOverride> childOverridesFor(Routine motherRoutine, LocalDate date) {
+    List<Routine> children = motherRoutine.getChildren();
+    if (children.isEmpty()) {
+      return Map.of();
+    }
+    return routineOverrideRepository
+        .findByRoutineIdInAndOverrideDate(children.stream().map(Routine::getId).toList(), date)
+        .stream()
+        .collect(Collectors.toMap(o -> o.getRoutine().getId(), o -> o));
   }
 
   private Todo saveRoutineTodo(
