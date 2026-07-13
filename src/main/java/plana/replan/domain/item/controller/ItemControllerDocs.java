@@ -429,7 +429,12 @@ public interface ItemControllerDocs {
           | todoId | integer | 하위 투두 ID. 행이 없는 회차의 하위(예정분·예약분)는 null |
           | title | string | 제목 |
           | isCompleted | boolean | 완료 여부 |
-          | reservedIndex | integer | 예약 하위의 배열 위치(수정/삭제 시 지목용). 행 하위는 null, todoId와 둘 다 null이면 하위 루틴 예정분(읽기 전용) |
+          | reservedIndex | integer | 예약 하위의 배열 위치(수정/삭제 시 지목용). 예약 하위가 아니면 null |
+          | subRoutineId | integer | 하위 루틴 ID(반복 전체 수정/삭제 시 지목용). 하위 루틴과 무관한 하위면 null |
+
+          **subTodos 원소 구분**: `todoId` 있음=행 하위(그날만 조작) / `reservedIndex` 있음=예약 하위(그날만 조작) /
+          `subRoutineId`만 있음=하위 루틴 예정분(반복 전체로만 조작). 하위 루틴 출신 행 하위는 `todoId`와 `subRoutineId`가 둘 다 있어
+          "그날만"과 "반복 전체" 조작을 모두 지원한다.
 
           **참고**: ROUTINE 상세의 반복 유형/요일 정보는 목록 응답에 이미 포함돼 있어 여기서는 null로 반환된다.
           행(Todo)이 아직 없는 미래 회차의 `subTodos`에는 하위 루틴 예정분(읽기 전용)과 예약된 하위가 병합되어 내려온다.
@@ -946,10 +951,13 @@ public interface ItemControllerDocs {
           """
           **kind=TODO** (todoId 필수): 그 투두에 하위 투두 추가. 기존 `POST /api/todos/{parentId}/sub-todos`와 동일.
 
-          **kind=ROUTINE** (routineId·date 필수): 그 날짜 회차에 하위 투두 추가.
+          **kind=ROUTINE + scope=THIS** (routineId·date 필수): 그 날짜 회차에만 하위 투두 추가.
           - 그날 행(Todo)이 이미 있으면 행에 바로 생성된다.
           - 아직 없으면(미래 회차) 회차 예외에 **예약**해 뒀다가 배치가 행을 만들 때 실체화한다.
           - 예약 하위는 상세 응답 `subTodos`에 `reservedIndex`가 채워진 항목으로 내려온다.
+
+          **kind=ROUTINE + scope=ALL** (routineId 필수): **하위 루틴 생성** — 이후 모든 회차에 반복되는 하위.
+          기존 `POST /api/routines/{parentId}/children`과 동일.
 
           **Request Headers**
 
@@ -965,7 +973,8 @@ public interface ItemControllerDocs {
           | kind | ✅ 필수 | string | TODO / ROUTINE | `"ROUTINE"` |
           | todoId | kind=TODO일 때 ✅ | integer | 투두 ID | `42` |
           | routineId | kind=ROUTINE일 때 ✅ | integer | 루틴 ID | `7` |
-          | date | kind=ROUTINE일 때 ✅ | string | 회차 날짜 (yyyy-MM-dd 형식) | `"2026-07-20"` |
+          | date | ROUTINE+THIS일 때 ✅ | string | 회차 날짜 (yyyy-MM-dd 형식) | `"2026-07-20"` |
+          | scope | kind=ROUTINE일 때 ✅ | string | THIS(그 날짜 회차만) / ALL(하위 루틴 생성) | `"THIS"` |
           | title | ✅ 필수 | string | 하위 투두 제목 | `"단어 50개 외우기"` |
 
           > ❌ 선택 필드는 생략하거나 null로 전달해도 동일하게 처리됩니다.
@@ -983,10 +992,16 @@ public interface ItemControllerDocs {
                         {"kind": "TODO", "todoId": 42, "title": "단어 50개 외우기"}
                         """),
                 @ExampleObject(
-                    name = "루틴 회차에 하위 추가 (미래 회차면 예약)",
+                    name = "루틴 그 날짜 회차에만 추가 (미래 회차면 예약)",
                     value =
                         """
-                        {"kind": "ROUTINE", "routineId": 7, "date": "2026-07-20", "title": "단어 50개 외우기"}
+                        {"kind": "ROUTINE", "routineId": 7, "date": "2026-07-20", "scope": "THIS", "title": "단어 50개 외우기"}
+                        """),
+                @ExampleObject(
+                    name = "하위 루틴 생성 (모든 회차에 반복)",
+                    value =
+                        """
+                        {"kind": "ROUTINE", "routineId": 7, "scope": "ALL", "title": "매일 스트레칭"}
                         """)
               }))
   @ApiResponses({
@@ -1027,12 +1042,14 @@ public interface ItemControllerDocs {
       @Valid @RequestBody ItemSubTodoCreateRequestDto request);
 
   @Operation(
-      summary = "예약된 하위 투두 제목 수정",
+      summary = "통합 아이템 하위 투두 제목 수정",
       description =
           """
-          행이 아직 없는 회차에 **예약된** 하위 투두의 제목을 수정한다. `index`는 상세 응답 `subTodos`의 `reservedIndex` 값.
+          하위 투두의 제목을 수정한다. 아래 세 가지 지목 방법 중 정확히 하나를 사용한다.
 
-          행이 있는 날짜의 하위 투두는 기존 `PUT /api/todos/{parentId}/sub-todos/{subTodoId}`를 사용한다.
+          - **행 하위 (그날만)**: `parentTodoId` + `subTodoId` — 기존 `PUT /api/todos/{parentId}/sub-todos/{subTodoId}`와 동일
+          - **예약 하위 (그날만, 행이 아직 없는 회차)**: `routineId` + `date` + `index` (상세 응답 `subTodos`의 `reservedIndex`)
+          - **하위 루틴 (반복 전체)**: `subRoutineId` (상세 응답 `subTodos`의 `subRoutineId`) — 기존 `PATCH /api/routines/children/{id}`와 동일
 
           **Request Headers**
 
@@ -1045,30 +1062,52 @@ public interface ItemControllerDocs {
 
           | 필드명 | 필수 여부 | 타입 | 설명 | 예시 |
           |--------|-----------|------|------|------|
-          | routineId | ✅ 필수 | integer | 루틴 ID | `7` |
-          | date | ✅ 필수 | string | 회차 날짜 (yyyy-MM-dd 형식) | `"2026-07-20"` |
-          | index | ✅ 필수 | integer | 예약 배열 위치 (상세 응답의 reservedIndex) | `0` |
+          | parentTodoId | 행 하위 지목 시 ✅ | integer | 부모 투두 ID | `42` |
+          | subTodoId | 행 하위 지목 시 ✅ | integer | 하위 투두 ID | `128` |
+          | routineId | 예약 하위 지목 시 ✅ | integer | 루틴 ID | `7` |
+          | date | 예약 하위 지목 시 ✅ | string | 회차 날짜 (yyyy-MM-dd 형식) | `"2026-07-20"` |
+          | index | 예약 하위 지목 시 ✅ | integer | 예약 배열 위치 (상세 응답의 reservedIndex) | `0` |
+          | subRoutineId | 반복 전체 지목 시 ✅ | integer | 하위 루틴 ID (상세 응답의 subRoutineId) | `11` |
           | title | ✅ 필수 | string | 새 제목 | `"단어 100개 외우기"` |
+
+          > ❌ 선택 필드는 생략하거나 null로 전달해도 동일하게 처리됩니다.
           """,
       security = @SecurityRequirement(name = "Bearer Authentication"))
   @io.swagger.v3.oas.annotations.parameters.RequestBody(
       content =
           @Content(
               mediaType = "application/json",
-              examples =
-                  @ExampleObject(
-                      name = "예약 하위 제목 수정",
-                      value =
-                          """
-                          {"routineId": 7, "date": "2026-07-20", "index": 0, "title": "단어 100개 외우기"}
-                          """)))
+              examples = {
+                @ExampleObject(
+                    name = "행 하위 수정 (그날만)",
+                    value =
+                        """
+                        {"parentTodoId": 42, "subTodoId": 128, "title": "단어 100개 외우기"}
+                        """),
+                @ExampleObject(
+                    name = "예약 하위 수정 (그날만, 미래 회차)",
+                    value =
+                        """
+                        {"routineId": 7, "date": "2026-07-20", "index": 0, "title": "단어 100개 외우기"}
+                        """),
+                @ExampleObject(
+                    name = "하위 루틴 수정 (반복 전체)",
+                    value =
+                        """
+                        {"subRoutineId": 11, "title": "유산소 30분"}
+                        """)
+              }))
   @ApiResponses({
     @ApiResponse(responseCode = "200", description = "수정 성공"),
     @ApiResponse(
         responseCode = "400",
-        description = "빈 제목 또는 필수 필드 누락",
+        description = "빈 제목, 지목 필드 누락, 엄마 루틴 ID를 subRoutineId로 지정",
         content =
-            @Content(examples = @ExampleObject(name = "빈 제목/필수 누락", value = ERR_INVALID_INPUT))),
+            @Content(
+                examples = {
+                  @ExampleObject(name = "빈 제목/지목 누락", value = ERR_INVALID_INPUT),
+                  @ExampleObject(name = "엄마 루틴 ID 지정", value = ERR_ROUTINE_INVALID_TARGET)
+                })),
     @ApiResponse(
         responseCode = "401",
         description = "AccessToken 없음 또는 만료",
@@ -1080,25 +1119,28 @@ public interface ItemControllerDocs {
                 })),
     @ApiResponse(
         responseCode = "404",
-        description = "루틴 없음 또는 예약된 하위 투두 없음(index 범위 밖)",
+        description = "대상 없음 — 투두/루틴/예약(index 범위 밖)",
         content =
             @Content(
                 examples = {
+                  @ExampleObject(name = "투두 없음", value = ERR_TODO_NOT_FOUND),
                   @ExampleObject(name = "루틴 없음", value = ERR_ROUTINE_NOT_FOUND),
                   @ExampleObject(name = "예약 하위 없음", value = ERR_OVERRIDE_SUBTODO_NOT_FOUND)
                 }))
   })
-  ResponseEntity<ApiResult<Void>> updateItemReservedSubTodo(
+  ResponseEntity<ApiResult<Void>> updateItemSubTodo(
       @AuthenticationPrincipal Long userId,
       @Valid @RequestBody ItemSubTodoUpdateRequestDto request);
 
   @Operation(
-      summary = "예약된 하위 투두 삭제",
+      summary = "통합 아이템 하위 투두 삭제",
       description =
           """
-          행이 아직 없는 회차에 **예약된** 하위 투두를 삭제한다. `index`는 상세 응답 `subTodos`의 `reservedIndex` 값.
+          하위 투두를 삭제한다. 아래 세 가지 지목 방법 중 정확히 하나를 사용한다.
 
-          행이 있는 날짜의 하위 투두는 기존 `DELETE /api/todos/{parentId}/sub-todos/{subTodoId}`를 사용한다.
+          - **행 하위 (그날만)**: `parentTodoId` + `subTodoId` — 기존 `DELETE /api/todos/{parentId}/sub-todos/{subTodoId}`와 동일
+          - **예약 하위 (그날만, 행이 아직 없는 회차)**: `routineId` + `date` + `index` (상세 응답 `subTodos`의 `reservedIndex`)
+          - **하위 루틴 (반복 전체 — 이후 모든 회차에서 사라짐)**: `subRoutineId` — 기존 `DELETE /api/routines/children/{id}`와 동일
 
           **요청 본문 주의**: DELETE지만 본문(body)이 필수다. axios는 `axios.delete(url, { data: {...} })`처럼
           설정 객체의 `data`로 본문을 전달해야 한다.
@@ -1114,28 +1156,51 @@ public interface ItemControllerDocs {
 
           | 필드명 | 필수 여부 | 타입 | 설명 | 예시 |
           |--------|-----------|------|------|------|
-          | routineId | ✅ 필수 | integer | 루틴 ID | `7` |
-          | date | ✅ 필수 | string | 회차 날짜 (yyyy-MM-dd 형식) | `"2026-07-20"` |
-          | index | ✅ 필수 | integer | 예약 배열 위치 (상세 응답의 reservedIndex) | `0` |
+          | parentTodoId | 행 하위 지목 시 ✅ | integer | 부모 투두 ID | `42` |
+          | subTodoId | 행 하위 지목 시 ✅ | integer | 하위 투두 ID | `128` |
+          | routineId | 예약 하위 지목 시 ✅ | integer | 루틴 ID | `7` |
+          | date | 예약 하위 지목 시 ✅ | string | 회차 날짜 (yyyy-MM-dd 형식) | `"2026-07-20"` |
+          | index | 예약 하위 지목 시 ✅ | integer | 예약 배열 위치 (상세 응답의 reservedIndex) | `0` |
+          | subRoutineId | 반복 전체 지목 시 ✅ | integer | 하위 루틴 ID (상세 응답의 subRoutineId) | `11` |
+
+          > ❌ 선택 필드는 생략하거나 null로 전달해도 동일하게 처리됩니다.
           """,
       security = @SecurityRequirement(name = "Bearer Authentication"))
   @io.swagger.v3.oas.annotations.parameters.RequestBody(
       content =
           @Content(
               mediaType = "application/json",
-              examples =
-                  @ExampleObject(
-                      name = "예약 하위 삭제",
-                      value =
-                          """
-                          {"routineId": 7, "date": "2026-07-20", "index": 0}
-                          """)))
+              examples = {
+                @ExampleObject(
+                    name = "행 하위 삭제 (그날만)",
+                    value =
+                        """
+                        {"parentTodoId": 42, "subTodoId": 128}
+                        """),
+                @ExampleObject(
+                    name = "예약 하위 삭제 (그날만, 미래 회차)",
+                    value =
+                        """
+                        {"routineId": 7, "date": "2026-07-20", "index": 0}
+                        """),
+                @ExampleObject(
+                    name = "하위 루틴 삭제 (반복 전체)",
+                    value =
+                        """
+                        {"subRoutineId": 11}
+                        """)
+              }))
   @ApiResponses({
     @ApiResponse(responseCode = "200", description = "삭제 성공"),
     @ApiResponse(
         responseCode = "400",
-        description = "필수 필드 누락",
-        content = @Content(examples = @ExampleObject(name = "필수 누락", value = ERR_INVALID_INPUT))),
+        description = "지목 필드 누락, 엄마 루틴 ID를 subRoutineId로 지정",
+        content =
+            @Content(
+                examples = {
+                  @ExampleObject(name = "지목 누락", value = ERR_INVALID_INPUT),
+                  @ExampleObject(name = "엄마 루틴 ID 지정", value = ERR_ROUTINE_INVALID_TARGET)
+                })),
     @ApiResponse(
         responseCode = "401",
         description = "AccessToken 없음 또는 만료",
@@ -1147,15 +1212,16 @@ public interface ItemControllerDocs {
                 })),
     @ApiResponse(
         responseCode = "404",
-        description = "루틴 없음 또는 예약된 하위 투두 없음(index 범위 밖)",
+        description = "대상 없음 — 투두/루틴/예약(index 범위 밖)",
         content =
             @Content(
                 examples = {
+                  @ExampleObject(name = "투두 없음", value = ERR_TODO_NOT_FOUND),
                   @ExampleObject(name = "루틴 없음", value = ERR_ROUTINE_NOT_FOUND),
                   @ExampleObject(name = "예약 하위 없음", value = ERR_OVERRIDE_SUBTODO_NOT_FOUND)
                 }))
   })
-  ResponseEntity<ApiResult<Void>> deleteItemReservedSubTodo(
+  ResponseEntity<ApiResult<Void>> deleteItemSubTodo(
       @AuthenticationPrincipal Long userId,
       @Valid @RequestBody ItemSubTodoDeleteRequestDto request);
 }

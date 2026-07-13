@@ -447,16 +447,16 @@ public class RoutineService {
   }
 
   /**
-   * 살아있는 하위 루틴 제목 목록. 행(Todo)이 아직 없는 가상 회차 상세에서 "그날 생길 예정인 하위"를 보여주는 용도로, 배치가 하위 투두를 만드는 기준( {@code
-   * getChildren()})과 같은 목록을 쓴다.
+   * 살아있는 하위 루틴 목록(ID 포함). 행(Todo)이 아직 없는 가상 회차 상세에서 "그날 생길 예정인 하위"를 보여주고, 하위 루틴을 지목(수정/삭제)할 수 있게 하는
+   * 용도로, 배치가 하위 투두를 만드는 기준({@code getChildren()})과 같은 목록을 쓴다.
    */
   @Transactional(readOnly = true)
-  public List<String> getAliveChildTitles(Long userId, Long routineId) {
+  public List<SubRoutineResponseDto> getAliveChildren(Long userId, Long routineId) {
     Routine routine = findOwnedRoutine(userId, routineId);
     if (routine.isChild()) {
       throw new CustomException(RoutineErrorCode.ROUTINE_INVALID_TARGET);
     }
-    return routine.getChildren().stream().map(Routine::getTitle).toList();
+    return routine.getChildren().stream().map(SubRoutineResponseDto::from).toList();
   }
 
   @Transactional(readOnly = true)
