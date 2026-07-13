@@ -295,9 +295,12 @@ public class GoalAiService {
         10. WEEKLY routineDays는 요일 인덱스 배열: 월=0, 화=1, 수=2, 목=3, 금=4, 토=5, 일=6 (예: 월·수·금 → [0,2,4])
         11. MONTHLY routineDays는 일자 배열(1~31): 그 달 며칠에 반복할지 (예: 3일·20일 → [3,20])
         12. DAILY는 routineDays 불필요 (null)
-        13. dueDate는 yyyy-MM-dd 형식 또는 null, dueTime은 HH:mm 형식 또는 null
+        13. dueDate는 yyyy-MM-dd 형식 또는 null, dueTime은 HH:mm 형식 또는 null, routineTime은 HH:mm 형식 또는 null
         14. type은 "ONE_TIME" 또는 "RECURRING"만 허용
         15. routineType은 "DAILY", "WEEKLY", "MONTHLY" 중 하나 (ONE_TIME이면 null)
+        15-1. ONE_TIME: dueDate/dueTime은 그 투두의 마감 일시, routineTime은 null
+        15-2. RECURRING: routineTime은 매 회차를 수행할 시각(반복시간), dueDate/dueTime은 반복이 끝나는
+              종료 일정(기본값: 목표 마감일, 목표 마감이 없으면 null). 수행 시각을 dueTime에 넣지 않는다
         16. overallReason: 이 추천 전체에 대한 총평을 서술체("~합니다", "~했습니다")로 작성. 조언·명령형("~하세요") 절대 금지.
             - 어떤 기준으로 투두를 구성했는지, 핵심 전략이 무엇인지 서술
             - 솔루션에 교재·강의가 포함된 경우 각 항목마다 아래 형식으로 출처 정보를 포함:
@@ -306,7 +309,7 @@ public class GoalAiService {
             - 링크는 Google Search로 확인된 실제 URL만 사용. 확인 불가 시 링크 생략
 
         반드시 아래 JSON만 출력하세요 (다른 설명 없이):
-        {"overallReason":"","todos":[{"type":"","title":"","dueDate":null,"dueTime":null,"routineType":null,"routineDays":null,"tagId":null}]}
+        {"overallReason":"","todos":[{"type":"","title":"","dueDate":null,"dueTime":null,"routineType":null,"routineDays":null,"routineTime":null,"tagId":null}]}
         """
             .formatted(req.goal(), deadlineInfo, buildSolutionInfo(req.solutions()), tagInfo);
     return prompt + refreshStyleBlock(req.refreshCount() == null ? 0 : req.refreshCount());
@@ -319,7 +322,8 @@ public class GoalAiService {
           case 1 -> "1회차(여유): 마감에 5~6일 버퍼를 넉넉히 둔다. 할 일은 아주 잘게(마이크로) 쪼개고, 쉬운 것부터 정순으로 배치한다.";
           case 2 -> "2회차(벼락치기): 버퍼 없이 혹은 마이너스로 빡빡하게 잡는다. 가장 핵심 1개(1-Pick) 위주로 줄이고, 어려운 것부터 역순으로 배치한다.";
           case 3 -> "3회차(환경 변경): 분량·난이도는 적정 수준으로 두되, 기존 진행 시간대·요일을 실제로 다른 쪽으로 옮겨 배치한다."
-              + " 예: 평일 저녁 → 주말 오전, 평일 → 주말. 각 투두의 dueTime을 기존과 다른 시간대로 바꾸거나"
+              + " 예: 평일 저녁 → 주말 오전, 평일 → 주말. 각 투두의 수행 시각(ONE_TIME은 dueTime,"
+              + " RECURRING은 routineTime)을 기존과 다른 시간대로 바꾸거나"
               + " routineType/routineDays를 주말(토·일) 쪽으로 옮긴다.";
           default -> null;
         };
@@ -374,6 +378,12 @@ public class GoalAiService {
         String dueTime = node.path("dueTime").isNull() ? null : node.path("dueTime").asText(null);
         String routineType =
             node.path("routineType").isNull() ? null : node.path("routineType").asText(null);
+        // routineTime: 매 회차 수행 시각(HH:mm). RECURRING 전용 — 그 외에는 null로 강제.
+        String routineTime =
+            node.path("routineTime").isNull() ? null : node.path("routineTime").asText(null);
+        if (!"RECURRING".equals(type)) {
+          routineTime = null;
+        }
         // routineDays: 반복 날짜 배열 (WEEKLY=요일 인덱스 0~6, MONTHLY=일자 1~31). 없으면 null.
         List<Integer> routineDays = null;
         JsonNode routineDaysNode = node.path("routineDays");
@@ -423,7 +433,15 @@ public class GoalAiService {
 
         todos.add(
             new RecommendedTodo(
-                type, title, dueDate, dueTime, routineType, routineDays, tagId, tagName));
+                type,
+                title,
+                dueDate,
+                dueTime,
+                routineType,
+                routineDays,
+                routineTime,
+                tagId,
+                tagName));
       }
       return new TodoRecommendationResponse(overallReason, todos);
     } catch (Exception e) {

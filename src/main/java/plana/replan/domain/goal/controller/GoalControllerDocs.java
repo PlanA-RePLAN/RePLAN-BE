@@ -1027,10 +1027,11 @@ public interface GoalControllerDocs {
           | todos | array | 추천 투두 목록 |
           | todos[].type | string | `ONE_TIME` (일회형) 또는 `RECURRING` (반복형) |
           | todos[].title | string | 투두 제목 |
-          | todos[].dueDate | string | 마감 날짜 (yyyy-MM-dd 형식). 없으면 null |
-          | todos[].dueTime | string | 마감 시간 (HH:mm 형식). 없으면 null |
+          | todos[].dueDate | string | 마감 날짜 (yyyy-MM-dd 형식). ONE_TIME=마감일, RECURRING=반복 종료일(기본: 목표 마감일). 없으면 null |
+          | todos[].dueTime | string | 마감 시간 (HH:mm 형식). ONE_TIME=마감 시각, RECURRING=반복 종료일의 시각. 없으면 null |
           | todos[].routineType | string | RECURRING만: `DAILY` / `WEEKLY` / `MONTHLY`. ONE_TIME이면 null |
           | todos[].routineDays | array | RECURRING WEEKLY: 요일 인덱스(월=0 … 일=6). MONTHLY: 일자(1~31). DAILY·ONE_TIME: null |
+          | todos[].routineTime | string | 매 회차 수행 시각(반복시간, HH:mm 형식). RECURRING만, 없으면 null |
           | todos[].tagId | integer | AI가 이 투두에 배정한 태그 ID. 요청한 유저의 실제 태그 중에서 선택됨. 마땅한 태그가 없으면 null |
           | todos[].tagName | string | 배정된 태그 이름. tagId가 null이면 함께 null |
 
@@ -1065,6 +1066,7 @@ public interface GoalControllerDocs {
                                     "dueTime": null,
                                     "routineType": "DAILY",
                                     "routineDays": null,
+                                    "routineTime": "08:00",
                                     "tagId": 1,
                                     "tagName": "Study"
                                   },
@@ -1075,6 +1077,7 @@ public interface GoalControllerDocs {
                                     "dueTime": "08:00",
                                     "routineType": null,
                                     "routineDays": null,
+                                    "routineTime": null,
                                     "tagId": 1,
                                     "tagName": "Study"
                                   },
@@ -1085,6 +1088,7 @@ public interface GoalControllerDocs {
                                     "dueTime": null,
                                     "routineType": null,
                                     "routineDays": null,
+                                    "routineTime": null,
                                     "tagId": null,
                                     "tagName": null
                                   }
