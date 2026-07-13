@@ -180,6 +180,15 @@ public class RoutineOverrideService {
     override.updateSubtodo(index, title);
   }
 
+  /** 예약된 하위 투두 완료/미완료 (행이 있는 날짜의 하위는 투두 완료 API를 사용). */
+  @Transactional
+  public void completeSubtodo(
+      Long userId, Long routineId, LocalDate date, int index, boolean isCompleted) {
+    Routine routine = findOwnedMotherRoutine(userId, routineId);
+    RoutineOverride override = requireOverrideWithSubtodo(routine, date, index);
+    override.completeSubtodo(index, isCompleted);
+  }
+
   /** 예약된 하위 투두 삭제 (행이 있는 날짜의 하위는 기존 투두 API를 사용). */
   @Transactional
   public void deleteSubtodo(Long userId, Long routineId, LocalDate date, int index) {

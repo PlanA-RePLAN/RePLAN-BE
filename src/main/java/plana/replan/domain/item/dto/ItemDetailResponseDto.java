@@ -54,9 +54,9 @@ public record ItemDetailResponseDto(
       return new SubItemDto(null, title, false, null, subRoutineId);
     }
 
-    /** 회차 예외에 예약된 하위 — index로 수정/삭제한다. */
-    public static SubItemDto reserved(String title, int index) {
-      return new SubItemDto(null, title, false, index, null);
+    /** 회차 예외에 예약된 하위 — index로 완료/수정/삭제한다. */
+    public static SubItemDto reserved(String title, boolean isCompleted, int index) {
+      return new SubItemDto(null, title, isCompleted, index, null);
     }
   }
 
