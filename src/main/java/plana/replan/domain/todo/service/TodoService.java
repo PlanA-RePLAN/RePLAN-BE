@@ -152,6 +152,28 @@ public class TodoService {
     return TodoResponseDto.from(subTodo);
   }
 
+  /** 하위 투두 완료/미완료 처리. 부모 소유·소속을 검증한다 (completeTodo는 부모 전용이라 하위를 받지 않는다). */
+  @Transactional
+  public void completeSubTodo(Long userId, Long parentId, Long subTodoId, boolean isCompleted) {
+    if (userId == null) {
+      throw new CustomException(UserErrorCode.USER_NOT_FOUND);
+    }
+    Todo subTodo =
+        todoRepository
+            .findById(subTodoId)
+            .orElseThrow(() -> new CustomException(TodoErrorCode.TODO_NOT_FOUND));
+
+    if (!subTodo.getUser().getId().equals(userId)) {
+      throw new CustomException(TodoErrorCode.TODO_NOT_FOUND);
+    }
+
+    if (subTodo.getParent() == null || !subTodo.getParent().getId().equals(parentId)) {
+      throw new CustomException(TodoErrorCode.TODO_NOT_FOUND);
+    }
+
+    subTodo.updateCompleted(isCompleted, LocalDateTime.now(clock));
+  }
+
   @Transactional(readOnly = true)
   public List<TodoListResponseDto> getPinnedTodos(Long userId) {
     if (userId == null) {

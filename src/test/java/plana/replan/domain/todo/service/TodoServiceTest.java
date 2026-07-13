@@ -1953,4 +1953,57 @@ class TodoServiceTest {
     assertThat(ReflectionTestUtils.getField(child1, "deletedAt")).isNull();
     assertThat(ReflectionTestUtils.getField(child2, "deletedAt")).isNull();
   }
+
+  // ── completeSubTodo ────────────────────────────────────────────────────────
+
+  @Test
+  @DisplayName("completeSubTodo - 성공: 하위 투두 완료 상태가 바뀐다")
+  void completeSubTodo_success() {
+    User user = testUser();
+    Todo parent = testTodo(10L, user);
+    Todo subTodo = Todo.builder().title("하위 투두").user(user).parent(parent).isPinned(false).build();
+    ReflectionTestUtils.setField(subTodo, "id", 43L);
+
+    given(todoRepository.findById(43L)).willReturn(Optional.of(subTodo));
+
+    todoService.completeSubTodo(1L, 10L, 43L, true);
+    assertThat(subTodo.isCompleted()).isTrue();
+
+    todoService.completeSubTodo(1L, 10L, 43L, false);
+    assertThat(subTodo.isCompleted()).isFalse();
+  }
+
+  @Test
+  @DisplayName("completeSubTodo - parentId 불일치: TODO_NOT_FOUND 예외")
+  void completeSubTodo_parentMismatch_throws() {
+    User user = testUser();
+    Todo parent = testTodo(10L, user);
+    Todo subTodo = Todo.builder().title("하위 투두").user(user).parent(parent).isPinned(false).build();
+    ReflectionTestUtils.setField(subTodo, "id", 43L);
+
+    given(todoRepository.findById(43L)).willReturn(Optional.of(subTodo));
+
+    assertThatThrownBy(() -> todoService.completeSubTodo(1L, 99L, 43L, true))
+        .isInstanceOf(CustomException.class)
+        .satisfies(
+            e ->
+                assertThat(((CustomException) e).getErrorCode())
+                    .isEqualTo(TodoErrorCode.TODO_NOT_FOUND));
+  }
+
+  @Test
+  @DisplayName("completeSubTodo - 부모 투두를 하위로 지목: TODO_NOT_FOUND 예외")
+  void completeSubTodo_targetIsNotSub_throws() {
+    User user = testUser();
+    Todo parent = testTodo(10L, user);
+
+    given(todoRepository.findById(10L)).willReturn(Optional.of(parent));
+
+    assertThatThrownBy(() -> todoService.completeSubTodo(1L, 10L, 10L, true))
+        .isInstanceOf(CustomException.class)
+        .satisfies(
+            e ->
+                assertThat(((CustomException) e).getErrorCode())
+                    .isEqualTo(TodoErrorCode.TODO_NOT_FOUND));
+  }
 }
