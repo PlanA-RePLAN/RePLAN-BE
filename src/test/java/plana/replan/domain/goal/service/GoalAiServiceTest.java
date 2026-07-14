@@ -7,6 +7,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
 import plana.replan.domain.goal.dto.explore.GoalExploreRequest;
@@ -126,6 +127,31 @@ class GoalAiServiceTest {
   @Test
   void 기한검사_형식이_잘못된_날짜는_지나지_않은_것으로_본다() {
     assertThat(service.isDeadlinePassed("내일까지", null)).isFalse();
+  }
+
+  @Test
+  @SuppressWarnings("unchecked")
+  void 요청_본문에_출력길이_제한과_생각_제한이_들어간다() {
+    // 3세대 모델이 '생각'에 토큰을 다 써서 실제 답이 잘리는(MAX_TOKENS) 문제를 막기 위한 설정
+    Map<String, Object> body = service.buildGeminiRequestBody("아무 프롬프트", null);
+    Map<String, Object> generationConfig = (Map<String, Object>) body.get("generationConfig");
+    assertThat(generationConfig.get("maxOutputTokens")).isEqualTo(8192);
+    Map<String, Object> thinkingConfig =
+        (Map<String, Object>) generationConfig.get("thinkingConfig");
+    assertThat(thinkingConfig.get("thinkingLevel")).isEqualTo("low");
+    // 스키마를 안 주면 JSON 강제출력 설정은 없어야 한다
+    assertThat(generationConfig).doesNotContainKey("responseMimeType");
+    assertThat(generationConfig).doesNotContainKey("responseSchema");
+  }
+
+  @Test
+  @SuppressWarnings("unchecked")
+  void 응답_스키마를_주면_JSON_강제출력_설정이_들어간다() {
+    Map<String, Object> schema = Map.of("type", "OBJECT");
+    Map<String, Object> body = service.buildGeminiRequestBody("아무 프롬프트", schema);
+    Map<String, Object> generationConfig = (Map<String, Object>) body.get("generationConfig");
+    assertThat(generationConfig.get("responseMimeType")).isEqualTo("application/json");
+    assertThat(generationConfig.get("responseSchema")).isEqualTo(schema);
   }
 
   @Test
