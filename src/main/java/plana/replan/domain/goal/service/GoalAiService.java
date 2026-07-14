@@ -1,5 +1,7 @@
 package plana.replan.domain.goal.service;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.Clock;
@@ -53,6 +55,109 @@ public class GoalAiService {
   static final DateTimeFormatter PROMPT_NOW_FORMAT =
       DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm (EEEE)", Locale.KOREAN);
 
+  // 응답 길이 상한. 3세대 모델은 답하기 전 '생각(thinking)'에도 이 예산을 함께 쓴다.
+  // 이 값이 부족하면 생각이 예산을 다 먹고 실제 답이 중간에 잘려(MAX_TOKENS) 반쪽 JSON이 온다.
+  private static final int GEMINI_MAX_OUTPUT_TOKENS = 8192;
+
+  // 각 API 응답을 항상 완결된 JSON으로 받도록 강제하기 위한 응답 구조(스키마).
+  // 검색(google_search)과 함께 써도 3세대 모델에서는 동작한다.
+  private static final String EXPLORE_SCHEMA =
+      """
+      {
+        "type": "OBJECT",
+        "properties": {
+          "valid": { "type": "BOOLEAN" },
+          "message": { "type": "STRING", "nullable": true },
+          "questions": {
+            "type": "ARRAY",
+            "items": {
+              "type": "OBJECT",
+              "properties": {
+                "question": { "type": "STRING" },
+                "chips": { "type": "ARRAY", "items": { "type": "STRING" } }
+              },
+              "propertyOrdering": ["question", "chips"]
+            }
+          }
+        },
+        "propertyOrdering": ["valid", "message", "questions"]
+      }
+      """;
+
+  private static final String REFINE_SCHEMA =
+      """
+      {
+        "type": "OBJECT",
+        "properties": {
+          "goal": {
+            "type": "OBJECT",
+            "properties": { "value": { "type": "STRING" }, "reason": { "type": "STRING" } },
+            "propertyOrdering": ["value", "reason"]
+          },
+          "deadline": {
+            "type": "OBJECT",
+            "properties": {
+              "date": { "type": "STRING", "nullable": true },
+              "time": { "type": "STRING", "nullable": true },
+              "reason": { "type": "STRING" }
+            },
+            "propertyOrdering": ["date", "time", "reason"]
+          },
+          "solutions": {
+            "type": "ARRAY",
+            "items": {
+              "type": "OBJECT",
+              "properties": {
+                "question": { "type": "STRING" },
+                "items": {
+                  "type": "ARRAY",
+                  "items": {
+                    "type": "OBJECT",
+                    "properties": {
+                      "title": { "type": "STRING" },
+                      "content": { "type": "STRING" }
+                    },
+                    "propertyOrdering": ["title", "content"]
+                  }
+                },
+                "reason": { "type": "STRING" }
+              },
+              "propertyOrdering": ["question", "items", "reason"]
+            }
+          }
+        },
+        "propertyOrdering": ["goal", "deadline", "solutions"]
+      }
+      """;
+
+  private static final String RECOMMEND_SCHEMA =
+      """
+      {
+        "type": "OBJECT",
+        "properties": {
+          "overallReason": { "type": "STRING" },
+          "todos": {
+            "type": "ARRAY",
+            "items": {
+              "type": "OBJECT",
+              "properties": {
+                "type": { "type": "STRING" },
+                "title": { "type": "STRING" },
+                "dueDate": { "type": "STRING", "nullable": true },
+                "dueTime": { "type": "STRING", "nullable": true },
+                "routineType": { "type": "STRING", "nullable": true },
+                "routineDays": { "type": "ARRAY", "nullable": true, "items": { "type": "INTEGER" } },
+                "routineTime": { "type": "STRING", "nullable": true },
+                "tagId": { "type": "INTEGER", "nullable": true }
+              },
+              "propertyOrdering": ["type", "title", "dueDate", "dueTime", "routineType", "routineDays", "routineTime", "tagId"]
+            }
+          }
+        },
+        "propertyOrdering": ["overallReason", "todos"]
+      }
+      """;
+
   private final RestClient geminiRestClient;
   private final TagRepository tagRepository;
   private final Clock clock;
@@ -67,7 +172,7 @@ public class GoalAiService {
     }
     String today = LocalDate.now(clock).format(DateTimeFormatter.ISO_LOCAL_DATE);
     String prompt = buildExplorePrompt(request, today);
-    String raw = callGemini(prompt);
+    String raw = callGemini(prompt, schema(EXPLORE_SCHEMA));
     return parseExploreResponse(raw);
   }
 
@@ -110,7 +215,14 @@ public class GoalAiService {
         2. 질문은 목표에 맞게 동적으로 만든다(고정 문구 금지). 예: 어학 목표면 현재 실력/성적/수준을 묻는 질문,
            운동 목표면 현재 체력·운동 경험을 묻는 질문 등 목표에 맞춰 워딩을 바꾼다.
         3. question은 짧은 라벨 형태로 쓴다(예: "현재 영어 실력", "투자 가능 시간", "특이사항").
-        4. 각 질문마다 사용자가 바로 누를 수 있는 예시 답변(chips)을 2~3개 생성한다(짧은 단어·구).
+        4. 각 질문마다 그 질문에 대한 '실제 예시 답변'(chips)을 2~3개 생성한다(짧은 단어·구).
+           - chip은 사용자가 그대로 눌러 답이 되는 '구체적인 값'이어야 한다.
+             질문을 바꿔 말한 표현, 카테고리·분야 이름, 막연한 라벨은 절대 chip으로 쓰지 않는다.
+           - 판단 기준: chip을 그 질문의 답 자리에 넣었을 때 자연스러운 대답이 되어야 한다.
+           - 좋은 예) 질문 "보고 싶은 책" → chips ["자기계발서", "소설", "경제·경영서"]
+           - 나쁜 예) 질문 "보고 싶은 책" → chips ["선호 책", "관심 분야"]  (질문을 되풀이한 라벨이라 금지)
+           - 좋은 예) 질문 "현재 영어 실력" → chips ["토익 600점대", "회화 초급", "노베이스"]
+           - 나쁜 예) 질문 "현재 영어 실력" → chips ["영어 수준", "실력 정도"]  (금지)
         5. 모든 텍스트는 서술형/명사형으로 쓰고 "~하세요" 같은 명령형은 쓰지 않는다.
 
         반드시 아래 JSON만 출력하세요 (다른 설명 없이):
@@ -148,7 +260,7 @@ public class GoalAiService {
   public GoalRefinementResponse refineGoal(GoalRefinementRequest request) {
     String today = LocalDate.now(clock).format(DateTimeFormatter.ISO_LOCAL_DATE);
     String prompt = buildRefinePrompt(request, today);
-    String raw = callGemini(prompt);
+    String raw = callGemini(prompt, schema(REFINE_SCHEMA));
     return parseRefineResponse(raw);
   }
 
@@ -236,7 +348,7 @@ public class GoalAiService {
     List<Tag> tags = tagRepository.findAllByUserId(userId);
     String now = LocalDateTime.now(clock).format(PROMPT_NOW_FORMAT);
     String prompt = buildRecommendPrompt(request, buildTagInfo(tags), now);
-    String raw = callGemini(prompt);
+    String raw = callGemini(prompt, schema(RECOMMEND_SCHEMA));
     return parseRecommendResponse(raw, tags);
   }
 
@@ -516,10 +628,15 @@ public class GoalAiService {
   }
 
   String callGemini(String prompt) {
-    Map<String, Object> body =
-        Map.of(
-            "tools", new Object[] {Map.of("google_search", Map.of())},
-            "contents", new Object[] {Map.of("parts", new Object[] {Map.of("text", prompt)})});
+    return callGemini(prompt, null);
+  }
+
+  /**
+   * Gemini에 요청을 보내고 응답 본문 텍스트를 돌려준다. responseSchema를 주면 그 구조의 완결된 JSON만 받도록 강제한다. 응답이 길이 제한에 걸려
+   * 잘리면(finishReason=MAX_TOKENS) 반쪽 JSON이므로 명확히 로그를 남기고 파싱 오류로 처리한다.
+   */
+  String callGemini(String prompt, Map<String, Object> responseSchema) {
+    Map<String, Object> body = buildGeminiRequestBody(prompt, responseSchema);
 
     try {
       String response =
@@ -532,19 +649,50 @@ public class GoalAiService {
               .body(String.class);
 
       JsonNode root = objectMapper.readTree(response);
-      return root.path("candidates")
-          .path(0)
-          .path("content")
-          .path("parts")
-          .path(0)
-          .path("text")
-          .asText();
+      JsonNode candidate = root.path("candidates").path(0);
+      String text = candidate.path("content").path("parts").path(0).path("text").asText();
+      if ("MAX_TOKENS".equals(candidate.path("finishReason").asText(""))) {
+        log.error("Gemini 응답이 길이 제한에 걸려 잘렸습니다(finishReason=MAX_TOKENS). 받은 일부 응답: {}", text);
+        throw new CustomException(GoalErrorCode.GEMINI_PARSE_ERROR);
+      }
+      return text;
+    } catch (CustomException e) {
+      throw e;
     } catch (RestClientException e) {
       log.error("Gemini API 호출 실패", e);
       throw new CustomException(GoalErrorCode.GEMINI_API_ERROR);
     } catch (Exception e) {
       log.error("Gemini 응답 처리 실패", e);
       throw new CustomException(GoalErrorCode.GEMINI_PARSE_ERROR);
+    }
+  }
+
+  /** Gemini 요청 본문을 만든다. 출력 길이 상한과 '생각' 제한을 항상 넣어 응답 잘림을 막고, 응답 스키마가 있으면 JSON 강제출력 설정을 추가한다. */
+  Map<String, Object> buildGeminiRequestBody(String prompt, Map<String, Object> responseSchema) {
+    Map<String, Object> generationConfig = new LinkedHashMap<>();
+    generationConfig.put("maxOutputTokens", GEMINI_MAX_OUTPUT_TOKENS);
+    // '생각' 분량을 낮게 제한해 출력 예산 대부분을 실제 답에 쓰게 한다(과한 생각으로 답이 잘리는 것 방지).
+    generationConfig.put("thinkingConfig", Map.of("thinkingLevel", "low"));
+    if (responseSchema != null) {
+      generationConfig.put("responseMimeType", "application/json");
+      generationConfig.put("responseSchema", responseSchema);
+    }
+
+    return Map.of(
+        "tools", new Object[] {Map.of("google_search", Map.of())},
+        "contents", new Object[] {Map.of("parts", new Object[] {Map.of("text", prompt)})},
+        "generationConfig", generationConfig);
+  }
+
+  /**
+   * 응답 스키마 JSON 문자열을 Gemini 요청 본문에 넣을 Map으로 변환한다. JsonNode로 넘기면 HTTP 클라이언트가 JsonNode의 게터 (isArray
+   * 등)를 필드로 직렬화해 Gemini가 거부하므로, 반드시 Map으로 변환해 넘긴다.
+   */
+  private Map<String, Object> schema(String schemaJson) {
+    try {
+      return objectMapper.readValue(schemaJson, new TypeReference<Map<String, Object>>() {});
+    } catch (JsonProcessingException e) {
+      throw new IllegalStateException("잘못된 응답 스키마 정의", e);
     }
   }
 
