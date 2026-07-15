@@ -58,6 +58,14 @@ public class MonthlyReport extends BaseTimeEntity {
   @Column(name = "ai_insight")
   private AiInsight aiInsight;
 
+  // 팁노트의 "작성 팁" 카드 텍스트. 유저+월당 1행인 이 테이블에 둬서 "월별 1개"가 구조로 보장된다.
+  @Column(name = "tip_note_text")
+  private String tipNoteText;
+
+  public void updateTipNoteText(String tipNoteText) {
+    this.tipNoteText = tipNoteText;
+  }
+
   public void update(
       Integer totalTodos,
       Integer completedTodos,
