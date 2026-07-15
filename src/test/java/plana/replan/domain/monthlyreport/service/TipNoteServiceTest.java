@@ -292,6 +292,7 @@ class TipNoteServiceTest {
     given(tipNoteItemRepository.findAllByMonthlyReportOrderBySortOrderAscIdAsc(report))
         .willReturn(List.of(todoCard, modifyCard, unchecked));
     given(routineRepository.findById(5L)).willReturn(Optional.of(target));
+    given(tipNoteItemRepository.markAppliedIfPending(anyLong())).willReturn(1);
 
     TipNoteApplyResponse response =
         tipNoteService.apply(1L, 17L, new TipNoteApplyRequest(List.of(1L, 2L)));
@@ -304,6 +305,24 @@ class TipNoteServiceTest {
     assertThat(todoCard.getStatus()).isEqualTo(TipNoteItemStatus.APPLIED);
     assertThat(modifyCard.getStatus()).isEqualTo(TipNoteItemStatus.APPLIED);
     assertThat(unchecked.getStatus()).isEqualTo(TipNoteItemStatus.PENDING);
+  }
+
+  @Test
+  @DisplayName("같은 카드 동시 반영: DB 조건부 갱신에서 밀린 요청은 거부되고 중복 생성이 없다")
+  void apply_concurrentDuplicate_rejected() {
+    TipNoteItem card = addTodoItem(1L, LocalDateTime.of(2026, 7, 20, 23, 59));
+
+    stubOwnedLatestNote();
+    given(tipNoteItemRepository.findAllByMonthlyReportOrderBySortOrderAscIdAsc(report))
+        .willReturn(List.of(card));
+    // 다른 요청이 먼저 APPLIED로 바꿔서 이 요청의 조건부 갱신은 0건
+    given(tipNoteItemRepository.markAppliedIfPending(1L)).willReturn(0);
+
+    assertThatThrownBy(() -> tipNoteService.apply(1L, 17L, new TipNoteApplyRequest(List.of(1L))))
+        .isInstanceOf(CustomException.class)
+        .extracting("errorCode")
+        .isEqualTo(MonthlyReportErrorCode.TIP_NOTE_ITEM_NOT_APPLICABLE);
+    verify(todoService, never()).createTodo(anyLong(), any(TodoCreateRequestDto.class));
   }
 
   @Test

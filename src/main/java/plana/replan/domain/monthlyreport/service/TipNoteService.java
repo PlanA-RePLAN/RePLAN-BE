@@ -99,8 +99,13 @@ public class TipNoteService {
       if (!isVisible(item, now)) {
         throw new CustomException(MonthlyReportErrorCode.TIP_NOTE_ITEM_NOT_APPLICABLE);
       }
+      // 같은 카드에 동시에 반영 요청이 들어와도(더블탭 등) 한 요청만 통과하도록,
+      // "아직 PENDING일 때만 APPLIED로 바꾸기"를 DB에서 원자적으로 수행한 뒤에 실제 반영한다.
+      if (tipNoteItemRepository.markAppliedIfPending(item.getId()) == 0) {
+        throw new CustomException(MonthlyReportErrorCode.TIP_NOTE_ITEM_NOT_APPLICABLE);
+      }
       applyItem(userId, item);
-      item.markApplied();
+      item.markApplied(); // DB는 위에서 이미 바뀜 — 메모리의 엔티티 상태만 맞춘다
       applied.add(toItemResponse(item));
     }
     return new TipNoteApplyResponse(applied);

@@ -121,6 +121,22 @@ class TipNoteDraftParserTest {
   }
 
   @Test
+  @DisplayName("오늘이 월말이면 과거 날짜를 (곧바로 지나버릴 오늘 대신) 내일로 교정")
+  void parse_pastDueDateOnMonthEnd_correctedToTomorrow() {
+    LocalDate monthEnd = LocalDate.of(2026, 7, 31);
+    TipNoteDraft draft =
+        parser.parse(
+            node(
+                """
+                {"tip":"팁","items":[{"action":"ADD_TODO","title":"밀린 일","todoDueAt":"2026-07-01 09:00"}]}
+                """),
+            materials(),
+            monthEnd);
+
+    assertThat(draft.items().get(0).todoDueAt()).isEqualTo(LocalDateTime.of(2026, 8, 1, 9, 0));
+  }
+
+  @Test
   @DisplayName("과거 반복 종료일도 이번 달 마지막 날로 교정")
   void parse_pastRoutineEndAt_corrected() {
     TipNoteDraft draft =

@@ -102,7 +102,7 @@ public class TipNoteDraftParser {
         LocalDateTime dueAt = parseDateTime(textOrNull(node.path("todoDueAt")));
         if (dueAt == null) {
           // 마감 없는 추천은 허용하지 않는다(모든 투두는 마감기한이 있어야 한다) → 이번 달 마지막 날로 채운다.
-          dueAt = endOfMonth(today).atTime(23, 59, 59);
+          dueAt = fallbackDate(today).atTime(23, 59, 59);
         }
         yield new TipNoteDraft.Item(
             action,
@@ -249,16 +249,18 @@ public class TipNoteDraftParser {
     return candidate != null && tagsById.containsKey(candidate) ? candidate : null;
   }
 
-  /** 과거 날짜를 이번 달 마지막 날로 교정한다(시간 부분은 유지). */
+  /** 과거 날짜를 이번 달 마지막 날로 교정한다(시간 부분은 유지). 오늘 날짜는 유효한 제안이라 건드리지 않는다. */
   private LocalDateTime correctPastDate(LocalDateTime dateTime, LocalDate today) {
     if (dateTime.toLocalDate().isBefore(today)) {
-      return endOfMonth(today).atTime(dateTime.toLocalTime());
+      return fallbackDate(today).atTime(dateTime.toLocalTime());
     }
     return dateTime;
   }
 
-  private LocalDate endOfMonth(LocalDate today) {
-    return today.withDayOfMonth(today.lengthOfMonth());
+  /** 교정·채움 목적지: 이번 달 마지막 날. 단 오늘이 월말이면 곧바로 지나버리므로 내일로 넘긴다. */
+  private LocalDate fallbackDate(LocalDate today) {
+    LocalDate endOfMonth = today.withDayOfMonth(today.lengthOfMonth());
+    return endOfMonth.isAfter(today) ? endOfMonth : today.plusDays(1);
   }
 
   /** DAILY는 날짜 배열이 없어야 정상(null로 정규화), WEEKLY/MONTHLY는 유효한 배열 필수 — 아니면 카드 버림. */

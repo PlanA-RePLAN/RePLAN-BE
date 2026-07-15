@@ -1,6 +1,7 @@
 package plana.replan.domain.monthlyreport.service;
 
 import java.time.Clock;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.YearMonth;
 import java.util.ArrayList;
@@ -55,10 +56,11 @@ public class TipNoteMaterialCollector {
             .toList();
 
     // 수정 제안 대상은 "지금 살아있고 아직 안 끝난" 엄마 루틴만 — 종료일 지난 루틴을 고치라는 제안을 막는다.
-    LocalDateTime now = LocalDateTime.now(clock);
+    // 종료일은 자정(00:00)으로 저장되지만 "그 날짜까지 반복"이라는 뜻이라 날짜 단위로 비교한다(종료일 당일은 포함).
+    LocalDate today = LocalDate.now(clock);
     List<RoutineSnapshot> routines =
         routineRepository.findAllActiveMotherRoutinesByUser(user.getId()).stream()
-            .filter(r -> r.getDueDate() == null || !r.getDueDate().isBefore(now))
+            .filter(r -> r.getDueDate() == null || !r.getDueDate().toLocalDate().isBefore(today))
             .map(
                 r ->
                     new RoutineSnapshot(
