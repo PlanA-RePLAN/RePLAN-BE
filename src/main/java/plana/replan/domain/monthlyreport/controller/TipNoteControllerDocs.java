@@ -9,7 +9,12 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestParam;
 import plana.replan.domain.monthlyreport.dto.TipNoteApplyRequest;
 import plana.replan.domain.monthlyreport.dto.TipNoteApplyResponse;
 import plana.replan.domain.monthlyreport.dto.TipNoteResponse;
@@ -208,8 +213,14 @@ public interface TipNoteControllerDocs {
   })
   ResponseEntity<ApiResult<TipNoteResponse>> getTipNote(
       Long userId,
-      @Parameter(name = "year", description = "조회할 연도", example = "2026", required = true) int year,
+      @Parameter(name = "year", description = "조회할 연도", example = "2026", required = true)
+          @RequestParam
+          @Min(1)
+          int year,
       @Parameter(name = "month", description = "조회할 월 (1~12)", example = "6", required = true)
+          @RequestParam
+          @Min(1)
+          @Max(12)
           int month);
 
   @Operation(
@@ -389,6 +400,8 @@ public interface TipNoteControllerDocs {
                                   """
                                   { "itemIds": [3, 5] }
                                   """)))
+          @Valid
+          @RequestBody
           TipNoteApplyRequest request);
 
   @Operation(

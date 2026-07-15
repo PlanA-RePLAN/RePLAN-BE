@@ -1,8 +1,6 @@
 package plana.replan.domain.monthlyreport.controller;
 
 import jakarta.validation.Valid;
-import jakarta.validation.constraints.Max;
-import jakarta.validation.constraints.Min;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -31,9 +29,7 @@ public class TipNoteController implements TipNoteControllerDocs {
   @Override
   @GetMapping
   public ResponseEntity<ApiResult<TipNoteResponse>> getTipNote(
-      @AuthenticationPrincipal Long userId,
-      @RequestParam @Min(1) int year,
-      @RequestParam @Min(1) @Max(12) int month) {
+      @AuthenticationPrincipal Long userId, @RequestParam int year, @RequestParam int month) {
     return ResponseEntity.ok(ApiResult.ok(tipNoteService.getTipNote(userId, year, month)));
   }
 
