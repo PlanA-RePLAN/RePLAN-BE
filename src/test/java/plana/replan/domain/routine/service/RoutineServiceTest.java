@@ -3,9 +3,11 @@ package plana.replan.domain.routine.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
@@ -30,6 +32,7 @@ import plana.replan.domain.goal.entity.Goal;
 import plana.replan.domain.goal.exception.GoalErrorCode;
 import plana.replan.domain.goal.repository.GoalRepository;
 import plana.replan.domain.routine.dto.RoutineCreateRequestDto;
+import plana.replan.domain.routine.dto.RoutineDateProjection;
 import plana.replan.domain.routine.dto.RoutineResponseDto;
 import plana.replan.domain.routine.dto.RoutineUpdateRequestDto;
 import plana.replan.domain.routine.entity.Routine;
@@ -1385,5 +1388,117 @@ class RoutineServiceTest {
             e ->
                 assertThat(((CustomException) e).getErrorCode())
                     .isEqualTo(GlobalErrorCode.INVALID_INPUT));
+  }
+
+  // ========== getRoutinesByFilter — week/month: 미완료 회차는 루틴당 가장 이른 1건만 ==========
+
+  private RoutineDateProjection dateProjection(long routineId, boolean completed) {
+    RoutineDateProjection projection = mock(RoutineDateProjection.class);
+    lenient().when(projection.getRoutineId()).thenReturn(routineId);
+    lenient().when(projection.getIsCompleted()).thenReturn(completed);
+    return projection;
+  }
+
+  private void givenRoutinesOnDate(LocalDate date, RoutineDateProjection... projections) {
+    lenient()
+        .when(routineRepository.findMotherRoutinesByDate(eq(1L), anyInt(), anyInt(), eq(date)))
+        .thenReturn(List.of(projections));
+  }
+
+  @Test
+  void getRoutinesByFilter_week_미완료_회차는_가장_이른_1건만_반환() {
+    given(userRepository.findById(1L)).willReturn(Optional.of(testUser()));
+    List<LocalDate> dates = TEST_DATE.datesUntil(TEST_DATE.plusWeeks(1)).toList();
+    for (LocalDate d : dates) {
+      givenRoutinesOnDate(d, dateProjection(10L, false)); // 매일 걸리는 데일리 루틴, 전부 미완료
+    }
+
+    Map<String, List<RoutineResponseDto>> result =
+        routineService.getRoutinesByFilter(1L, "week", TEST_DATE);
+
+    assertThat(result).hasSize(7); // 날짜 키는 7개 그대로 유지
+    assertThat(result.get(TEST_DATE.toString())).hasSize(1); // 첫날 것만 남는다
+    long total = result.values().stream().mapToLong(List::size).sum();
+    assertThat(total).isEqualTo(1);
+  }
+
+  @Test
+  void getRoutinesByFilter_week_완료한_회차는_전부_남고_미완료는_그다음_1건만_함께_반환() {
+    given(userRepository.findById(1L)).willReturn(Optional.of(testUser()));
+    List<LocalDate> dates = TEST_DATE.datesUntil(TEST_DATE.plusWeeks(1)).toList();
+    for (int i = 0; i < dates.size(); i++) {
+      givenRoutinesOnDate(dates.get(i), dateProjection(10L, i < 2)); // 첫 이틀 완료, 나머지 미완료
+    }
+
+    Map<String, List<RoutineResponseDto>> result =
+        routineService.getRoutinesByFilter(1L, "week", TEST_DATE);
+
+    assertThat(result.get(dates.get(0).toString()))
+        .singleElement()
+        .satisfies(dto -> assertThat(dto.isCompleted()).isTrue());
+    assertThat(result.get(dates.get(1).toString()))
+        .singleElement()
+        .satisfies(dto -> assertThat(dto.isCompleted()).isTrue());
+    assertThat(result.get(dates.get(2).toString()))
+        .singleElement()
+        .satisfies(dto -> assertThat(dto.isCompleted()).isFalse());
+    for (int i = 3; i < dates.size(); i++) {
+      assertThat(result.get(dates.get(i).toString())).isEmpty();
+    }
+  }
+
+  @Test
+  void getRoutinesByFilter_week_루틴이_여러개면_각자_가장_이른_1건씩_반환() {
+    given(userRepository.findById(1L)).willReturn(Optional.of(testUser()));
+    List<LocalDate> dates = TEST_DATE.datesUntil(TEST_DATE.plusWeeks(1)).toList();
+    for (int i = 0; i < dates.size(); i++) {
+      if (i == 2 || i == 4) {
+        // 루틴 20은 수·금에만 걸리는 주 2회 루틴
+        givenRoutinesOnDate(dates.get(i), dateProjection(10L, false), dateProjection(20L, false));
+      } else {
+        givenRoutinesOnDate(dates.get(i), dateProjection(10L, false));
+      }
+    }
+
+    Map<String, List<RoutineResponseDto>> result =
+        routineService.getRoutinesByFilter(1L, "week", TEST_DATE);
+
+    assertThat(result.get(dates.get(0).toString()))
+        .extracting(RoutineResponseDto::getRoutineId)
+        .containsExactly(10L);
+    assertThat(result.get(dates.get(2).toString()))
+        .extracting(RoutineResponseDto::getRoutineId)
+        .containsExactly(20L);
+    long total = result.values().stream().mapToLong(List::size).sum();
+    assertThat(total).isEqualTo(2);
+  }
+
+  @Test
+  void getRoutinesByFilter_month_미완료_회차는_가장_이른_1건만_반환() {
+    given(userRepository.findById(1L)).willReturn(Optional.of(testUser()));
+    List<LocalDate> dates = TEST_DATE.datesUntil(TEST_DATE.plusMonths(1)).toList();
+    for (LocalDate d : dates) {
+      givenRoutinesOnDate(d, dateProjection(10L, false));
+    }
+
+    Map<String, List<RoutineResponseDto>> result =
+        routineService.getRoutinesByFilter(1L, "month", TEST_DATE);
+
+    assertThat(result).hasSize(dates.size()); // 날짜 키는 구간 전체 유지
+    assertThat(result.get(TEST_DATE.toString())).hasSize(1);
+    long total = result.values().stream().mapToLong(List::size).sum();
+    assertThat(total).isEqualTo(1);
+  }
+
+  @Test
+  void getRoutinesByFilter_day_그날_회차는_그대로_1건_반환() {
+    given(userRepository.findById(1L)).willReturn(Optional.of(testUser()));
+    givenRoutinesOnDate(TEST_DATE, dateProjection(10L, false));
+
+    Map<String, List<RoutineResponseDto>> result =
+        routineService.getRoutinesByFilter(1L, "day", TEST_DATE);
+
+    assertThat(result).containsOnlyKeys(TEST_DATE.toString());
+    assertThat(result.get(TEST_DATE.toString())).hasSize(1);
   }
 }

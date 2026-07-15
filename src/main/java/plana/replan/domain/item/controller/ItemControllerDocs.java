@@ -259,6 +259,10 @@ public interface ItemControllerDocs {
           | sort | ❌ 선택 | string | `priority` | priority(정렬 순서) / dueDate(마감 빠른 순) | `priority` |
           | date | ❌ 선택 | string | 오늘 | 기준 날짜 (yyyy-MM-dd 형식) | `2026-07-10` |
 
+          **루틴 회차 노출 규칙**: 모든 filter에서 루틴은 **완료한 회차는 구간 안에서 전부**,
+          **아직 완료하지 않은 회차는 루틴마다 가장 이른 1건만** 나온다. 매일 루틴이라도 `week`에 7건이
+          아니라 1건만 나오고, 그 회차를 완료 처리하면 다음 회차가 목록에 나타난다.
+
           **Response Elements** (배열 원소)
 
           | 필드명 | 타입 | 설명 |
