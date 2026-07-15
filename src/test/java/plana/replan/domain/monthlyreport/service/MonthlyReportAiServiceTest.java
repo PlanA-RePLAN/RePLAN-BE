@@ -7,7 +7,10 @@ import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
 
 import java.math.BigDecimal;
+import java.time.Clock;
+import java.time.Instant;
 import java.time.YearMonth;
+import java.time.ZoneId;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -30,8 +33,17 @@ class MonthlyReportAiServiceTest {
 
   @BeforeEach
   void setUp() {
-    aiService = new MonthlyReportAiService(geminiRestClient);
+    Clock fixedClock = Clock.fixed(Instant.parse("2025-06-01T00:00:00Z"), ZoneId.of("Asia/Seoul"));
+    aiService = new MonthlyReportAiService(geminiRestClient, new TipNoteDraftParser(), fixedClock);
     ReflectionTestUtils.setField(aiService, "apiKey", "test-api-key");
+  }
+
+  private TipNoteMaterials emptyMaterials() {
+    return new TipNoteMaterials(List.of(), List.of(), List.of(), List.of());
+  }
+
+  private AiInsight generateInsightOnly(CalculatedStats stats, YearMonth month) {
+    return aiService.generate(stats, month, emptyMaterials()).aiInsight();
   }
 
   private void stubGemini(String geminiResponseBody) {
@@ -70,7 +82,7 @@ class MonthlyReportAiServiceTest {
 
     stubGemini(geminiResponse);
 
-    AiInsight result = aiService.generateInsight(minimalStats(), YearMonth.of(2025, 5));
+    AiInsight result = generateInsightOnly(minimalStats(), YearMonth.of(2025, 5));
 
     assertThat(result.insights()).hasSize(1);
     assertThat(result.insights().get(0).summary()).isEqualTo("화요일 집중력 최고");
@@ -91,7 +103,7 @@ class MonthlyReportAiServiceTest {
 
     stubGemini(geminiResponse);
 
-    AiInsight result = aiService.generateInsight(minimalStats(), YearMonth.of(2025, 5));
+    AiInsight result = generateInsightOnly(minimalStats(), YearMonth.of(2025, 5));
 
     assertThat(result.insights()).hasSize(1);
     assertThat(result.insights().get(0).summary()).isEqualTo("좋은 달");
@@ -110,7 +122,7 @@ class MonthlyReportAiServiceTest {
 
     stubGemini(geminiResponse);
 
-    AiInsight result = aiService.generateInsight(minimalStats(), YearMonth.of(2025, 5));
+    AiInsight result = generateInsightOnly(minimalStats(), YearMonth.of(2025, 5));
 
     assertThat(result.insights()).isEmpty();
     assertThat(result.writingTip()).isNull();
@@ -124,7 +136,7 @@ class MonthlyReportAiServiceTest {
     given(geminiRestClient.post()).willReturn(uriSpec);
     given(uriSpec.uri(anyString())).willThrow(new RuntimeException("네트워크 오류"));
 
-    AiInsight result = aiService.generateInsight(minimalStats(), YearMonth.of(2025, 5));
+    AiInsight result = generateInsightOnly(minimalStats(), YearMonth.of(2025, 5));
 
     assertThat(result.insights()).isEmpty();
     assertThat(result.writingTip()).isNull();
