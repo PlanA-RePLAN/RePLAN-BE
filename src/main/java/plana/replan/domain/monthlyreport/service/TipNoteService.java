@@ -159,9 +159,11 @@ public class TipNoteService {
     }
     return switch (item.getAction()) {
       case ADD_TODO -> item.getTodoDueAt() == null || !item.getTodoDueAt().isBefore(now);
-      case ADD_ROUTINE -> item.getRoutineEndAt() == null || !item.getRoutineEndAt().isBefore(now);
+        // 반복 종료일은 자정(00:00)으로 저장되지만 "그 날짜까지 반복"이라는 뜻이므로(회차 생성과 동일),
+        // 시각이 아니라 날짜 단위로 비교해 종료일 당일 카드가 숨겨지지 않게 한다.
+      case ADD_ROUTINE -> !routineEndPassed(item.getRoutineEndAt(), now);
       case MODIFY_ROUTINE -> {
-        if (item.getRoutineEndAt() != null && item.getRoutineEndAt().isBefore(now)) {
+        if (routineEndPassed(item.getRoutineEndAt(), now)) {
           yield false;
         }
         Routine routine = aliveTargetRoutine(item);
@@ -173,6 +175,11 @@ public class TipNoteService {
             || !routine.getUpdatedAt().isAfter(item.getCreatedAt());
       }
     };
+  }
+
+  /** 반복 종료일이 지났는지 날짜 단위로 판정한다. 무기한(null)은 지나지 않은 것으로 본다. */
+  private boolean routineEndPassed(LocalDateTime routineEndAt, LocalDateTime now) {
+    return routineEndAt != null && routineEndAt.toLocalDate().isBefore(now.toLocalDate());
   }
 
   /** 수정 대상 루틴이 아직 살아있으면(삭제 안 됨 + 활성 + 엄마 루틴) 반환, 아니면 null. */

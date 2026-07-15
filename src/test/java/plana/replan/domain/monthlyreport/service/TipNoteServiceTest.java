@@ -189,6 +189,35 @@ class TipNoteServiceTest {
   }
 
   @Test
+  @DisplayName("반복 종료일이 '오늘'인 루틴 카드는 종료일 당일까지는 보인다 (날짜 단위 비교)")
+  void getTipNote_routineEndingToday_stillVisible() {
+    TipNoteItem endsToday =
+        TipNoteItem.builder()
+            .monthlyReport(report)
+            .action(TipNoteAction.ADD_ROUTINE)
+            .title("오늘까지 반복")
+            .routineType(RoutineType.DAILY)
+            .routineEndAt(LocalDate.of(2026, 7, 15).atStartOfDay()) // 오늘 자정
+            .build();
+    ReflectionTestUtils.setField(endsToday, "id", 1L);
+    ReflectionTestUtils.setField(endsToday, "createdAt", GENERATED_AT);
+
+    given(userRepository.findById(1L)).willReturn(Optional.of(user));
+    given(monthlyReportRepository.findByUserAndReportMonth(user, LocalDate.of(2026, 6, 1)))
+        .willReturn(Optional.of(report));
+    given(
+            monthlyReportRepository.findFirstByUserAndTipNoteTextIsNotNullOrderByReportMonthDesc(
+                user))
+        .willReturn(Optional.of(report));
+    given(tipNoteItemRepository.findAllByMonthlyReportOrderBySortOrderAscIdAsc(report))
+        .willReturn(List.of(endsToday));
+
+    TipNoteResponse response = tipNoteService.getTipNote(1L, 2026, 6);
+
+    assertThat(response.items()).hasSize(1);
+  }
+
+  @Test
   @DisplayName("팁노트 생성 뒤 유저가 직접 고친 루틴의 수정 카드는 숨긴다")
   void getTipNote_hidesUserEditedRoutineCard() {
     Routine editedAfter = motherRoutine(5L, GENERATED_AT.plusDays(3)); // 생성 후 수정됨
