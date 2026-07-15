@@ -35,6 +35,8 @@ public class MonthlyReportService {
   private final TagRepository tagRepository;
   private final MonthlyReportCalculator calculator;
   private final MonthlyReportAiService aiService;
+  private final TipNoteMaterialCollector materialCollector;
+  private final TipNoteStore tipNoteStore;
 
   @Transactional
   public MonthlyReportResponse generateReport(Long userId, int year, int month) {
@@ -45,41 +47,15 @@ public class MonthlyReportService {
 
     YearMonth targetMonth = YearMonth.of(year, month);
     CalculatedStats stats = calculator.calculate(user, targetMonth);
-    final AiInsight aiInsight =
-        stats.hasActivity() ? aiService.generateInsight(stats, targetMonth) : null;
+    MonthlyAiResult ai = generateAi(user, stats, targetMonth);
 
-    LocalDate reportMonth = targetMonth.atDay(1);
     MonthlyReport report =
-        monthlyReportRepository
-            .findByUserAndReportMonth(user, reportMonth)
-            .map(
-                existing -> {
-                  existing.update(
-                      stats.totalTodos(),
-                      stats.completedTodos(),
-                      stats.achievementRate(),
-                      stats.prevMonthDiff(),
-                      stats.replanCount(),
-                      stats.replanAchievementEffect(),
-                      stats.analysisData(),
-                      aiInsight);
-                  return existing;
-                })
-            .orElseGet(
-                () ->
-                    monthlyReportRepository.save(
-                        MonthlyReport.builder()
-                            .user(user)
-                            .reportMonth(reportMonth)
-                            .totalTodos(stats.totalTodos())
-                            .completedTodos(stats.completedTodos())
-                            .achievementRate(stats.achievementRate())
-                            .prevMonthDiff(stats.prevMonthDiff())
-                            .replanCount(stats.replanCount())
-                            .replanAchievementEffect(stats.replanAchievementEffect())
-                            .analysisData(stats.analysisData())
-                            .aiInsight(aiInsight)
-                            .build()));
+        upsertReport(
+            user,
+            targetMonth.atDay(1),
+            stats,
+            ai != null ? ai.aiInsight() : null,
+            ai != null ? ai.tipNote() : null);
 
     List<Tag> userTags = tagRepository.findAllByUserOrderByCreatedAtDescIdDesc(user);
     Map<String, String> tagColorMap =
@@ -128,9 +104,13 @@ public class MonthlyReportService {
 
     try {
       CalculatedStats stats = calculator.calculate(user, targetMonth);
-      AiInsight aiInsight =
-          stats.hasActivity() ? aiService.generateInsight(stats, targetMonth) : null;
-      upsertReport(user, failure.getTargetMonth(), stats, aiInsight);
+      MonthlyAiResult ai = generateAi(user, stats, targetMonth);
+      upsertReport(
+          user,
+          failure.getTargetMonth(),
+          stats,
+          ai != null ? ai.aiInsight() : null,
+          ai != null ? ai.tipNote() : null);
       failure.softDelete();
       log.info("재처리 성공 - userId={}", user.getId());
       return stats.hasActivity();
@@ -142,36 +122,55 @@ public class MonthlyReportService {
     }
   }
 
+  /** 활동이 있는 유저만 Gemini를 호출해 인사이트+팁노트를 함께 생성한다. 활동 없으면 null. */
+  private MonthlyAiResult generateAi(User user, CalculatedStats stats, YearMonth targetMonth) {
+    if (!stats.hasActivity()) {
+      return null;
+    }
+    TipNoteMaterials materials = materialCollector.collect(user, targetMonth);
+    return aiService.generate(stats, targetMonth, materials);
+  }
+
   @Transactional
-  public void upsertReport(
-      User user, LocalDate reportMonth, CalculatedStats stats, AiInsight aiInsight) {
-    monthlyReportRepository
-        .findByUserAndReportMonth(user, reportMonth)
-        .ifPresentOrElse(
-            report ->
-                report.update(
-                    stats.totalTodos(),
-                    stats.completedTodos(),
-                    stats.achievementRate(),
-                    stats.prevMonthDiff(),
-                    stats.replanCount(),
-                    stats.replanAchievementEffect(),
-                    stats.analysisData(),
-                    aiInsight),
-            () ->
-                monthlyReportRepository.save(
-                    MonthlyReport.builder()
-                        .user(user)
-                        .reportMonth(reportMonth)
-                        .totalTodos(stats.totalTodos())
-                        .completedTodos(stats.completedTodos())
-                        .achievementRate(stats.achievementRate())
-                        .prevMonthDiff(stats.prevMonthDiff())
-                        .replanCount(stats.replanCount())
-                        .replanAchievementEffect(stats.replanAchievementEffect())
-                        .analysisData(stats.analysisData())
-                        .aiInsight(aiInsight)
-                        .build()));
+  public MonthlyReport upsertReport(
+      User user,
+      LocalDate reportMonth,
+      CalculatedStats stats,
+      AiInsight aiInsight,
+      TipNoteDraft tipNote) {
+    MonthlyReport report =
+        monthlyReportRepository
+            .findByUserAndReportMonth(user, reportMonth)
+            .map(
+                existing -> {
+                  existing.update(
+                      stats.totalTodos(),
+                      stats.completedTodos(),
+                      stats.achievementRate(),
+                      stats.prevMonthDiff(),
+                      stats.replanCount(),
+                      stats.replanAchievementEffect(),
+                      stats.analysisData(),
+                      aiInsight);
+                  return existing;
+                })
+            .orElseGet(
+                () ->
+                    monthlyReportRepository.save(
+                        MonthlyReport.builder()
+                            .user(user)
+                            .reportMonth(reportMonth)
+                            .totalTodos(stats.totalTodos())
+                            .completedTodos(stats.completedTodos())
+                            .achievementRate(stats.achievementRate())
+                            .prevMonthDiff(stats.prevMonthDiff())
+                            .replanCount(stats.replanCount())
+                            .replanAchievementEffect(stats.replanAchievementEffect())
+                            .analysisData(stats.analysisData())
+                            .aiInsight(aiInsight)
+                            .build()));
+    tipNoteStore.replace(report, tipNote);
+    return report;
   }
 
   private MonthlyReportResponse toResponse(MonthlyReport report, Map<String, String> tagColorMap) {
