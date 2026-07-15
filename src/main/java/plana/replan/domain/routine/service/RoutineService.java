@@ -4,7 +4,9 @@ import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -217,9 +219,18 @@ public class RoutineService {
           default -> throw new CustomException(GlobalErrorCode.INVALID_INPUT);
         };
 
+    // 구간 안에서 완료한 회차는 전부 보여주되, 아직 안 한 회차는 루틴당 가장 이른 1건만 남긴다.
+    // (all 필터의 "미래 몫 1건" 규칙과 동일. 날짜를 앞에서부터 돌므로 처음 만나는 미완료가 가장 이른 회차다.)
     Map<String, List<RoutineResponseDto>> result = new LinkedHashMap<>();
+    Set<Long> routinesWithPendingShown = new HashSet<>();
     for (LocalDate d : dates) {
-      result.put(d.toString(), getRoutinesForDate(userId, d));
+      List<RoutineResponseDto> kept = new ArrayList<>();
+      for (RoutineResponseDto routine : getRoutinesForDate(userId, d)) {
+        if (routine.isCompleted() || routinesWithPendingShown.add(routine.getRoutineId())) {
+          kept.add(routine);
+        }
+      }
+      result.put(d.toString(), kept);
     }
     return result;
   }

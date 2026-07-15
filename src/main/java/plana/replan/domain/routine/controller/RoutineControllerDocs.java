@@ -167,9 +167,11 @@ public interface RoutineControllerDocs {
             2. **아직 해야 할 일 1건** — 완료되지 않은 Todo 중 가장 최근 것(과거에 놓친 회차 포함)이 있으면 그 상태를,
                없으면 다음 발생일의 override가 있으면 그 값으로, override도 없으면 루틴 기본값으로 구성
           - `filter=day` / `week` / `month`: 해당 기간의 루틴 목록을 날짜별로 묶어 반환합니다. `date` 필수.
-            - `DAILY` 루틴: 기간 내 모든 날짜에 포함
-            - `WEEKLY` 루틴: 해당 날짜의 요일 인덱스가 `routineDays` 배열에 포함된 날짜에만 포함
-            - `MONTHLY` 루틴: 해당 날짜의 일(day)이 `routineDays` 배열에 포함된 날짜에만 포함
+            - `DAILY` 루틴: 기간 내 모든 날짜가 대상
+            - `WEEKLY` 루틴: 해당 날짜의 요일 인덱스가 `routineDays` 배열에 포함된 날짜만 대상
+            - `MONTHLY` 루틴: 해당 날짜의 일(day)이 `routineDays` 배열에 포함된 날짜만 대상
+            - 대상 날짜 중 **완료한 회차는 전부**, **아직 완료하지 않은 회차는 루틴마다 가장 이른 1건만** 반환합니다
+              (`filter=all`의 "아직 해야 할 일 1건" 규칙과 동일). 그 회차를 완료 처리하면 다음 회차가 목록에 나타납니다.
 
           각 루틴에 해당 날짜(또는 `all`의 "아직 해야 할 일" 항목)의 Todo가 이미 생성되어 있으면 `todoId`가
           포함되고, 아직 없으면 `null`입니다. `filter=all`의 "아직 해야 할 일" 항목에서 Todo도 override도
@@ -206,6 +208,7 @@ public interface RoutineControllerDocs {
           `filter=day/week/month`는 날짜(yyyy-MM-dd)를 키로 하는 객체를, `filter=all`은 `"all"` 하나를
           키로 하는 객체를 반환합니다. 값은 각각 해당 범위의 루틴 배열이며, `filter=all`의 경우 루틴 하나당
           완료 이력 개수(완료 Todo + Todo 없이 override로만 완료 처리된 날짜) + 1(아직 해야 할 일)건이 들어갑니다.
+          `filter=week/month`에서 미완료 회차가 가장 이른 1건만 남으므로, 남은 회차가 없는 날짜의 값은 빈 배열입니다.
 
           | 필드명 | 타입 | 설명 |
           |--------|------|------|
@@ -237,6 +240,7 @@ public interface RoutineControllerDocs {
                 examples = {
                   @ExampleObject(
                       name = "filter=day/week/month",
+                      summary = "매일 루틴 1은 20일 회차 완료 → 다음 미완료 회차(21일) 1건만 함께 노출",
                       value =
                           """
                           {
@@ -259,7 +263,7 @@ public interface RoutineControllerDocs {
                                   "todoId": 42,
                                   "sortOrder": 10000.0,
                                   "isPinned": false,
-                                  "isCompleted": false,
+                                  "isCompleted": true,
                                   "isOverdue": false,
                                   "hasOverride": false
                                 }
