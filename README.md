@@ -82,7 +82,7 @@ JWT 인증 필터 · 전역 예외 핸들러(@RestControllerAdvice) · Redis · 
 
 | 영역 | 구성 |
 |------|------|
-| **네트워크** | VPC를 Public/Private 서브넷으로 분리. 앱 EC2는 Private에 두고, NAT Instance로 아웃바운드만 허용 · Route53으로 도메인 연결 |
+| **네트워크** | VPC를 Public/Private 서브넷으로 분리. Route53으로 도메인 연결 |
 | **런타임** | EC2 한 대에서 Docker로 **Nginx(리버스 프록시 · Let's Encrypt SSL) + Spring Boot App + Redis**를 함께 운영 |
 | **데이터** | **RDS(PostgreSQL)** 메인 DB, **S3 + CloudFront**로 프로필 이미지 저장·배포 |
 | **보안** | 시크릿 18종(DB 비밀번호·JWT·소셜 로그인 키·Firebase 키 등)을 **SSM Parameter Store**에서 주입, 민감 값은 SecureString 암호화 |
