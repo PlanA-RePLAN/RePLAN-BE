@@ -77,7 +77,7 @@ JWT 인증 필터 · 전역 예외 핸들러(@RestControllerAdvice) · Redis · 
 
 ## ☁️ 인프라 & 배포 (AWS `ap-northeast-2`)
 
-<img width="4452" height="2940" alt="시스템 아키텍처" src="https://github.com/user-attachments/assets/27c502dc-23af-4332-bbdf-e951776cb516" />
+<img width="3840" height="2160" alt="replan-architecture" src="https://github.com/user-attachments/assets/8737a5b5-d1a1-48d5-8f73-8dc802d929b4" />
 
 
 | 영역 | 구성 |
